@@ -61,7 +61,7 @@ pub struct DownloadInfo {
     pub files: Option<Vec<PathBuf>>,
 }
 
-pub fn load_instances(path: PathBuf) -> Option<Vec<Instance>> {
+fn load_instances(path: PathBuf) -> Option<Vec<Instance>> {
     let mut instances: Option<Vec<Instance>> = None;
 
     let instance_directories = read_dir(path).ok()?;
@@ -129,7 +129,7 @@ pub fn load_profile<P: AsRef<Path>>(name: String, custom_path: Option<P>) -> Opt
         let profile_str = profile_dir.find_map(|e| {
             let entry = e.ok()?;
 
-            if !entry.path().is_file() {
+            if entry.path().is_dir() {
                 return None;
             }
 
@@ -154,6 +154,25 @@ pub fn load_profile<P: AsRef<Path>>(name: String, custom_path: Option<P>) -> Opt
     })?;
 
     Some(profile)
+}
+
+pub fn save_profile<P: AsRef<Path>>(profile: Profile, custom_path: Option<P>) -> Result<(), InitProfileError> {
+    let default_profile_path = match custom_path {
+        Some(p) => p.as_ref().to_path_buf(),
+        None => PathBuf::from(local_app_data()).join(APP_NAME),
+    };
+
+    create_dir_all(default_profile_path.join(&profile.name))?;
+    let profile_json = serde_json::to_string_pretty(&profile)?;
+
+    write(
+        default_profile_path
+            .join(&profile.name)
+            .join("profile.json"),
+        profile_json,
+    )?;
+
+    Ok(())
 }
 
 pub fn init_profile<P: AsRef<Path>>(name: String, game_path: P, init_path: Option<P>) -> Result<(), InitProfileError> {
