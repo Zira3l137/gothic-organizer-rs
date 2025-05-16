@@ -7,3 +7,18 @@ edition = "2024"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
 thiserror = "2.0.12"
+iced = { version = "0.13.1", features = ['image'] }
+rfd = "0.15.3"
+hashbrown = "0.15.3"
+chrono = "0.4.41"
+
+#####################
+### OPTIMIZATION ####
+#####################
+
+# [profile.release]
+# strip = "debuginfo"
+# lto = "fat"
+# opt-level = "s"
+# debug-assertions = false
+# debug = false
