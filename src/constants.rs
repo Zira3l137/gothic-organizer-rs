@@ -3,8 +3,8 @@ pub const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const APP_TITLE: &str = "Gothic Organizer";
 
 pub const GOTHIC: &str = "Gothic";
-pub const GOTHIC_2: &str = "Gothic 2: Night of Raven";
-pub const GOTHIC_2_CLASSIC: &str = "Gothic 2: Classic";
-pub const GOTHIC_SEQUEL: &str = "Gothic: The Sequel";
+pub const GOTHIC_2: &str = "Gothic 2 Night of Raven";
+pub const GOTHIC_2_CLASSIC: &str = "Gothic 2 Classic";
+pub const GOTHIC_SEQUEL: &str = "Gothic The Sequel";
 
 pub const GAME_PROFILES: [&str; 4] = [GOTHIC, GOTHIC_2, GOTHIC_2_CLASSIC, GOTHIC_SEQUEL];

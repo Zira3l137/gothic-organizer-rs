@@ -39,17 +39,20 @@ use chrono::Local;
 use crate::constants::APP_TITLE;
 use crate::constants::APP_VERSION;
 use crate::constants::GAME_PROFILES;
+use crate::profile::init_profile;
+use crate::profile::load_profile;
+use crate::profile::save_profile;
 use crate::profile::Instance;
 use crate::profile::Profile;
 
 #[derive(Debug, Default)]
 pub struct StartupWindow {
-    allowed_games: combo_box::State<String>,
-    available_instances: combo_box::State<String>,
-    game_selected: Option<String>,
-    instance_selected: Option<String>,
-    instance_input: Option<String>,
-    profiles: Vec<Profile>,
+    pub allowed_games: combo_box::State<String>,
+    pub available_instances: combo_box::State<String>,
+    pub game_selected: Option<String>,
+    pub instance_selected: Option<String>,
+    pub instance_input: Option<String>,
+    pub profiles: Vec<Profile>,
 }
 
 impl StartupWindow {
@@ -57,35 +60,53 @@ impl StartupWindow {
     pub const WINDOW_SIZE: (f32, f32) = (400.0, 260.0);
 
     pub fn new() -> (Self, Task<Message>) {
-        (
-            Self {
-                allowed_games: combo_box::State::new(
-                    GAME_PROFILES
-                        .iter()
-                        .map(|s| String::from(*s))
-                        .collect::<Vec<String>>(),
-                ),
-                available_instances: combo_box::State::new(Vec::new()),
-                game_selected: None,
-                instance_selected: None,
-                instance_input: None,
-                profiles: Vec::new(),
-            },
-            Task::none(),
-        )
+        let mut app = Self {
+            allowed_games: combo_box::State::new(
+                GAME_PROFILES
+                    .iter()
+                    .map(|s| String::from(*s))
+                    .collect::<Vec<String>>(),
+            ),
+            available_instances: combo_box::State::new(Vec::new()),
+            game_selected: None,
+            instance_selected: None,
+            instance_input: None,
+            profiles: Vec::new(),
+        };
+        let profiles: Vec<Profile> = GAME_PROFILES
+            .iter()
+            .filter_map(|profile_name| load_profile::<String>(profile_name, None))
+            .collect();
+        app.profiles = profiles;
+        (app, Task::none())
     }
 
     pub fn update(&mut self, message: Message) -> Task<Message> {
         match &message {
             Message::GameSelected(game) => {
                 self.game_selected = Some(game.clone());
+                if !self.profiles.is_empty() {
+                    if let Some(p) = self.profiles.iter().find(|p| p.name == *game) {
+                        self.available_instances = combo_box::State::new(
+                            p.instances
+                                .as_ref()
+                                .unwrap_or(&Vec::new())
+                                .iter()
+                                .map(|i| i.name.clone())
+                                .collect::<Vec<String>>(),
+                        )
+                    }
+                }
             }
+
             Message::InstanceSelected(instance) => {
                 self.instance_selected = Some(instance.clone());
             }
+
             Message::InstanceInput(input) => {
                 self.instance_input = Some(input.clone());
             }
+
             Message::BrowseGameDir(game) => {
                 if let Some(path) = FileDialog::new()
                     .set_title(format!("Select {} directory", game))
@@ -93,11 +114,16 @@ impl StartupWindow {
                 {
                     self.profiles.push(Profile {
                         name: game.clone(),
-                        game_path: path,
+                        game_path: path.clone(),
                         instances: None,
                     });
+                    match init_profile(game, &path, None) {
+                        Ok(_) => {}
+                        Err(e) => println!("Error: {}", e),
+                    };
                 }
             }
+
             Message::InstanceAddForGame(profile) => {
                 if let Some(p) = self.profiles.iter_mut().find(|p| p.name == *profile) {
                     match p.instances.as_mut() {
@@ -131,6 +157,7 @@ impl StartupWindow {
                     )
                 }
             }
+
             Message::InstanceRemoveForGame(profile) => {
                 if let Some(p) = self.profiles.iter_mut().find(|p| p.name == *profile) {
                     match p.instances.as_mut() {
@@ -159,8 +186,16 @@ impl StartupWindow {
                     self.instance_input = None;
                 }
             }
+
             Message::StartApp(_profile, _instance) => (),
+
             Message::Exit => {
+                self.profiles
+                    .iter()
+                    .for_each(|p| match save_profile::<String>(p.clone(), None) {
+                        Ok(_) => {}
+                        Err(e) => println!("Error: {}", e),
+                    });
                 return window::get_latest().and_then(window::close);
             }
         }
@@ -200,7 +235,7 @@ impl StartupWindow {
             row!(
                 combo_box(
                     &self.allowed_games,
-                    "select a game",
+                    "Select a game",
                     self.game_selected.as_ref(),
                     Message::GameSelected,
                 ),
@@ -214,7 +249,7 @@ impl StartupWindow {
             row!(
                 combo_box(
                     &self.available_instances,
-                    "select an instance",
+                    "Select an instance",
                     self.instance_selected.as_ref(),
                     Message::InstanceSelected,
                 )

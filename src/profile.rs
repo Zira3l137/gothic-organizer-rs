@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 use std::env::var;
+use std::fs::create_dir;
 use std::fs::create_dir_all;
 use std::fs::read_dir;
 use std::fs::read_to_string;
@@ -63,29 +64,17 @@ pub struct DownloadInfo {
 
 fn load_instances(path: PathBuf) -> Option<Vec<Instance>> {
     let mut instances: Option<Vec<Instance>> = None;
-
     let instance_directories = read_dir(path).ok()?;
 
     for instance_directory in instance_directories {
-        let Some(instance_directory_entry) = instance_directory.ok() else {
-            continue;
-        };
-
-        let Some(mut sub_entries) = read_dir(instance_directory_entry.path()).ok() else {
-            continue;
-        };
+        let instance_directory_entry = instance_directory.ok()?;
+        let mut sub_entries = read_dir(instance_directory_entry.path()).ok()?;
 
         let instance = sub_entries.find_map(|sub_entry| {
             sub_entry.ok().and_then(|sub_entry| {
                 if !sub_entry.path().is_dir() && sub_entry.file_name().to_string_lossy().ends_with(".json") {
-                    let Ok(instance_json) = read_to_string(sub_entry.path()) else {
-                        return None;
-                    };
-
-                    let Ok(instance) = serde_json::from_str(&instance_json) else {
-                        return None;
-                    };
-
+                    let instance_json = read_to_string(sub_entry.path()).ok()?;
+                    let instance = serde_json::from_str(&instance_json).ok()?;
                     Some(instance)
                 } else {
                     None
@@ -105,7 +94,20 @@ fn load_instances(path: PathBuf) -> Option<Vec<Instance>> {
     instances
 }
 
-pub fn load_profile<P: AsRef<Path>>(name: String, custom_path: Option<P>) -> Option<Profile> {
+fn save_instances(instances: Vec<Instance>, path: PathBuf) -> Result<(), InitProfileError> {
+    for instance in instances {
+        let instance_json = serde_json::to_string(&instance)?;
+        create_dir(path.join(&instance.name))?;
+        write(
+            path.join(instance.name).join("instance.json"),
+            instance_json,
+        )?;
+    }
+
+    Ok(())
+}
+
+pub fn load_profile<P: AsRef<Path>>(name: &str, custom_path: Option<P>) -> Option<Profile> {
     let default_profile_path = match custom_path {
         Some(p) => p.as_ref().to_path_buf(),
         None => PathBuf::from(local_app_data()).join(APP_NAME),
@@ -137,9 +139,7 @@ pub fn load_profile<P: AsRef<Path>>(name: String, custom_path: Option<P>) -> Opt
                 return None;
             }
 
-            let Ok(profile_str) = read_to_string(entry.path()) else {
-                return None;
-            };
+            let profile_str = read_to_string(entry.path()).ok()?;
 
             Some(profile_str)
         })?;
@@ -162,7 +162,7 @@ pub fn save_profile<P: AsRef<Path>>(profile: Profile, custom_path: Option<P>) ->
         None => PathBuf::from(local_app_data()).join(APP_NAME),
     };
 
-    create_dir_all(default_profile_path.join(&profile.name))?;
+    create_dir_all(default_profile_path.join(&profile.name).join("instances"))?;
     let profile_json = serde_json::to_string_pretty(&profile)?;
 
     write(
@@ -172,27 +172,45 @@ pub fn save_profile<P: AsRef<Path>>(profile: Profile, custom_path: Option<P>) ->
         profile_json,
     )?;
 
+    if let Some(instances) = &profile.instances {
+        save_instances(
+            instances.clone(),
+            default_profile_path.join(&profile.name).join("instances"),
+        )?;
+    }
+
     Ok(())
 }
 
-pub fn init_profile<P: AsRef<Path>>(name: String, game_path: P, init_path: Option<P>) -> Result<(), InitProfileError> {
+pub fn init_profile<P: AsRef<Path>>(name: &str, game_path: P, init_path: Option<P>) -> Result<(), InitProfileError> {
     let default_profile_path = match init_path {
         Some(p) => p.as_ref().to_path_buf(),
         None => PathBuf::from(local_app_data()).join(APP_NAME),
     };
 
-    create_dir_all(default_profile_path.join(&name))?;
+    println!(
+        "Creating directory: {}",
+        default_profile_path.join(name).display()
+    );
+    create_dir_all(default_profile_path.join(name))?;
 
     let profile = Profile {
-        name: name.clone(),
+        name: name.to_owned(),
         game_path: game_path.as_ref().to_path_buf(),
         instances: None,
     };
 
     let profile_json = serde_json::to_string_pretty(&profile)?;
 
+    println!(
+        "Creating file: {}",
+        default_profile_path
+            .join(name)
+            .join("profile.json")
+            .display()
+    );
     write(
-        default_profile_path.join(&name).join("profile.json"),
+        default_profile_path.join(name).join("profile.json"),
         profile_json,
     )?;
 
