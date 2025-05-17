@@ -76,38 +76,15 @@ impl StartupWindow {
     }
 
     pub fn update(&mut self, message: Message) -> Task<Message> {
-        if cfg!(debug_assertions) {
-            println!();
-            println!("Message: {:?}", message);
-            println!("Profiles: {:?}", self.profiles);
-            println!(
-                "Selected game: {}",
-                self.game_selected.as_ref().unwrap_or(&String::default())
-            );
-            println!(
-                "Selected instance: {}",
-                self.instance_selected
-                    .as_ref()
-                    .unwrap_or(&String::default())
-            );
-            println!(
-                "Instance input: {}",
-                self.instance_input.as_ref().unwrap_or(&String::default())
-            );
-        }
-
         match &message {
             Message::GameSelected(game) => {
                 self.game_selected = Some(game.clone());
-                Task::none()
             }
             Message::InstanceSelected(instance) => {
                 self.instance_selected = Some(instance.clone());
-                Task::none()
             }
             Message::InstanceInput(input) => {
                 self.instance_input = Some(input.clone());
-                Task::none()
             }
             Message::BrowseGameDir(game) => {
                 if let Some(path) = FileDialog::new()
@@ -120,7 +97,6 @@ impl StartupWindow {
                         instances: None,
                     });
                 }
-                Task::none()
             }
             Message::InstanceAddForGame(profile) => {
                 if let Some(p) = self.profiles.iter_mut().find(|p| p.name == *profile) {
@@ -154,7 +130,6 @@ impl StartupWindow {
                             .collect::<Vec<String>>(),
                     )
                 }
-                Task::none()
             }
             Message::InstanceRemoveForGame(profile) => {
                 if let Some(p) = self.profiles.iter_mut().find(|p| p.name == *profile) {
@@ -183,11 +158,33 @@ impl StartupWindow {
                     self.instance_selected = None;
                     self.instance_input = None;
                 }
-                Task::none()
             }
-            Message::StartApp(_profile, _instance) => Task::none(),
-            Message::Exit => window::get_latest().and_then(window::close),
+            Message::StartApp(_profile, _instance) => (),
+            Message::Exit => {
+                return window::get_latest().and_then(window::close);
+            }
         }
+
+        if cfg!(debug_assertions) {
+            println!();
+            println!("Message: {:?}", message);
+            println!("Profiles: {:?}", self.profiles);
+            println!(
+                "Selected game: {}",
+                self.game_selected.as_ref().unwrap_or(&String::default())
+            );
+            println!(
+                "Selected instance: {}",
+                self.instance_selected
+                    .as_ref()
+                    .unwrap_or(&String::default())
+            );
+            println!(
+                "Instance input: {}",
+                self.instance_input.as_ref().unwrap_or(&String::default())
+            );
+        }
+        Task::none()
     }
 
     pub fn view(&self) -> Element<Message> {
