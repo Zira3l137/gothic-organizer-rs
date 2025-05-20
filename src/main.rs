@@ -1,32 +1,45 @@
+mod application;
 mod constants;
 mod error;
 mod profile;
 mod startup_window;
 
-use iced::application;
-use iced::window::icon;
-use iced::window::Position;
-use iced::window::Settings;
-use iced::Size;
-
-use crate::startup_window::StartupWindow;
+use crate::startup_window::prelude::*;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(debug_assertions)]
     println!("Hello, Auronen!");
 
-    application(
-        StartupWindow::WINDOW_TITLE,
-        StartupWindow::update,
-        StartupWindow::view,
-    )
-    .window(Settings {
-        icon: icon::from_file("./resources/icon.ico").ok(),
-        position: Position::Centered,
-        resizable: false,
-        ..Default::default()
-    })
-    .window_size(Size::from(StartupWindow::WINDOW_SIZE))
-    .run_with(StartupWindow::new)?;
+    let previous_session = load_session!();
+    let session = match previous_session {
+        Some(s) => s,
+
+        None => {
+            let mut startup_window = StartupWindow::new();
+            startup_window.run()?;
+
+            if startup_window.canceled {
+                return Ok(());
+            }
+
+            let Some(selected_profile) = &startup_window.selected_profile else {
+                return Ok(());
+            };
+
+            let Some(selected_instance) = &startup_window.selected_instance else {
+                return Ok(());
+            };
+
+            save_session!(
+                Some(selected_profile.clone()),
+                Some(selected_instance.clone())
+            )?;
+
+            load_session!().unwrap()
+        }
+    };
+
+    println!("\nSession: {:?}", session);
+
     Ok(())
 }

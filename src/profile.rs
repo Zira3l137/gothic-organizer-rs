@@ -14,7 +14,7 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use crate::constants::APP_NAME;
-use crate::error::InitProfileError;
+use crate::error::*;
 
 pub fn local_app_data() -> String {
     #[cfg(windows)]
@@ -28,10 +28,33 @@ pub fn local_app_data() -> String {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Session {
+    pub selected_profile_name: Option<String>,
+    pub selected_instance_name: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Profile {
     pub name: String,
     pub game_path: PathBuf,
     pub instances: Option<Vec<Instance>>,
+}
+
+impl Profile {
+    pub fn new(name: String, game_path: PathBuf) -> Profile {
+        Profile {
+            name,
+            game_path,
+            instances: None,
+        }
+    }
+
+    pub fn add_instance(&mut self, instance: Instance) {
+        match &mut self.instances {
+            Some(instances) => instances.push(instance),
+            None => self.instances = Some(vec![instance]),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -39,6 +62,16 @@ pub struct Instance {
     pub name: String,
     pub mods: Option<Vec<ModInfo>>,
     pub downloads: Option<Vec<DownloadInfo>>,
+}
+
+impl Instance {
+    pub fn new(name: String) -> Instance {
+        Instance {
+            name,
+            mods: None,
+            downloads: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -94,14 +127,20 @@ fn load_instances(path: PathBuf) -> Option<Vec<Instance>> {
     instances
 }
 
-fn save_instances(instances: Vec<Instance>, path: PathBuf) -> Result<(), InitProfileError> {
+fn save_instances(instances: Vec<Instance>, path: PathBuf) -> Result<(), ProfileError> {
     for instance in instances {
-        let instance_json = serde_json::to_string(&instance)?;
-        create_dir(path.join(&instance.name))?;
+        let instance_json =
+            serde_json::to_string_pretty(&instance).map_err(|e| ProfileError::FailedToLoadInstances(format!("Kind: Json, Description: {}", e)))?;
+
+        if !path.join(&instance.name).exists() {
+            create_dir(path.join(&instance.name))?;
+        }
+
         write(
             path.join(instance.name).join("instance.json"),
             instance_json,
-        )?;
+        )
+        .map_err(|e| ProfileError::FailedToLoadInstances(format!("Kind: {}, Description: {}", e.kind(), e)))?;
     }
 
     Ok(())
@@ -156,14 +195,17 @@ pub fn load_profile<P: AsRef<Path>>(name: &str, custom_path: Option<P>) -> Optio
     Some(profile)
 }
 
-pub fn save_profile<P: AsRef<Path>>(profile: Profile, custom_path: Option<P>) -> Result<(), InitProfileError> {
+pub fn save_profile<P: AsRef<Path>>(profile: Profile, custom_path: Option<P>) -> Result<(), ProfileError> {
     let default_profile_path = match custom_path {
         Some(p) => p.as_ref().to_path_buf(),
         None => PathBuf::from(local_app_data()).join(APP_NAME),
     };
 
-    create_dir_all(default_profile_path.join(&profile.name).join("instances"))?;
-    let profile_json = serde_json::to_string_pretty(&profile)?;
+    create_dir_all(default_profile_path.join(&profile.name).join("instances"))
+        .map_err(|e| ProfileError::FailedToSaveProfile(format!("Kind: {}, Description: {}", e.kind(), e)))?;
+
+    let profile_json =
+        serde_json::to_string_pretty(&profile).map_err(|e| ProfileError::FailedToSaveProfile(format!("Kind: Json, Description: {}", e)))?;
 
     write(
         default_profile_path
@@ -182,17 +224,14 @@ pub fn save_profile<P: AsRef<Path>>(profile: Profile, custom_path: Option<P>) ->
     Ok(())
 }
 
-pub fn init_profile<P: AsRef<Path>>(name: &str, game_path: P, init_path: Option<P>) -> Result<(), InitProfileError> {
+pub fn init_profile<P: AsRef<Path>>(name: &str, game_path: P, init_path: Option<P>) -> Result<(), ProfileError> {
     let default_profile_path = match init_path {
         Some(p) => p.as_ref().to_path_buf(),
         None => PathBuf::from(local_app_data()).join(APP_NAME),
     };
 
-    println!(
-        "Creating directory: {}",
-        default_profile_path.join(name).display()
-    );
-    create_dir_all(default_profile_path.join(name))?;
+    create_dir_all(default_profile_path.join(name))
+        .map_err(|e| ProfileError::FailedToInitProfile(format!("Kind: {}, Description: {}", e.kind(), e)))?;
 
     let profile = Profile {
         name: name.to_owned(),
@@ -200,19 +239,94 @@ pub fn init_profile<P: AsRef<Path>>(name: &str, game_path: P, init_path: Option<
         instances: None,
     };
 
-    let profile_json = serde_json::to_string_pretty(&profile)?;
+    let profile_json =
+        serde_json::to_string_pretty(&profile).map_err(|e| ProfileError::FailedToInitProfile(format!("Kind: Json, Description: {}", e)))?;
 
-    println!(
-        "Creating file: {}",
-        default_profile_path
-            .join(name)
-            .join("profile.json")
-            .display()
-    );
     write(
         default_profile_path.join(name).join("profile.json"),
         profile_json,
     )?;
 
     Ok(())
+}
+
+pub fn save_session<P: AsRef<Path>>(
+    selected_profile_name: Option<String>,
+    selected_instance_name: Option<String>,
+    custom_path: Option<P>,
+) -> Result<(), SessionError> {
+    let session = Session {
+        selected_profile_name,
+        selected_instance_name,
+    };
+
+    let default_path = match custom_path {
+        Some(p) => p.as_ref().to_path_buf(),
+        None => PathBuf::from(local_app_data()).join(APP_NAME),
+    };
+
+    let session_json = serde_json::to_string_pretty(&session)?;
+    write(default_path.join("session.json"), session_json)?;
+
+    Ok(())
+}
+
+pub fn load_session<P: AsRef<Path>>(custom_path: Option<P>) -> Option<Session> {
+    let default_path = match custom_path {
+        Some(p) => p.as_ref().to_path_buf(),
+        None => PathBuf::from(local_app_data()).join(APP_NAME),
+    };
+
+    if !default_path.exists() {
+        return None;
+    }
+
+    let session_json = read_to_string(default_path.join("session.json")).ok()?;
+
+    let Ok(session): Result<Session, _> = serde_json::from_str(&session_json) else {
+        return None;
+    };
+
+    Some(session)
+}
+
+#[macro_export]
+macro_rules! save_session {
+    ($selected_profile_name: expr, $selected_instance_name: expr, $custom_path: expr) => {
+        $crate::profile::save_session($selected_profile_name, $selected_instance_name, expr)
+    };
+    ($selected_profile_name: expr, $selected_instance_name: expr) => {
+        $crate::profile::save_session::<String>($selected_profile_name, $selected_instance_name, None)
+    };
+}
+
+#[macro_export]
+macro_rules! load_session {
+    () => {
+        $crate::profile::load_session::<String>(None)
+    };
+
+    ($custom_path: expr) => {
+        $crate::profile::load_session($custom_path)
+    };
+}
+
+#[macro_export]
+macro_rules! save_profile {
+    ($profile: expr) => {
+        $crate::profile::save_profile::<String>($profile, None)
+    };
+    ($profile: expr, $custom_path: expr) => {
+        $crate::profile::save_profile($profile, $custom_path)
+    };
+}
+
+#[macro_export]
+macro_rules! load_profile {
+    ($name: expr) => {
+        $crate::profile::load_profile::<String>($name, None)
+    };
+    ($name: expr, $custom_path: expr) => {
+        $crate::profile::load_profile($name, $custom_path)
+    };
 }
