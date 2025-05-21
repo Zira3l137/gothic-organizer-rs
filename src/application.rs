@@ -5,11 +5,11 @@ use fltk::image::IcoImage;
 use fltk::prelude::*;
 use fltk::window::Window;
 
+use fltk_theme::ColorTheme;
 use fltk_theme::WidgetScheme;
-use fltk_theme::WidgetTheme;
 
+use crate::constants::ColorScheme;
 use crate::constants::Style;
-use crate::constants::Theme;
 use crate::error::GuiError;
 
 pub trait GothicOrganizerWindow {
@@ -38,8 +38,8 @@ pub trait GothicOrganizerWindow {
 
     fn app(settings: &ApplicationSettings) -> App {
         let app = App::default();
-        WidgetTheme::new(settings.theme.into()).apply();
         WidgetScheme::new(settings.style.into()).apply();
+        ColorTheme::new(settings.colors.into()).apply();
         app
     }
 
@@ -55,6 +55,6 @@ pub struct ApplicationSettings {
     pub centered: bool,
     pub resolution: (i32, i32),
     pub resizable: bool,
-    pub theme: Theme,
     pub style: Style,
+    pub colors: ColorScheme,
 }

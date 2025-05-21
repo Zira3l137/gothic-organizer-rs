@@ -55,6 +55,12 @@ impl Profile {
             None => self.instances = Some(vec![instance]),
         }
     }
+
+    pub fn remove_instance(&mut self, name: String) {
+        if let Some(instances) = &mut self.instances {
+            instances.retain(|i| i.name != name);
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -328,5 +334,22 @@ macro_rules! load_profile {
     };
     ($name: expr, $custom_path: expr) => {
         $crate::profile::load_profile($name, $custom_path)
+    };
+}
+
+#[macro_export]
+macro_rules! local_profiles {
+    () => {
+        std::path::PathBuf::from($crate::profile::local_app_data()).join($crate::constants::APP_NAME)
+    };
+}
+
+#[macro_export]
+macro_rules! local_instances {
+    ($profile_name: expr) => {
+        std::path::PathBuf::from($crate::profile::local_app_data())
+            .join($crate::constants::APP_NAME)
+            .join($profile_name)
+            .join("instances")
     };
 }

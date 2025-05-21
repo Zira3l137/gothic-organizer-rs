@@ -31,6 +31,8 @@ pub enum SessionError {
 
 #[derive(Error, Debug)]
 pub enum GuiError {
+    #[error("IO Error: {0}")]
+    IO(#[from] std::io::Error),
     #[error("Fltk Error: {0}")]
     Fltk(#[from] FltkError),
     #[error("Profile Error: {0}")]

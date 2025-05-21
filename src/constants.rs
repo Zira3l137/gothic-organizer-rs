@@ -1,3 +1,5 @@
+use fltk_theme::color_themes::fleet::*;
+use fltk_theme::ColorMap;
 use fltk_theme::SchemeType;
 use fltk_theme::ThemeType;
 
@@ -31,42 +33,6 @@ pub fn game_profile_list() -> [String; 4] {
         GameProfile::Gothic2Classic.to_string(),
         GameProfile::GothicSequel.to_string(),
     ]
-}
-
-#[derive(Debug, Default, Clone, Copy)]
-pub enum Theme {
-    /// Windows classic
-    Classic,
-    /// Windows 7
-    Aero,
-    /// Windows 8
-    Metro,
-    /// Classic MacOS
-    AquaClassic,
-    /// Xfce
-    Greybird,
-    /// Windows 2000
-    Blue,
-    /// Dark
-    #[default]
-    Dark,
-    /// High Contrast
-    HighContrast,
-}
-
-impl From<Theme> for ThemeType {
-    fn from(theme: Theme) -> Self {
-        match theme {
-            Theme::Classic => ThemeType::Classic,
-            Theme::Aero => ThemeType::Aero,
-            Theme::Metro => ThemeType::Metro,
-            Theme::AquaClassic => ThemeType::AquaClassic,
-            Theme::Greybird => ThemeType::Greybird,
-            Theme::Blue => ThemeType::Blue,
-            Theme::Dark => ThemeType::Dark,
-            Theme::HighContrast => ThemeType::HighContrast,
-        }
-    }
 }
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -112,6 +78,68 @@ impl From<Style> for SchemeType {
             Style::Sweet => SchemeType::Sweet,
             Style::Fleet1 => SchemeType::Fleet1,
             Style::Fleet2 => SchemeType::Fleet2,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ColorScheme {
+    GruvboxDark,
+    Monokai,
+    SolarizedLight,
+    Light,
+    #[default]
+    Dark1,
+    Dark2,
+    Tan,
+    DarkTan,
+    Nord,
+    Marine,
+    Blueish,
+    HighContrast,
+    Forest,
+    PurpleDusk,
+    SolarizedDark,
+    GruvboxLight,
+    Dracula,
+    OceanicNext,
+    Minimalist,
+    Autumn,
+    Cyberpunk,
+    MaterialDark,
+    Mint,
+    Vintage,
+    Gray,
+}
+
+impl From<ColorScheme> for &[ColorMap] {
+    fn from(theme: ColorScheme) -> Self {
+        match theme {
+            ColorScheme::GruvboxDark => &GRUVBOX_DARK,
+            ColorScheme::Monokai => &MONOKAI,
+            ColorScheme::SolarizedLight => &SOLARIZED_LIGHT,
+            ColorScheme::Light => &LIGHT,
+            ColorScheme::Dark1 => &DARK1,
+            ColorScheme::Dark2 => &DARK2,
+            ColorScheme::Tan => &TAN,
+            ColorScheme::DarkTan => &DARK_TAN,
+            ColorScheme::Nord => &NORD,
+            ColorScheme::Marine => &MARINE,
+            ColorScheme::Blueish => &BLUEISH,
+            ColorScheme::HighContrast => &HIGH_CONTRAST,
+            ColorScheme::Forest => &FOREST,
+            ColorScheme::PurpleDusk => &PURPLE_DUSK,
+            ColorScheme::SolarizedDark => &SOLARIZED_DARK,
+            ColorScheme::GruvboxLight => &GRUVBOX_LIGHT,
+            ColorScheme::Dracula => &DRACULA,
+            ColorScheme::OceanicNext => &OCEANIC_NEXT,
+            ColorScheme::Minimalist => &MINIMALIST,
+            ColorScheme::Autumn => &AUTUMN,
+            ColorScheme::Cyberpunk => &CYBERPUNK,
+            ColorScheme::MaterialDark => &MATERIAL_DARK,
+            ColorScheme::Mint => &MINT,
+            ColorScheme::Vintage => &VINTAGE,
+            ColorScheme::Gray => &GRAY,
         }
     }
 }

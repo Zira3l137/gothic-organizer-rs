@@ -1,26 +1,6 @@
-/* TODO: Create a startup window for the app.
-*
-* Startup window should contain:
-* - Logo
-* - App name
-* - Combo box for allowed game profiles (Gothic, Gothic II NOTR, Gothic II Classic?, Gothic
-* Sequel?)
-* - Selectable list box with available instances for the game profile
-* - Button to browse for select game directory
-* - Button to add an instance for the game profile into the list
-* - Button to remove an instance from the list
-* - Button to start the app
-*
-*     After user runs the main app, startup window should appear. User then will have to select a
-* desired game profile and provide a path to the game directory. Then, he should either create a
-* new instance of the game with an arbitrary name or select an existing one from the list. After
-* that, he should be able to start the main app.
-*
-*     Upon startup window creation, the list of instances should be loaded from the config file if
-* it exists, otherwise a new one should be initiliazed.
-*/
+use std::fs::read_dir;
+use std::fs::remove_dir_all;
 
-#[allow(dead_code)]
 use fltk::app::App;
 use fltk::browser::HoldBrowser;
 use fltk::button::Button;
@@ -38,10 +18,11 @@ use rfd::FileDialog;
 use crate::application::ApplicationSettings;
 use crate::application::GothicOrganizerWindow;
 use crate::constants::game_profile_list;
+use crate::constants::ColorScheme;
 use crate::constants::Style;
-use crate::constants::Theme;
 use crate::error::GuiError;
 use crate::load_profile;
+use crate::local_instances;
 use crate::profile::init_profile;
 use crate::profile::Instance;
 use crate::profile::Profile;
@@ -177,6 +158,10 @@ impl GothicOrganizerWindow for StartupWindow {
                                 load_profile!(&self.selected_profile.clone().unwrap())
                             }
                         };
+                        instance_entry.activate();
+                        add_instance_button.activate();
+                        remove_instance_button.activate();
+                        instance_selector.activate();
                     }
                     Message::SelectProfile => {
                         let profile = self
@@ -186,10 +171,6 @@ impl GothicOrganizerWindow for StartupWindow {
 
                         self.selected_profile = profile;
                         browse_button.activate();
-                        instance_entry.activate();
-                        add_instance_button.activate();
-                        remove_instance_button.activate();
-                        instance_selector.activate();
                     }
                     Message::SelectInstance => {
                         if let Some(available) = &self.instance_choices {
@@ -229,12 +210,13 @@ impl GothicOrganizerWindow for StartupWindow {
                         save_profile!(self.current_profile.clone().unwrap())?;
                     }
                     Message::RemoveInstance => {
-                        if let Some(available) = &mut self.instance_choices {
-                            if available.is_empty() {
-                                continue;
-                            }
+                        let Some(selected_instance_name) = self.selected_instance.clone() else {
+                            continue;
+                        };
 
+                        if let Some(available) = &mut self.instance_choices {
                             let value_index = instance_selector.value();
+
                             if value_index != 0 && value_index - 1 < available.len() as i32 && !available.is_empty() {
                                 available.remove((value_index as usize).saturating_sub(1));
                                 instance_selector.remove(value_index);
@@ -242,8 +224,24 @@ impl GothicOrganizerWindow for StartupWindow {
 
                             if available.is_empty() {
                                 start_button.deactivate();
+                                self.instance_choices = None;
                             }
                         }
+
+                        self.current_profile
+                            .as_mut()
+                            .unwrap()
+                            .remove_instance(selected_instance_name.clone());
+
+                        read_dir(local_instances!(self.selected_profile.clone().unwrap()))?.find_map(|d| {
+                            d.ok().and_then(|e| {
+                                if e.file_name().to_string_lossy().to_lowercase() == selected_instance_name.to_lowercase() {
+                                    remove_dir_all(e.path()).ok()
+                                } else {
+                                    None
+                                }
+                            })
+                        });
                     }
                     Message::Start => {
                         self.window.hide();
@@ -268,8 +266,8 @@ impl StartupWindow {
             height: 580,
             centered: true,
             resizable: true,
-            theme: Theme::Dark,
             style: Style::Fluent,
+            colors: ColorScheme::Dark2,
             icon: Some("resources/icon.ico".into()),
             ..Default::default()
         };
@@ -283,7 +281,7 @@ impl StartupWindow {
         }
     }
 
-    pub fn with_instances(instances: Option<Vec<String>>) -> Self {
+    pub fn _with_instances(instances: Option<Vec<String>>) -> Self {
         let mut sw = Self::new();
         sw.instance_choices = instances;
         sw
