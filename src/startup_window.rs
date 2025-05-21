@@ -1,20 +1,20 @@
+use std::collections::hash_map::HashMap;
 use std::fs::read_dir;
 use std::fs::remove_dir_all;
+use std::ops::DerefMut;
 
-use fltk::app::App;
 use fltk::browser::HoldBrowser;
 use fltk::button::Button;
 use fltk::enums::Align;
 use fltk::enums::CallbackTrigger;
-use fltk::group::Grid;
 use fltk::group::GridAlign;
 use fltk::input::Input;
 use fltk::menu::Choice;
 use fltk::prelude::*;
-use fltk::window::Window;
 
 use rfd::FileDialog;
 
+use crate::application::AnyWidget;
 use crate::application::ApplicationSettings;
 use crate::application::GothicOrganizerWindow;
 use crate::constants::game_profile_list;
@@ -28,14 +28,15 @@ use crate::profile::Instance;
 use crate::profile::Profile;
 use crate::save_profile;
 
-#[derive(Default, Debug)]
+#[derive(Default)]
 pub struct StartupWindow {
-    window: Window,
-    app: App,
+    widgets: HashMap<String, AnyWidget>,
     profile_choices: Vec<String>,
     instance_name_input: String,
     instance_choices: Option<Vec<String>>,
     current_profile: Option<Profile>,
+    selected_profile_index: i32,
+    selected_instance_index: i32,
     pub selected_directory: Option<String>,
     pub selected_profile: Option<String>,
     pub selected_instance: Option<String>,
@@ -44,212 +45,335 @@ pub struct StartupWindow {
 
 impl GothicOrganizerWindow for StartupWindow {
     type Message = Message;
+    type Task = Task;
 
-    fn run(&mut self) -> Result<(), GuiError> {
-        let (sender, receiver) = fltk::app::channel::<self::Message>();
-        self.window.begin();
+    fn settings(&self) -> ApplicationSettings {
+        ApplicationSettings {
+            title: "Gothic Organizer: Startup".to_string(),
+            width: 340,
+            height: 580,
+            centered: true,
+            resizable: true,
+            style: Style::Fluent,
+            colors: ColorScheme::Dark2,
+            icon: Some("resources/icon.ico".into()),
+            ..Default::default()
+        }
+    }
 
-        let mut layout_grid = Grid::default_fill();
-        layout_grid.set_layout(10, 1);
-        layout_grid.set_margin(10, 20, 10, 10);
-        layout_grid.set_gap(20, 10);
+    fn widgets_mut(&mut self) -> &mut HashMap<String, AnyWidget> {
+        &mut self.widgets
+    }
 
-        let mut profile_choice = Choice::default()
-            .with_size(self.window.width() - 50, 30)
-            .with_align(Align::TopLeft)
-            .with_label("Profile:");
+    fn populate_ui(&mut self, sender: fltk::app::Sender<Self::Message>, grid: &mut fltk::group::Grid) -> Result<(), GuiError> {
+        let profile_choice = self.add_widget(
+            "profile_choice",
+            Choice::default()
+                .with_size(300, 30)
+                .with_align(Align::TopLeft)
+                .with_label("Profile:"),
+        );
 
         self.profile_choices.iter().for_each(|p| {
-            profile_choice.add_choice(p);
+            profile_choice.borrow_mut().add_choice(p);
         });
 
-        profile_choice.emit(sender, Message::SelectProfile);
+        profile_choice.borrow_mut().set_callback(move |w| {
+            let index = w.value();
+            sender.send(Message::SelectProfile(index));
+        });
 
-        let mut browse_button = Button::default()
-            .with_size(self.window.width() - 50, 30)
-            .with_align(Align::Center)
-            .with_label("Browse game directory...");
+        let browse_button = self.add_widget(
+            "browse_button",
+            Button::default()
+                .with_size(300, 30)
+                .with_align(Align::Center)
+                .with_label("Browse game directory..."),
+        );
 
-        browse_button.emit(sender, Message::SelectProfileDirectory);
-        browse_button.deactivate();
+        browse_button
+            .borrow_mut()
+            .emit(sender, Message::SelectProfileDirectory);
+        browse_button.borrow_mut().deactivate();
 
-        let mut instance_entry = Input::default()
-            .with_size(self.window.width() - 50, 30)
-            .with_align(Align::TopLeft)
-            .with_label("New instance name:");
+        let instance_entry = self.add_widget(
+            "instance_entry",
+            Input::default()
+                .with_size(300, 30)
+                .with_align(Align::TopLeft)
+                .with_label("New instance name:"),
+        );
 
-        instance_entry.set_trigger(CallbackTrigger::EnterKeyChanged);
-        instance_entry.set_callback(move |i| sender.send(Message::InputInstanceName(i.value().to_string())));
-        instance_entry.deactivate();
+        instance_entry
+            .borrow_mut()
+            .set_trigger(CallbackTrigger::EnterKeyChanged);
+        instance_entry
+            .borrow_mut()
+            .set_callback(move |i| sender.send(Message::InputInstanceName(i.value().to_string())));
+        instance_entry.borrow_mut().deactivate();
 
-        let mut add_instance_button = Button::default()
-            .with_size(self.window.width() - 50, 30)
-            .with_align(Align::Center)
-            .with_label("Add instance");
+        let instance_selector = self.add_widget(
+            "instance_selector",
+            HoldBrowser::default()
+                .with_size(300, 200)
+                .with_align(Align::TopLeft)
+                .with_label("Instances:"),
+        );
 
-        add_instance_button.emit(sender, Message::AddInstance);
-        add_instance_button.deactivate();
+        instance_selector.borrow_mut().set_callback(move |w| {
+            let index = w.value();
+            sender.send(Message::SelectInstance(index));
+        });
 
-        let mut remove_instance_button = Button::default()
-            .with_size(self.window.width() - 50, 30)
-            .with_align(Align::Center)
-            .with_label("Remove instance");
-
-        remove_instance_button.emit(sender, Message::RemoveInstance);
-        remove_instance_button.deactivate();
-
-        let mut instance_selector = HoldBrowser::default()
-            .with_size(self.window.width() - 50, 200)
-            .with_align(Align::TopLeft)
-            .with_label("Instances:");
-
-        instance_selector.emit(sender, Message::SelectInstance);
         if let Some(available) = &self.instance_choices {
             available.iter().for_each(|i| {
-                instance_selector.add(i);
+                instance_selector.borrow_mut().add(i);
             });
         }
-        instance_selector.deactivate();
+        instance_selector.borrow_mut().deactivate();
 
-        let mut start_button = Button::default()
-            .with_size(self.window.width() - 50, 30)
-            .with_align(Align::Center)
-            .with_label("Start");
+        let add_instance_button = self.add_widget(
+            "add_instance_button",
+            Button::default()
+                .with_size(300, 30)
+                .with_align(Align::Center)
+                .with_label("Add instance"),
+        );
 
-        start_button.emit(sender, Message::Start);
-        start_button.deactivate();
+        add_instance_button
+            .borrow_mut()
+            .emit(sender, Message::AddInstance);
+        add_instance_button.borrow_mut().deactivate();
 
-        let mut cancel_button = Button::default()
-            .with_size(self.window.width() - 50, 30)
-            .with_align(Align::Center)
-            .with_label("Cancel");
+        let remove_instance_button = self.add_widget(
+            "remove_instance_button",
+            Button::default()
+                .with_size(300, 30)
+                .with_align(Align::Center)
+                .with_label("Remove instance"),
+        );
 
-        cancel_button.emit(sender, Message::Exit);
+        remove_instance_button
+            .borrow_mut()
+            .emit(sender, Message::RemoveInstance);
+        remove_instance_button.borrow_mut().deactivate();
 
-        layout_grid.set_widget_ext(&mut profile_choice, 0, 0, GridAlign::PROPORTIONAL)?;
-        layout_grid.set_widget_ext(&mut browse_button, 1, 0, GridAlign::PROPORTIONAL)?;
-        layout_grid.set_widget_ext(&mut instance_entry, 2, 0, GridAlign::PROPORTIONAL)?;
-        layout_grid.set_widget_ext(&mut add_instance_button, 3, 0, GridAlign::PROPORTIONAL)?;
-        layout_grid.set_widget_ext(&mut remove_instance_button, 4, 0, GridAlign::PROPORTIONAL)?;
-        layout_grid.set_widget_ext(&mut instance_selector, 5, 0, GridAlign::PROPORTIONAL)?;
-        layout_grid.set_widget_ext(&mut start_button, 6, 0, GridAlign::PROPORTIONAL)?;
-        layout_grid.set_widget_ext(&mut cancel_button, 7, 0, GridAlign::PROPORTIONAL)?;
+        let start_button = self.add_widget(
+            "start_button",
+            Button::default()
+                .with_size(300, 30)
+                .with_align(Align::Center)
+                .with_label("Start"),
+        );
 
-        self.window.end();
-        self.window.show();
+        start_button.borrow_mut().emit(sender, Message::Start);
+        start_button.borrow_mut().deactivate();
 
-        while self.app.wait() {
-            if let Some(msg) = receiver.recv() {
-                match msg {
-                    Message::SelectProfileDirectory => {
-                        let dir = FileDialog::new()
-                            .pick_folder()
-                            .map(|p| p.to_str().unwrap().to_string());
+        let cancel_button = self.add_widget(
+            "cancel_button",
+            Button::default()
+                .with_size(300, 30)
+                .with_align(Align::Center)
+                .with_label("Cancel"),
+        );
 
-                        self.selected_directory = dir;
-                        self.current_profile = match load_profile!(&self.selected_profile.clone().unwrap()) {
-                            Some(p) => Some(p),
-                            None => {
-                                init_profile(
-                                    &self.selected_profile.clone().unwrap(),
-                                    self.selected_directory.clone().unwrap(),
-                                    None,
-                                )?;
-                                load_profile!(&self.selected_profile.clone().unwrap())
-                            }
-                        };
-                        instance_entry.activate();
-                        add_instance_button.activate();
-                        remove_instance_button.activate();
-                        instance_selector.activate();
+        cancel_button.borrow_mut().emit(sender, Message::Exit);
+
+        grid.set_widget_ext(
+            profile_choice.borrow_mut().deref_mut(),
+            0,
+            0,
+            GridAlign::PROPORTIONAL,
+        )?;
+        grid.set_widget_ext(
+            browse_button.borrow_mut().deref_mut(),
+            1,
+            0,
+            GridAlign::PROPORTIONAL,
+        )?;
+        grid.set_widget_ext(
+            instance_entry.borrow_mut().deref_mut(),
+            2,
+            0,
+            GridAlign::PROPORTIONAL,
+        )?;
+        grid.set_widget_ext(
+            add_instance_button.borrow_mut().deref_mut(),
+            3,
+            0,
+            GridAlign::PROPORTIONAL,
+        )?;
+        grid.set_widget_ext(
+            remove_instance_button.borrow_mut().deref_mut(),
+            4,
+            0,
+            GridAlign::PROPORTIONAL,
+        )?;
+        grid.set_widget_ext(
+            instance_selector.borrow_mut().deref_mut(),
+            5,
+            0,
+            GridAlign::PROPORTIONAL,
+        )?;
+        grid.set_widget_ext(
+            start_button.borrow_mut().deref_mut(),
+            6,
+            0,
+            GridAlign::PROPORTIONAL,
+        )?;
+        grid.set_widget_ext(
+            cancel_button.borrow_mut().deref_mut(),
+            7,
+            0,
+            GridAlign::PROPORTIONAL,
+        )?;
+
+        Ok(())
+    }
+
+    fn handle_message(&mut self, msg: Self::Message) -> Result<Task, GuiError> {
+        match msg {
+            Message::SelectProfileDirectory => {
+                let dir = FileDialog::new()
+                    .pick_folder()
+                    .map(|p| p.to_str().unwrap().to_string());
+
+                self.selected_directory = dir;
+                self.current_profile = match load_profile!(&self.selected_profile.clone().unwrap()) {
+                    Some(p) => Some(p),
+                    None => {
+                        init_profile(
+                            &self.selected_profile.clone().unwrap(),
+                            self.selected_directory.clone().unwrap(),
+                            None,
+                        )?;
+                        load_profile!(&self.selected_profile.clone().unwrap())
                     }
-                    Message::SelectProfile => {
-                        let profile = self
-                            .profile_choices
-                            .get(profile_choice.value() as usize)
-                            .map(|p| p.to_string());
+                };
+                self.activate_widget("instance_entry")?;
+                self.activate_widget("add_instance_button")?;
+                self.activate_widget("remove_instance_button")?;
+                self.activate_widget("instance_selector")?;
+            }
+            Message::SelectProfile(index) => {
+                let profile = self
+                    .profile_choices
+                    .get(index as usize)
+                    .map(|p| p.to_string());
 
-                        self.selected_profile = profile;
-                        browse_button.activate();
+                self.selected_profile_index = index;
+                self.selected_profile = profile;
+                self.activate_widget("browse_button")?;
+            }
+            Message::SelectInstance(index) => {
+                self.selected_instance_index = index;
+                if let Some(available) = &self.instance_choices {
+                    if index != 0 && index - 1 < available.len() as i32 && !available.is_empty() {
+                        let instance = available.get((index as usize).saturating_sub(1)).cloned();
+                        self.selected_instance = instance;
                     }
-                    Message::SelectInstance => {
-                        if let Some(available) = &self.instance_choices {
-                            let value_index = instance_selector.value();
-                            if value_index - 1 < available.len() as i32 && !available.is_empty() {
-                                let instance = available
-                                    .get((instance_selector.value() as usize).saturating_sub(1))
-                                    .cloned();
-                                self.selected_instance = instance;
-                            }
+                }
+                self.activate_widget("start_button")?;
+            }
+            Message::InputInstanceName(name) => {
+                self.instance_name_input = name;
+            }
+            Message::AddInstance => {
+                if self.instance_name_input.clone().is_empty() {
+                    return Ok(Task::None);
+                }
+
+                if let Some(available) = &mut self.instance_choices {
+                    if available.contains(&self.instance_name_input) {
+                        return Ok(Task::None);
+                    }
+
+                    available.push(self.instance_name_input.clone());
+                } else {
+                    self.instance_choices = Some(vec![self.instance_name_input.clone()]);
+                }
+
+                if let AnyWidget::HoldBrowser(instance_selector) = self
+                    .widgets
+                    .get("instance_selector")
+                    .ok_or(GuiError::WidgetNotFound("instance_selector".to_owned()))?
+                {
+                    instance_selector
+                        .borrow_mut()
+                        .add(&self.instance_name_input);
+                }
+
+                self.current_profile
+                    .as_mut()
+                    .unwrap()
+                    .add_instance(Instance::new(self.instance_name_input.clone()));
+                save_profile!(self.current_profile.clone().unwrap())?;
+            }
+
+            Message::RemoveInstance => {
+                let index = self.selected_instance_index;
+                let Some(selected_instance_name) = self.selected_instance.clone() else {
+                    return Ok(Task::None);
+                };
+
+                if let Some(available) = &mut self.instance_choices {
+                    if index != 0 && index - 1 < available.len() as i32 && !available.is_empty() {
+                        available.remove((index as usize).saturating_sub(1));
+                        if let AnyWidget::HoldBrowser(instance_selector) = self
+                            .widgets
+                            .get("instance_selector")
+                            .ok_or(GuiError::WidgetNotFound("instance_selector".to_owned()))?
+                        {
+                            instance_selector.borrow_mut().remove(index);
                         }
-                        start_button.activate();
                     }
-                    Message::InputInstanceName(name) => {
-                        self.instance_name_input = name;
+
+                    if available.is_empty() {
+                        self.deactivate_widget("start_button")?;
+                        self.instance_choices = None;
                     }
-                    Message::AddInstance => {
-                        if self.instance_name_input.clone().is_empty() {
-                            continue;
-                        }
+                }
 
-                        if let Some(available) = &mut self.instance_choices {
-                            if available.contains(&self.instance_name_input) {
-                                continue;
-                            }
+                self.current_profile
+                    .as_mut()
+                    .unwrap()
+                    .remove_instance(selected_instance_name.clone());
 
-                            available.push(self.instance_name_input.clone());
+                read_dir(local_instances!(self.selected_profile.clone().unwrap()))?.find_map(|d| {
+                    d.ok().and_then(|e| {
+                        if e.file_name().to_string_lossy().to_lowercase() == selected_instance_name.to_lowercase() {
+                            remove_dir_all(e.path()).ok()
                         } else {
-                            self.instance_choices = Some(vec![self.instance_name_input.clone()]);
+                            None
                         }
+                    })
+                });
+            }
+            Message::Start => {
+                return Ok(Task::CloseWindow);
+            }
+            Message::Exit => {
+                self.canceled = true;
+                return Ok(Task::CloseWindow);
+            }
+        }
+        Ok(Task::None)
+    }
 
-                        instance_selector.add(&self.instance_name_input);
-                        self.current_profile
-                            .as_mut()
-                            .unwrap()
-                            .add_instance(Instance::new(self.instance_name_input.clone()));
-                        save_profile!(self.current_profile.clone().unwrap())?;
+    fn event_loop(
+        &mut self,
+        app: &mut fltk::app::App,
+        window: &mut fltk::window::Window,
+        receiver: fltk::app::Receiver<<Self as GothicOrganizerWindow>::Message>,
+    ) -> Result<(), GuiError> {
+        while app.wait() {
+            if let Some(msg) = receiver.recv() {
+                match self.handle_message(msg)? {
+                    Task::CloseWindow => {
+                        window.hide();
+                        break;
                     }
-                    Message::RemoveInstance => {
-                        let Some(selected_instance_name) = self.selected_instance.clone() else {
-                            continue;
-                        };
-
-                        if let Some(available) = &mut self.instance_choices {
-                            let value_index = instance_selector.value();
-
-                            if value_index != 0 && value_index - 1 < available.len() as i32 && !available.is_empty() {
-                                available.remove((value_index as usize).saturating_sub(1));
-                                instance_selector.remove(value_index);
-                            }
-
-                            if available.is_empty() {
-                                start_button.deactivate();
-                                self.instance_choices = None;
-                            }
-                        }
-
-                        self.current_profile
-                            .as_mut()
-                            .unwrap()
-                            .remove_instance(selected_instance_name.clone());
-
-                        read_dir(local_instances!(self.selected_profile.clone().unwrap()))?.find_map(|d| {
-                            d.ok().and_then(|e| {
-                                if e.file_name().to_string_lossy().to_lowercase() == selected_instance_name.to_lowercase() {
-                                    remove_dir_all(e.path()).ok()
-                                } else {
-                                    None
-                                }
-                            })
-                        });
-                    }
-                    Message::Start => {
-                        self.window.hide();
-                    }
-                    Message::Exit => {
-                        self.canceled = true;
-                        self.window.hide();
-                    }
+                    Task::None => (),
                 }
             }
         }
@@ -260,21 +384,7 @@ impl GothicOrganizerWindow for StartupWindow {
 
 impl StartupWindow {
     pub fn new() -> Self {
-        let settings = ApplicationSettings {
-            title: "Gothic Organizer: Startup".to_string(),
-            width: 340,
-            height: 580,
-            centered: true,
-            resizable: true,
-            style: Style::Fluent,
-            colors: ColorScheme::Dark2,
-            icon: Some("resources/icon.ico".into()),
-            ..Default::default()
-        };
-
         Self {
-            window: Self::window(&settings),
-            app: Self::app(&settings),
             canceled: false,
             profile_choices: game_profile_list().to_vec(),
             ..Default::default()
@@ -291,13 +401,19 @@ impl StartupWindow {
 #[derive(Debug, Clone)]
 pub enum Message {
     SelectProfileDirectory,
-    SelectProfile,
-    SelectInstance,
+    SelectProfile(i32),
+    SelectInstance(i32),
+    RemoveInstance,
     InputInstanceName(String),
     AddInstance,
-    RemoveInstance,
     Start,
     Exit,
+}
+
+#[derive(Debug, Clone)]
+pub enum Task {
+    CloseWindow,
+    None,
 }
 
 pub mod prelude {

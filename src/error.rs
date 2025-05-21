@@ -39,4 +39,6 @@ pub enum GuiError {
     Profile(#[from] ProfileError),
     #[error("Session Error: {0}")]
     Session(#[from] SessionError),
+    #[error("Widget not found: {0}")]
+    WidgetNotFound(String),
 }
