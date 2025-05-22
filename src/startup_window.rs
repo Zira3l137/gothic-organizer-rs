@@ -233,6 +233,43 @@ impl GothicOrganizerWindow for StartupWindow {
 
     fn handle_message(&mut self, msg: Self::Message) -> Result<Task, GuiError> {
         match msg {
+            Message::Start => {
+                return Ok(Task::CloseWindow);
+            }
+
+            Message::Exit => {
+                self.canceled = true;
+                return Ok(Task::CloseWindow);
+            }
+
+            Message::InputInstanceName(name) => {
+                self.instance_name_input = name;
+            }
+
+            Message::SelectProfile(index) => {
+                let profile = self
+                    .profile_choices
+                    .get(index as usize)
+                    .map(|p| p.to_string());
+
+                self.selected_profile_index = index;
+                self.selected_profile = profile;
+                self.activate_widget("browse_button")?;
+            }
+
+            Message::SelectInstance(index) => {
+                self.selected_instance_index = index;
+
+                if let Some(available) = &self.instance_choices {
+                    if index != 0 && index - 1 < available.len() as i32 && !available.is_empty() {
+                        let instance = available.get((index as usize).saturating_sub(1)).cloned();
+                        self.selected_instance = instance;
+                    }
+                }
+
+                self.activate_widget("start_button")?;
+            }
+
             Message::SelectProfileDirectory => {
                 let dir = FileDialog::new()
                     .pick_folder()
@@ -247,37 +284,17 @@ impl GothicOrganizerWindow for StartupWindow {
                             self.selected_directory.clone().unwrap(),
                             None,
                         )?;
+
                         load_profile!(&self.selected_profile.clone().unwrap())
                     }
                 };
+
                 self.activate_widget("instance_entry")?;
                 self.activate_widget("add_instance_button")?;
                 self.activate_widget("remove_instance_button")?;
                 self.activate_widget("instance_selector")?;
             }
-            Message::SelectProfile(index) => {
-                let profile = self
-                    .profile_choices
-                    .get(index as usize)
-                    .map(|p| p.to_string());
 
-                self.selected_profile_index = index;
-                self.selected_profile = profile;
-                self.activate_widget("browse_button")?;
-            }
-            Message::SelectInstance(index) => {
-                self.selected_instance_index = index;
-                if let Some(available) = &self.instance_choices {
-                    if index != 0 && index - 1 < available.len() as i32 && !available.is_empty() {
-                        let instance = available.get((index as usize).saturating_sub(1)).cloned();
-                        self.selected_instance = instance;
-                    }
-                }
-                self.activate_widget("start_button")?;
-            }
-            Message::InputInstanceName(name) => {
-                self.instance_name_input = name;
-            }
             Message::AddInstance => {
                 if self.instance_name_input.clone().is_empty() {
                     return Ok(Task::None);
@@ -287,7 +304,6 @@ impl GothicOrganizerWindow for StartupWindow {
                     if available.contains(&self.instance_name_input) {
                         return Ok(Task::None);
                     }
-
                     available.push(self.instance_name_input.clone());
                 } else {
                     self.instance_choices = Some(vec![self.instance_name_input.clone()]);
@@ -307,11 +323,13 @@ impl GothicOrganizerWindow for StartupWindow {
                     .as_mut()
                     .unwrap()
                     .add_instance(Instance::new(self.instance_name_input.clone()));
+
                 save_profile!(self.current_profile.clone().unwrap())?;
             }
 
             Message::RemoveInstance => {
                 let index = self.selected_instance_index;
+
                 let Some(selected_instance_name) = self.selected_instance.clone() else {
                     return Ok(Task::None);
                 };
@@ -319,6 +337,7 @@ impl GothicOrganizerWindow for StartupWindow {
                 if let Some(available) = &mut self.instance_choices {
                     if index != 0 && index - 1 < available.len() as i32 && !available.is_empty() {
                         available.remove((index as usize).saturating_sub(1));
+
                         if let AnyWidget::HoldBrowser(instance_selector) = self
                             .widgets
                             .get("instance_selector")
@@ -349,14 +368,8 @@ impl GothicOrganizerWindow for StartupWindow {
                     })
                 });
             }
-            Message::Start => {
-                return Ok(Task::CloseWindow);
-            }
-            Message::Exit => {
-                self.canceled = true;
-                return Ok(Task::CloseWindow);
-            }
         }
+
         Ok(Task::None)
     }
 
@@ -389,12 +402,6 @@ impl StartupWindow {
             profile_choices: game_profile_list().to_vec(),
             ..Default::default()
         }
-    }
-
-    pub fn _with_instances(instances: Option<Vec<String>>) -> Self {
-        let mut sw = Self::new();
-        sw.instance_choices = instances;
-        sw
     }
 }
 

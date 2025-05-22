@@ -34,7 +34,7 @@ pub trait GothicOrganizerWindow {
     /// Should return a mutable reference to the container used to store widgets used by this window.
     fn widgets_mut(&mut self) -> &mut HashMap<String, AnyWidget>;
 
-    /// Construct the `Window` (with size, pos, icon, etc).
+    /// Constructs the `Window` (with size, pos, icon, etc).
     fn window(settings: &ApplicationSettings) -> Window {
         let mut wnd = Window::default()
             .with_size(settings.width, settings.height)
@@ -64,16 +64,16 @@ pub trait GothicOrganizerWindow {
         app
     }
 
-    /// Here the concrete window should:
-    /// - call `self.populate(&sender, &mut grid)`
-    /// - return the receiver end of the message channel.
+    /// Constructs the UI for this window.
+    /// All widgets need to be defined in this method. Dedicated `add_widget` method can be used to
+    /// do this.
     fn populate_ui(&mut self, sender: fltk::app::Sender<Self::Message>, grid: &mut fltk::group::Grid) -> Result<(), GuiError>;
 
     /// Here the concrete window should match `msg` and mutate itself,
-    /// potentially sending back a `GuiError` or hiding the window.
+    /// potentially sending back a `GuiError` or a `Task` to be handled by `event_loop`.
     fn handle_message(&mut self, msg: Self::Message) -> Result<Self::Task, GuiError>;
 
-    /// This method defines how `Task` is returned by `handle_message` is handled during the event
+    /// This method defines how `Task` returned by `handle_message` is handled during the event
     /// loop. Example implementation:
     /// ```ignore
     /// while app.wait() {
@@ -92,7 +92,8 @@ pub trait GothicOrganizerWindow {
         receiver: fltk::app::Receiver<<Self as GothicOrganizerWindow>::Message>,
     ) -> Result<(), GuiError>;
 
-    /// This is the only method each window impl needs to override:
+    /// Main entry point. Populates the UI and starts the event loop. Overwrite for custom widget
+    /// layout and window handling. By default utilizes `fltk::group::Grid` for widget layout.
     fn run(&mut self) -> Result<(), GuiError> {
         let settings = self.settings();
         let mut wnd = Self::window(&settings);
@@ -105,7 +106,6 @@ pub trait GothicOrganizerWindow {
         grid.set_margin(10, 20, 10, 10);
         grid.set_gap(20, 10);
 
-        // Delegate to the concrete window:
         self.populate_ui(s, &mut grid)?;
 
         wnd.end();
@@ -116,6 +116,7 @@ pub trait GothicOrganizerWindow {
         Ok(())
     }
 
+    /// Adds a widget to the dedicated container under `name` and returns a reference to it.
     fn add_widget<T>(&mut self, name: &str, widget: T) -> Rc<RefCell<T>>
     where
         T: WidgetExt + 'static,
@@ -127,6 +128,7 @@ pub trait GothicOrganizerWindow {
         rc
     }
 
+    /// Activates the widget under `name`.
     fn activate_widget(&mut self, name: &str) -> Result<(), GuiError> {
         let query = self
             .widgets_mut()
@@ -138,6 +140,7 @@ pub trait GothicOrganizerWindow {
         Ok(())
     }
 
+    /// Deactivates the widget under `name`.
     fn deactivate_widget(&mut self, name: &str) -> Result<(), GuiError> {
         let query = self
             .widgets_mut()
@@ -172,16 +175,8 @@ pub enum AnyWidget {
     Group(Rc<RefCell<dyn GroupExt>>),
     Window(Rc<RefCell<dyn WindowExt>>),
 }
-/// This implements:
-///
-/// ```ignore
-/// impl From<Rc<RefCell<$ty>>> for AnyWidget {
-///   fn from(x: Rc<RefCell<$ty>>) -> Self {
-///     AnyWidget::$variant(x)
-///   }
-/// }
-/// ```
-macro_rules! from_widget {
+
+macro_rules! impl_from_widget {
     ($ty:ty => $variant:ident) => {
         impl From<Rc<RefCell<$ty>>> for AnyWidget {
             fn from(x: Rc<RefCell<$ty>>) -> Self {
@@ -227,20 +222,20 @@ impl From<Rc<RefCell<dyn WindowExt>>> for AnyWidget {
     }
 }
 
-from_widget!(Browser      => Browser);
-from_widget!(HoldBrowser  => HoldBrowser);
-from_widget!(FileBrowser  => FileBrowser);
-from_widget!(CheckBrowser => CheckBrowser);
-from_widget!(MultiBrowser => MultiBrowser);
-from_widget!(SelectBrowser=> SelectBrowser);
-from_widget!(Table        => Table);
-from_widget!(TableRow     => TableRow);
-from_widget!(TextDisplay  => TextDisplay);
-from_widget!(TextEditor   => TextEditor);
-from_widget!(Terminal     => Terminal);
-from_widget!(Choice       => Menu);
-from_widget!(Button       => Button);
-from_widget!(Input        => Input);
+impl_from_widget!(Browser      => Browser);
+impl_from_widget!(HoldBrowser  => HoldBrowser);
+impl_from_widget!(FileBrowser  => FileBrowser);
+impl_from_widget!(CheckBrowser => CheckBrowser);
+impl_from_widget!(MultiBrowser => MultiBrowser);
+impl_from_widget!(SelectBrowser=> SelectBrowser);
+impl_from_widget!(Table        => Table);
+impl_from_widget!(TableRow     => TableRow);
+impl_from_widget!(TextDisplay  => TextDisplay);
+impl_from_widget!(TextEditor   => TextEditor);
+impl_from_widget!(Terminal     => Terminal);
+impl_from_widget!(Choice       => Menu);
+impl_from_widget!(Button       => Button);
+impl_from_widget!(Input        => Input);
 
 impl AnyWidget {
     /// Get a `RefMut<dyn WidgetExt>` no matter which variant we are.
