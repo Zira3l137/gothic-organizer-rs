@@ -21,6 +21,7 @@ use crate::constants::game_profile_list;
 use crate::constants::ColorScheme;
 use crate::constants::Style;
 use crate::error::GuiError;
+use crate::impl_widget_name_enum;
 use crate::load_profile;
 use crate::local_instances;
 use crate::profile::init_profile;
@@ -68,7 +69,7 @@ impl GothicOrganizerWindow for StartupWindow {
         &mut self.widgets
     }
 
-    fn populate_ui(&mut self, sender: fltk::app::Sender<Self::Message>, layout: crate::application::AnyGroup) -> Result<(), GuiError> {
+    fn populate_ui(&mut self, sender: fltk::app::Sender<Self::Message>, layout: &mut crate::application::AnyGroup) -> Result<(), GuiError> {
         let profile_choice = self.add_widget(
             WidgetName::ProfileChoice,
             Choice::default()
@@ -259,7 +260,7 @@ impl GothicOrganizerWindow for StartupWindow {
 
                 self.selected_profile_index = index;
                 self.selected_profile = profile;
-                self.activate_widget(WidgetName::BrowseButton)?;
+                self.activate_widget(&WidgetName::BrowseButton)?;
             }
 
             Message::SelectInstance(index) => {
@@ -272,7 +273,7 @@ impl GothicOrganizerWindow for StartupWindow {
                     }
                 }
 
-                self.activate_widget(WidgetName::StartButton)?;
+                self.activate_widget(&WidgetName::StartButton)?;
             }
 
             Message::SelectProfileDirectory => {
@@ -296,16 +297,16 @@ impl GothicOrganizerWindow for StartupWindow {
                             }
                         };
 
-                        self.activate_widget(WidgetName::InstanceEntry)?;
-                        self.activate_widget(WidgetName::AddInstanceButton)?;
-                        self.activate_widget(WidgetName::RemoveInstanceButton)?;
-                        self.activate_widget(WidgetName::InstanceSelector)?;
+                        self.activate_widget(&WidgetName::InstanceEntry)?;
+                        self.activate_widget(&WidgetName::AddInstanceButton)?;
+                        self.activate_widget(&WidgetName::RemoveInstanceButton)?;
+                        self.activate_widget(&WidgetName::InstanceSelector)?;
                     }
                     _ => {
-                        self.deactivate_widget(WidgetName::InstanceEntry)?;
-                        self.deactivate_widget(WidgetName::AddInstanceButton)?;
-                        self.deactivate_widget(WidgetName::RemoveInstanceButton)?;
-                        self.deactivate_widget(WidgetName::InstanceSelector)?;
+                        self.deactivate_widget(&WidgetName::InstanceEntry)?;
+                        self.deactivate_widget(&WidgetName::AddInstanceButton)?;
+                        self.deactivate_widget(&WidgetName::RemoveInstanceButton)?;
+                        self.deactivate_widget(&WidgetName::InstanceSelector)?;
                     }
                 }
             }
@@ -324,7 +325,7 @@ impl GothicOrganizerWindow for StartupWindow {
                     self.instance_choices = Some(vec![self.instance_name_input.clone()]);
                 }
 
-                if let AnyWidget::HoldBrowser(instance_selector) = self.widget(WidgetName::InstanceSelector)? {
+                if let AnyWidget::HoldBrowser(instance_selector) = self.widget(&WidgetName::InstanceSelector)? {
                     instance_selector
                         .borrow_mut()
                         .add(&self.instance_name_input);
@@ -341,7 +342,7 @@ impl GothicOrganizerWindow for StartupWindow {
             Message::RemoveInstance => {
                 let index = self.selected_instance_index;
 
-                let instance_selector = self.widget(WidgetName::InstanceSelector)?;
+                let instance_selector = self.widget(&WidgetName::InstanceSelector)?;
 
                 let Some(selected_instance_name) = self.selected_instance.clone() else {
                     return Ok(Task::None);
@@ -360,7 +361,7 @@ impl GothicOrganizerWindow for StartupWindow {
                 }
 
                 if available.is_empty() {
-                    self.deactivate_widget(WidgetName::StartButton)?;
+                    self.deactivate_widget(&WidgetName::StartButton)?;
                     self.instance_choices = None;
                 }
 
@@ -434,8 +435,7 @@ pub enum Task {
     None,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, std::hash::Hash)]
-pub enum WidgetName {
+impl_widget_name_enum!(
     ProfileSelector,
     ProfileChoice,
     InstanceSelector,
@@ -445,23 +445,7 @@ pub enum WidgetName {
     StartButton,
     BrowseButton,
     CancelButton,
-}
-
-impl From<WidgetName> for String {
-    fn from(value: WidgetName) -> Self {
-        match value {
-            WidgetName::ProfileSelector => "profile_selector".to_owned(),
-            WidgetName::ProfileChoice => "profile_choice".to_owned(),
-            WidgetName::InstanceSelector => "instance_selector".to_owned(),
-            WidgetName::InstanceEntry => "instance_entry".to_owned(),
-            WidgetName::AddInstanceButton => "add_instance_button".to_owned(),
-            WidgetName::RemoveInstanceButton => "remove_instance_button".to_owned(),
-            WidgetName::StartButton => "start_button".to_owned(),
-            WidgetName::BrowseButton => "browse_button".to_owned(),
-            WidgetName::CancelButton => "cancel_button".to_owned(),
-        }
-    }
-}
+);
 
 pub mod prelude {
     pub use crate::application::GothicOrganizerWindow;

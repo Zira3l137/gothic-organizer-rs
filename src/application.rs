@@ -25,6 +25,34 @@ use crate::constants::ColorScheme;
 use crate::constants::Style;
 use crate::error::GuiError;
 
+#[macro_export]
+macro_rules! impl_widget_name_enum {
+    ($($name_variant:ident,)+) => {
+        #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
+        pub enum WidgetName {
+            $($name_variant),+
+        }
+
+        impl From<WidgetName> for String {
+            fn from(value: WidgetName) -> Self {
+                match value {
+                    $(WidgetName::$name_variant => stringify!($name_variant).to_string()),+
+                }
+            }
+        }
+    };
+}
+
+macro_rules! impl_from_widget {
+    ($ty:ty => $variant:ident) => {
+        impl From<Rc<RefCell<$ty>>> for AnyWidget {
+            fn from(x: Rc<RefCell<$ty>>) -> Self {
+                AnyWidget::$variant(x)
+            }
+        }
+    };
+}
+
 pub trait GothicOrganizerWindow {
     type Message: Clone + Send + Sync + 'static;
     type Task: Clone + Send + Sync + 'static;
@@ -73,7 +101,7 @@ pub trait GothicOrganizerWindow {
     /// Constructs the UI for this window.
     /// All widgets need to be defined in this method. Dedicated `add_widget` method can be used to
     /// do this.
-    fn populate_ui(&mut self, sender: fltk::app::Sender<Self::Message>, layout: AnyGroup) -> Result<(), GuiError>;
+    fn populate_ui(&mut self, sender: fltk::app::Sender<Self::Message>, layout: &mut AnyGroup) -> Result<(), GuiError>;
 
     /// Here the concrete window should match `msg` and mutate itself,
     /// potentially sending back a `GuiError` or a `Task` to be handled by `event_loop`.
@@ -112,7 +140,7 @@ pub trait GothicOrganizerWindow {
         grid.set_margin(10, 20, 10, 10);
         grid.set_gap(20, 10);
 
-        self.populate_ui(s, Rc::new(RefCell::new(grid)).into())?;
+        self.populate_ui(s, &mut Rc::new(RefCell::new(grid)).into())?;
 
         wnd.end();
         wnd.show();
@@ -133,19 +161,19 @@ pub trait GothicOrganizerWindow {
         rc
     }
 
-    fn widget(&self, name: Self::WidgetName) -> Result<AnyWidget, GuiError> {
+    fn widget(&self, name: &Self::WidgetName) -> Result<AnyWidget, GuiError> {
         self.widgets()
-            .get(&name)
+            .get(name)
             .cloned()
-            .ok_or(GuiError::WidgetNotFound(name.into()))
+            .ok_or(GuiError::WidgetNotFound(name.clone().into()))
     }
 
     /// Activates the widget under `name`.
-    fn activate_widget(&mut self, name: Self::WidgetName) -> Result<(), GuiError> {
+    fn activate_widget(&mut self, name: &Self::WidgetName) -> Result<(), GuiError> {
         let query = self
             .widgets_mut()
-            .get(&name)
-            .ok_or(GuiError::WidgetNotFound(name.into()))?;
+            .get(name)
+            .ok_or(GuiError::WidgetNotFound(name.clone().into()))?;
 
         let mut w = query.as_widget_ext_mut();
         w.activate();
@@ -153,11 +181,11 @@ pub trait GothicOrganizerWindow {
     }
 
     /// Deactivates the widget under `name`.
-    fn deactivate_widget(&mut self, name: Self::WidgetName) -> Result<(), GuiError> {
+    fn deactivate_widget(&mut self, name: &Self::WidgetName) -> Result<(), GuiError> {
         let query = self
             .widgets_mut()
-            .get(&name)
-            .ok_or(GuiError::WidgetNotFound(name.into()))?;
+            .get(name)
+            .ok_or(GuiError::WidgetNotFound(name.clone().into()))?;
 
         let mut w = query.as_widget_ext_mut();
         w.deactivate();
@@ -165,6 +193,8 @@ pub trait GothicOrganizerWindow {
     }
 }
 
+#[allow(dead_code)]
+#[derive(Debug)]
 pub enum AnyGroup {
     Flex(Rc<RefCell<Flex>>),
     Grid(Rc<RefCell<Grid>>),
@@ -228,46 +258,42 @@ pub enum AnyWidget {
     Window(Rc<RefCell<dyn WindowExt>>),
 }
 
-macro_rules! impl_from_widget {
-    ($ty:ty => $variant:ident) => {
-        impl From<Rc<RefCell<$ty>>> for AnyWidget {
-            fn from(x: Rc<RefCell<$ty>>) -> Self {
-                AnyWidget::$variant(x)
-            }
-        }
-    };
-}
-
 impl From<Rc<RefCell<dyn WidgetExt>>> for AnyWidget {
     fn from(x: Rc<RefCell<dyn WidgetExt>>) -> Self {
         AnyWidget::Basic(x)
     }
 }
+
 impl From<Rc<RefCell<dyn ValuatorExt>>> for AnyWidget {
     fn from(x: Rc<RefCell<dyn ValuatorExt>>) -> Self {
         AnyWidget::Valuator(x)
     }
 }
+
 impl From<Rc<RefCell<dyn MenuExt>>> for AnyWidget {
     fn from(x: Rc<RefCell<dyn MenuExt>>) -> Self {
         AnyWidget::Menu(x)
     }
 }
+
 impl From<Rc<RefCell<dyn InputExt>>> for AnyWidget {
     fn from(x: Rc<RefCell<dyn InputExt>>) -> Self {
         AnyWidget::Input(x)
     }
 }
+
 impl From<Rc<RefCell<dyn ButtonExt>>> for AnyWidget {
     fn from(x: Rc<RefCell<dyn ButtonExt>>) -> Self {
         AnyWidget::Button(x)
     }
 }
+
 impl From<Rc<RefCell<dyn GroupExt>>> for AnyWidget {
     fn from(x: Rc<RefCell<dyn GroupExt>>) -> Self {
         AnyWidget::Group(x)
     }
 }
+
 impl From<Rc<RefCell<dyn WindowExt>>> for AnyWidget {
     fn from(x: Rc<RefCell<dyn WindowExt>>) -> Self {
         AnyWidget::Window(x)
