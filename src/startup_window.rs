@@ -5,14 +5,14 @@ use std::ops::DerefMut;
 
 use fltk::browser::HoldBrowser;
 use fltk::button::Button;
+use fltk::dialog::NativeFileChooser;
+use fltk::dialog::NativeFileChooserType;
 use fltk::enums::Align;
 use fltk::enums::CallbackTrigger;
 use fltk::group::GridAlign;
 use fltk::input::Input;
 use fltk::menu::Choice;
 use fltk::prelude::*;
-
-use rfd::FileDialog;
 
 use crate::application::AnyWidget;
 use crate::application::ApplicationSettings;
@@ -30,7 +30,7 @@ use crate::save_profile;
 
 #[derive(Default)]
 pub struct StartupWindow {
-    widgets: HashMap<String, AnyWidget>,
+    widgets: HashMap<WidgetName, AnyWidget>,
     profile_choices: Vec<String>,
     instance_name_input: String,
     instance_choices: Option<Vec<String>>,
@@ -46,28 +46,31 @@ pub struct StartupWindow {
 impl GothicOrganizerWindow for StartupWindow {
     type Message = Message;
     type Task = Task;
+    type WidgetName = WidgetName;
 
     fn settings(&self) -> ApplicationSettings {
-        ApplicationSettings {
-            title: "Gothic Organizer: Startup".to_string(),
-            width: 340,
-            height: 580,
-            centered: true,
-            resizable: true,
-            style: Style::Fluent,
-            colors: ColorScheme::Dark2,
-            icon: Some("resources/icon.ico".into()),
-            ..Default::default()
-        }
+        ApplicationSettings::new()
+            .with_title("Gothic Organizer: Startup")
+            .with_width(340)
+            .with_height(580)
+            .with_style(Style::Fluent)
+            .with_colors(ColorScheme::Dark2)
+            .with_icon("resources/icon.ico")
+            .centered()
+            .resizable()
     }
 
-    fn widgets_mut(&mut self) -> &mut HashMap<String, AnyWidget> {
+    fn widgets(&self) -> &HashMap<WidgetName, AnyWidget> {
+        &self.widgets
+    }
+
+    fn widgets_mut(&mut self) -> &mut HashMap<WidgetName, AnyWidget> {
         &mut self.widgets
     }
 
-    fn populate_ui(&mut self, sender: fltk::app::Sender<Self::Message>, grid: &mut fltk::group::Grid) -> Result<(), GuiError> {
+    fn populate_ui(&mut self, sender: fltk::app::Sender<Self::Message>, layout: crate::application::AnyGroup) -> Result<(), GuiError> {
         let profile_choice = self.add_widget(
-            "profile_choice",
+            WidgetName::ProfileChoice,
             Choice::default()
                 .with_size(300, 30)
                 .with_align(Align::TopLeft)
@@ -84,7 +87,7 @@ impl GothicOrganizerWindow for StartupWindow {
         });
 
         let browse_button = self.add_widget(
-            "browse_button",
+            WidgetName::BrowseButton,
             Button::default()
                 .with_size(300, 30)
                 .with_align(Align::Center)
@@ -97,7 +100,7 @@ impl GothicOrganizerWindow for StartupWindow {
         browse_button.borrow_mut().deactivate();
 
         let instance_entry = self.add_widget(
-            "instance_entry",
+            WidgetName::InstanceEntry,
             Input::default()
                 .with_size(300, 30)
                 .with_align(Align::TopLeft)
@@ -113,7 +116,7 @@ impl GothicOrganizerWindow for StartupWindow {
         instance_entry.borrow_mut().deactivate();
 
         let instance_selector = self.add_widget(
-            "instance_selector",
+            WidgetName::InstanceSelector,
             HoldBrowser::default()
                 .with_size(300, 200)
                 .with_align(Align::TopLeft)
@@ -133,7 +136,7 @@ impl GothicOrganizerWindow for StartupWindow {
         instance_selector.borrow_mut().deactivate();
 
         let add_instance_button = self.add_widget(
-            "add_instance_button",
+            WidgetName::AddInstanceButton,
             Button::default()
                 .with_size(300, 30)
                 .with_align(Align::Center)
@@ -146,7 +149,7 @@ impl GothicOrganizerWindow for StartupWindow {
         add_instance_button.borrow_mut().deactivate();
 
         let remove_instance_button = self.add_widget(
-            "remove_instance_button",
+            WidgetName::RemoveInstanceButton,
             Button::default()
                 .with_size(300, 30)
                 .with_align(Align::Center)
@@ -159,7 +162,7 @@ impl GothicOrganizerWindow for StartupWindow {
         remove_instance_button.borrow_mut().deactivate();
 
         let start_button = self.add_widget(
-            "start_button",
+            WidgetName::StartButton,
             Button::default()
                 .with_size(300, 30)
                 .with_align(Align::Center)
@@ -170,7 +173,7 @@ impl GothicOrganizerWindow for StartupWindow {
         start_button.borrow_mut().deactivate();
 
         let cancel_button = self.add_widget(
-            "cancel_button",
+            WidgetName::CancelButton,
             Button::default()
                 .with_size(300, 30)
                 .with_align(Align::Center)
@@ -179,54 +182,56 @@ impl GothicOrganizerWindow for StartupWindow {
 
         cancel_button.borrow_mut().emit(sender, Message::Exit);
 
-        grid.set_widget_ext(
-            profile_choice.borrow_mut().deref_mut(),
-            0,
-            0,
-            GridAlign::PROPORTIONAL,
-        )?;
-        grid.set_widget_ext(
-            browse_button.borrow_mut().deref_mut(),
-            1,
-            0,
-            GridAlign::PROPORTIONAL,
-        )?;
-        grid.set_widget_ext(
-            instance_entry.borrow_mut().deref_mut(),
-            2,
-            0,
-            GridAlign::PROPORTIONAL,
-        )?;
-        grid.set_widget_ext(
-            add_instance_button.borrow_mut().deref_mut(),
-            3,
-            0,
-            GridAlign::PROPORTIONAL,
-        )?;
-        grid.set_widget_ext(
-            remove_instance_button.borrow_mut().deref_mut(),
-            4,
-            0,
-            GridAlign::PROPORTIONAL,
-        )?;
-        grid.set_widget_ext(
-            instance_selector.borrow_mut().deref_mut(),
-            5,
-            0,
-            GridAlign::PROPORTIONAL,
-        )?;
-        grid.set_widget_ext(
-            start_button.borrow_mut().deref_mut(),
-            6,
-            0,
-            GridAlign::PROPORTIONAL,
-        )?;
-        grid.set_widget_ext(
-            cancel_button.borrow_mut().deref_mut(),
-            7,
-            0,
-            GridAlign::PROPORTIONAL,
-        )?;
+        if let Some(mut grid_layout) = layout.as_grid_mut() {
+            grid_layout.set_widget_ext(
+                profile_choice.borrow_mut().deref_mut(),
+                0,
+                0,
+                GridAlign::PROPORTIONAL,
+            )?;
+            grid_layout.set_widget_ext(
+                browse_button.borrow_mut().deref_mut(),
+                1,
+                0,
+                GridAlign::PROPORTIONAL,
+            )?;
+            grid_layout.set_widget_ext(
+                instance_entry.borrow_mut().deref_mut(),
+                2,
+                0,
+                GridAlign::PROPORTIONAL,
+            )?;
+            grid_layout.set_widget_ext(
+                add_instance_button.borrow_mut().deref_mut(),
+                3,
+                0,
+                GridAlign::PROPORTIONAL,
+            )?;
+            grid_layout.set_widget_ext(
+                remove_instance_button.borrow_mut().deref_mut(),
+                4,
+                0,
+                GridAlign::PROPORTIONAL,
+            )?;
+            grid_layout.set_widget_ext(
+                instance_selector.borrow_mut().deref_mut(),
+                5,
+                0,
+                GridAlign::PROPORTIONAL,
+            )?;
+            grid_layout.set_widget_ext(
+                start_button.borrow_mut().deref_mut(),
+                6,
+                0,
+                GridAlign::PROPORTIONAL,
+            )?;
+            grid_layout.set_widget_ext(
+                cancel_button.borrow_mut().deref_mut(),
+                7,
+                0,
+                GridAlign::PROPORTIONAL,
+            )?;
+        }
 
         Ok(())
     }
@@ -254,7 +259,7 @@ impl GothicOrganizerWindow for StartupWindow {
 
                 self.selected_profile_index = index;
                 self.selected_profile = profile;
-                self.activate_widget("browse_button")?;
+                self.activate_widget(WidgetName::BrowseButton)?;
             }
 
             Message::SelectInstance(index) => {
@@ -267,32 +272,42 @@ impl GothicOrganizerWindow for StartupWindow {
                     }
                 }
 
-                self.activate_widget("start_button")?;
+                self.activate_widget(WidgetName::StartButton)?;
             }
 
             Message::SelectProfileDirectory => {
-                let dir = FileDialog::new()
-                    .pick_folder()
-                    .map(|p| p.to_str().unwrap().to_string());
+                let mut file_dialog = NativeFileChooser::new(NativeFileChooserType::BrowseDir);
+                file_dialog.set_title("Select game directory");
+                file_dialog.show();
 
-                self.selected_directory = dir;
-                self.current_profile = match load_profile!(&self.selected_profile.clone().unwrap()) {
-                    Some(p) => Some(p),
-                    None => {
-                        init_profile(
-                            &self.selected_profile.clone().unwrap(),
-                            self.selected_directory.clone().unwrap(),
-                            None,
-                        )?;
+                match file_dialog.filename().to_string_lossy().to_string() {
+                    dir if !dir.is_empty() => {
+                        self.selected_directory = Some(dir);
+                        self.current_profile = match load_profile!(&self.selected_profile.clone().unwrap()) {
+                            Some(p) => Some(p),
+                            None => {
+                                init_profile(
+                                    &self.selected_profile.clone().unwrap(),
+                                    self.selected_directory.clone().unwrap(),
+                                    None,
+                                )?;
 
-                        load_profile!(&self.selected_profile.clone().unwrap())
+                                load_profile!(&self.selected_profile.clone().unwrap())
+                            }
+                        };
+
+                        self.activate_widget(WidgetName::InstanceEntry)?;
+                        self.activate_widget(WidgetName::AddInstanceButton)?;
+                        self.activate_widget(WidgetName::RemoveInstanceButton)?;
+                        self.activate_widget(WidgetName::InstanceSelector)?;
                     }
-                };
-
-                self.activate_widget("instance_entry")?;
-                self.activate_widget("add_instance_button")?;
-                self.activate_widget("remove_instance_button")?;
-                self.activate_widget("instance_selector")?;
+                    _ => {
+                        self.deactivate_widget(WidgetName::InstanceEntry)?;
+                        self.deactivate_widget(WidgetName::AddInstanceButton)?;
+                        self.deactivate_widget(WidgetName::RemoveInstanceButton)?;
+                        self.deactivate_widget(WidgetName::InstanceSelector)?;
+                    }
+                }
             }
 
             Message::AddInstance => {
@@ -309,11 +324,7 @@ impl GothicOrganizerWindow for StartupWindow {
                     self.instance_choices = Some(vec![self.instance_name_input.clone()]);
                 }
 
-                if let AnyWidget::HoldBrowser(instance_selector) = self
-                    .widgets
-                    .get("instance_selector")
-                    .ok_or(GuiError::WidgetNotFound("instance_selector".to_owned()))?
-                {
+                if let AnyWidget::HoldBrowser(instance_selector) = self.widget(WidgetName::InstanceSelector)? {
                     instance_selector
                         .borrow_mut()
                         .add(&self.instance_name_input);
@@ -330,27 +341,27 @@ impl GothicOrganizerWindow for StartupWindow {
             Message::RemoveInstance => {
                 let index = self.selected_instance_index;
 
+                let instance_selector = self.widget(WidgetName::InstanceSelector)?;
+
                 let Some(selected_instance_name) = self.selected_instance.clone() else {
                     return Ok(Task::None);
                 };
 
-                if let Some(available) = &mut self.instance_choices {
-                    if index != 0 && index - 1 < available.len() as i32 && !available.is_empty() {
-                        available.remove((index as usize).saturating_sub(1));
+                let Some(available) = &mut self.instance_choices else {
+                    return Ok(Task::None);
+                };
 
-                        if let AnyWidget::HoldBrowser(instance_selector) = self
-                            .widgets
-                            .get("instance_selector")
-                            .ok_or(GuiError::WidgetNotFound("instance_selector".to_owned()))?
-                        {
-                            instance_selector.borrow_mut().remove(index);
-                        }
-                    }
+                if index != 0 && index - 1 < available.len() as i32 && !available.is_empty() {
+                    available.remove((index as usize).saturating_sub(1));
 
-                    if available.is_empty() {
-                        self.deactivate_widget("start_button")?;
-                        self.instance_choices = None;
+                    if let AnyWidget::HoldBrowser(instance_selector) = instance_selector {
+                        instance_selector.borrow_mut().remove(index);
                     }
+                }
+
+                if available.is_empty() {
+                    self.deactivate_widget(WidgetName::StartButton)?;
+                    self.instance_choices = None;
                 }
 
                 self.current_profile
@@ -421,6 +432,35 @@ pub enum Message {
 pub enum Task {
     CloseWindow,
     None,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, std::hash::Hash)]
+pub enum WidgetName {
+    ProfileSelector,
+    ProfileChoice,
+    InstanceSelector,
+    InstanceEntry,
+    AddInstanceButton,
+    RemoveInstanceButton,
+    StartButton,
+    BrowseButton,
+    CancelButton,
+}
+
+impl From<WidgetName> for String {
+    fn from(value: WidgetName) -> Self {
+        match value {
+            WidgetName::ProfileSelector => "profile_selector".to_owned(),
+            WidgetName::ProfileChoice => "profile_choice".to_owned(),
+            WidgetName::InstanceSelector => "instance_selector".to_owned(),
+            WidgetName::InstanceEntry => "instance_entry".to_owned(),
+            WidgetName::AddInstanceButton => "add_instance_button".to_owned(),
+            WidgetName::RemoveInstanceButton => "remove_instance_button".to_owned(),
+            WidgetName::StartButton => "start_button".to_owned(),
+            WidgetName::BrowseButton => "browse_button".to_owned(),
+            WidgetName::CancelButton => "cancel_button".to_owned(),
+        }
+    }
 }
 
 pub mod prelude {

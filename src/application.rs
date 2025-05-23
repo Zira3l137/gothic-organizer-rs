@@ -1,12 +1,14 @@
 use std::cell::RefCell;
 use std::cell::RefMut;
 use std::collections::hash_map::HashMap;
+use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
 
 use fltk::app::App;
 use fltk::browser::*;
 use fltk::button::*;
+use fltk::group::*;
 use fltk::image::IcoImage;
 use fltk::input::*;
 use fltk::menu::*;
@@ -26,19 +28,23 @@ use crate::error::GuiError;
 pub trait GothicOrganizerWindow {
     type Message: Clone + Send + Sync + 'static;
     type Task: Clone + Send + Sync + 'static;
+    type WidgetName: Clone + Send + Sync + Eq + Into<String> + std::hash::Hash + 'static;
 
     /// Should return a reference to the `ApplicationSettings` used
     /// to build this window.
     fn settings(&self) -> ApplicationSettings;
 
+    /// Should return a reference to the container used to store widgets used by this window.
+    fn widgets(&self) -> &HashMap<Self::WidgetName, AnyWidget>;
+
     /// Should return a mutable reference to the container used to store widgets used by this window.
-    fn widgets_mut(&mut self) -> &mut HashMap<String, AnyWidget>;
+    fn widgets_mut(&mut self) -> &mut HashMap<Self::WidgetName, AnyWidget>;
 
     /// Constructs the `Window` (with size, pos, icon, etc).
     fn window(settings: &ApplicationSettings) -> Window {
         let mut wnd = Window::default()
             .with_size(settings.width, settings.height)
-            .with_pos(settings.resolution.0, settings.resolution.1)
+            .with_pos(settings.x, settings.y)
             .with_label(&settings.title);
 
         if settings.centered {
@@ -67,7 +73,7 @@ pub trait GothicOrganizerWindow {
     /// Constructs the UI for this window.
     /// All widgets need to be defined in this method. Dedicated `add_widget` method can be used to
     /// do this.
-    fn populate_ui(&mut self, sender: fltk::app::Sender<Self::Message>, grid: &mut fltk::group::Grid) -> Result<(), GuiError>;
+    fn populate_ui(&mut self, sender: fltk::app::Sender<Self::Message>, layout: AnyGroup) -> Result<(), GuiError>;
 
     /// Here the concrete window should match `msg` and mutate itself,
     /// potentially sending back a `GuiError` or a `Task` to be handled by `event_loop`.
@@ -106,7 +112,7 @@ pub trait GothicOrganizerWindow {
         grid.set_margin(10, 20, 10, 10);
         grid.set_gap(20, 10);
 
-        self.populate_ui(s, &mut grid)?;
+        self.populate_ui(s, Rc::new(RefCell::new(grid)).into())?;
 
         wnd.end();
         wnd.show();
@@ -117,23 +123,29 @@ pub trait GothicOrganizerWindow {
     }
 
     /// Adds a widget to the dedicated container under `name` and returns a reference to it.
-    fn add_widget<T>(&mut self, name: &str, widget: T) -> Rc<RefCell<T>>
+    fn add_widget<T>(&mut self, name: Self::WidgetName, widget: T) -> Rc<RefCell<T>>
     where
         T: WidgetExt + 'static,
         Rc<RefCell<T>>: Into<AnyWidget>,
     {
         let rc = Rc::new(RefCell::new(widget));
-        self.widgets_mut()
-            .insert(name.to_string(), rc.clone().into());
+        self.widgets_mut().insert(name, rc.clone().into());
         rc
     }
 
+    fn widget(&self, name: Self::WidgetName) -> Result<AnyWidget, GuiError> {
+        self.widgets()
+            .get(&name)
+            .cloned()
+            .ok_or(GuiError::WidgetNotFound(name.into()))
+    }
+
     /// Activates the widget under `name`.
-    fn activate_widget(&mut self, name: &str) -> Result<(), GuiError> {
+    fn activate_widget(&mut self, name: Self::WidgetName) -> Result<(), GuiError> {
         let query = self
             .widgets_mut()
-            .get(name)
-            .ok_or(GuiError::WidgetNotFound(name.to_owned()))?;
+            .get(&name)
+            .ok_or(GuiError::WidgetNotFound(name.into()))?;
 
         let mut w = query.as_widget_ext_mut();
         w.activate();
@@ -141,11 +153,11 @@ pub trait GothicOrganizerWindow {
     }
 
     /// Deactivates the widget under `name`.
-    fn deactivate_widget(&mut self, name: &str) -> Result<(), GuiError> {
+    fn deactivate_widget(&mut self, name: Self::WidgetName) -> Result<(), GuiError> {
         let query = self
             .widgets_mut()
-            .get(name)
-            .ok_or(GuiError::WidgetNotFound(name.to_owned()))?;
+            .get(&name)
+            .ok_or(GuiError::WidgetNotFound(name.into()))?;
 
         let mut w = query.as_widget_ext_mut();
         w.deactivate();
@@ -153,7 +165,47 @@ pub trait GothicOrganizerWindow {
     }
 }
 
-#[allow(dead_code)]
+pub enum AnyGroup {
+    Flex(Rc<RefCell<Flex>>),
+    Grid(Rc<RefCell<Grid>>),
+}
+
+impl From<Rc<RefCell<Flex>>> for AnyGroup {
+    fn from(x: Rc<RefCell<Flex>>) -> Self {
+        AnyGroup::Flex(x)
+    }
+}
+impl From<Rc<RefCell<Grid>>> for AnyGroup {
+    fn from(x: Rc<RefCell<Grid>>) -> Self {
+        AnyGroup::Grid(x)
+    }
+}
+
+impl AnyGroup {
+    pub fn as_group_mut(&self) -> RefMut<dyn GroupExt> {
+        match self {
+            AnyGroup::Flex(x) => x.borrow_mut(),
+            AnyGroup::Grid(x) => x.borrow_mut(),
+        }
+    }
+
+    pub fn as_grid_mut(&self) -> Option<RefMut<Grid>> {
+        if let AnyGroup::Grid(x) = self {
+            Some(x.borrow_mut())
+        } else {
+            None
+        }
+    }
+
+    pub fn as_flex_mut(&self) -> Option<RefMut<Flex>> {
+        if let AnyGroup::Flex(x) = self {
+            Some(x.borrow_mut())
+        } else {
+            None
+        }
+    }
+}
+
 #[derive(Clone)]
 pub enum AnyWidget {
     TextDisplay(Rc<RefCell<TextDisplay>>),
@@ -273,8 +325,74 @@ pub struct ApplicationSettings {
     pub width: i32,
     pub height: i32,
     pub centered: bool,
-    pub resolution: (i32, i32),
+    pub x: i32,
+    pub y: i32,
     pub resizable: bool,
     pub style: Style,
     pub colors: ColorScheme,
+}
+
+#[allow(dead_code)]
+impl ApplicationSettings {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_icon(mut self, icon: impl AsRef<Path>) -> Self {
+        let path = icon.as_ref();
+
+        self.icon = Some(path.into());
+        self
+    }
+
+    pub fn with_title(mut self, title: impl Into<String>) -> Self {
+        self.title = title.into();
+        self
+    }
+
+    pub fn with_width(mut self, width: i32) -> Self {
+        self.width = width;
+        self
+    }
+
+    pub fn with_height(mut self, height: i32) -> Self {
+        self.height = height;
+        self
+    }
+
+    pub fn with_x(mut self, x: i32) -> Self {
+        self.x = x;
+        self
+    }
+
+    pub fn with_y(mut self, y: i32) -> Self {
+        self.y = y;
+        self
+    }
+
+    pub fn with_position(mut self, x: i32, y: i32) -> Self {
+        self.x = x;
+        self.y = y;
+        self
+    }
+
+    pub fn centered(mut self) -> Self {
+        self.centered = true;
+        self
+    }
+
+    pub fn resizable(mut self) -> Self {
+        self.resizable = true;
+        self
+    }
+
+    pub fn with_style(mut self, style: Style) -> Self {
+        self.style = style;
+        self
+    }
+
+    pub fn with_colors(mut self, colors: ColorScheme) -> Self {
+        self.colors = colors;
+        self
+    }
 }
