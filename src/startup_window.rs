@@ -1,7 +1,10 @@
+use std::cell::RefCell;
 use std::collections::hash_map::HashMap;
 use std::fs::read_dir;
 use std::fs::remove_dir_all;
 use std::ops::DerefMut;
+use std::path::PathBuf;
+use std::rc::Rc;
 
 use fltk::browser::HoldBrowser;
 use fltk::button::Button;
@@ -22,25 +25,23 @@ use crate::constants::ColorScheme;
 use crate::constants::Style;
 use crate::error::GuiError;
 use crate::impl_widget_name_enum;
-use crate::load_profile;
 use crate::local_instances;
-use crate::profile::init_profile;
 use crate::profile::Instance;
 use crate::profile::Profile;
 use crate::save_profile;
 
+/// A shortcut for a `Rc<RefCell<T>>`
+type MutRc<T> = Rc<RefCell<T>>;
+
 #[derive(Default)]
 pub struct StartupWindow {
     widgets: HashMap<WidgetName, AnyWidget>,
-    profile_choices: Vec<String>,
+    profiles: MutRc<Vec<MutRc<Profile>>>,
+    instances: MutRc<Vec<MutRc<Instance>>>,
+    current_profile: MutRc<Profile>,
     instance_name_input: String,
-    instance_choices: Option<Vec<String>>,
-    current_profile: Option<Profile>,
     selected_profile_index: i32,
     selected_instance_index: i32,
-    pub selected_directory: Option<String>,
-    pub selected_profile: Option<String>,
-    pub selected_instance: Option<String>,
     pub canceled: bool,
 }
 
@@ -78,14 +79,16 @@ impl GothicOrganizerWindow for StartupWindow {
                 .with_label("Profile:"),
         );
 
-        self.profile_choices.iter().for_each(|p| {
-            profile_choice.borrow_mut().add_choice(p);
-        });
-
-        profile_choice.borrow_mut().set_callback(move |w| {
-            let index = w.value();
-            sender.send(Message::SelectProfile(index));
-        });
+        {
+            let mut profile_choice = profile_choice.borrow_mut();
+            self.profiles.borrow().iter().for_each(|p| {
+                profile_choice.add_choice(&p.borrow().name);
+            });
+            profile_choice.set_callback(move |w| {
+                let index = w.value();
+                sender.send(Message::SelectProfile(index));
+            });
+        }
 
         let browse_button = self.add_widget(
             WidgetName::BrowseButton,
@@ -95,10 +98,11 @@ impl GothicOrganizerWindow for StartupWindow {
                 .with_label("Browse game directory..."),
         );
 
-        browse_button
-            .borrow_mut()
-            .emit(sender, Message::SelectProfileDirectory);
-        browse_button.borrow_mut().deactivate();
+        {
+            let mut browse_button = browse_button.borrow_mut();
+            browse_button.emit(sender, Message::SelectProfileDirectory);
+            browse_button.deactivate();
+        }
 
         let instance_entry = self.add_widget(
             WidgetName::InstanceEntry,
@@ -108,13 +112,12 @@ impl GothicOrganizerWindow for StartupWindow {
                 .with_label("New instance name:"),
         );
 
-        instance_entry
-            .borrow_mut()
-            .set_trigger(CallbackTrigger::EnterKeyChanged);
-        instance_entry
-            .borrow_mut()
-            .set_callback(move |i| sender.send(Message::InputInstanceName(i.value().to_string())));
-        instance_entry.borrow_mut().deactivate();
+        {
+            let mut instance_entry = instance_entry.borrow_mut();
+            instance_entry.set_trigger(CallbackTrigger::EnterKeyChanged);
+            instance_entry.set_callback(move |i| sender.send(Message::InputInstanceName(i.value().to_string())));
+            instance_entry.deactivate();
+        }
 
         let instance_selector = self.add_widget(
             WidgetName::InstanceSelector,
@@ -124,17 +127,17 @@ impl GothicOrganizerWindow for StartupWindow {
                 .with_label("Instances:"),
         );
 
-        instance_selector.borrow_mut().set_callback(move |w| {
-            let index = w.value();
-            sender.send(Message::SelectInstance(index));
-        });
-
-        if let Some(available) = &self.instance_choices {
-            available.iter().for_each(|i| {
-                instance_selector.borrow_mut().add(i);
+        {
+            let mut instance_selector = instance_selector.borrow_mut();
+            self.instances.borrow().iter().for_each(|i| {
+                instance_selector.add(&i.borrow().name);
             });
+            instance_selector.set_callback(move |w| {
+                let index = w.value();
+                sender.send(Message::SelectInstance(index));
+            });
+            instance_selector.deactivate();
         }
-        instance_selector.borrow_mut().deactivate();
 
         let add_instance_button = self.add_widget(
             WidgetName::AddInstanceButton,
@@ -144,10 +147,11 @@ impl GothicOrganizerWindow for StartupWindow {
                 .with_label("Add instance"),
         );
 
-        add_instance_button
-            .borrow_mut()
-            .emit(sender, Message::AddInstance);
-        add_instance_button.borrow_mut().deactivate();
+        {
+            let mut add_instance_button = add_instance_button.borrow_mut();
+            add_instance_button.emit(sender, Message::AddInstance);
+            add_instance_button.deactivate();
+        }
 
         let remove_instance_button = self.add_widget(
             WidgetName::RemoveInstanceButton,
@@ -157,10 +161,11 @@ impl GothicOrganizerWindow for StartupWindow {
                 .with_label("Remove instance"),
         );
 
-        remove_instance_button
-            .borrow_mut()
-            .emit(sender, Message::RemoveInstance);
-        remove_instance_button.borrow_mut().deactivate();
+        {
+            let mut remove_instance_button = remove_instance_button.borrow_mut();
+            remove_instance_button.emit(sender, Message::RemoveInstance);
+            remove_instance_button.deactivate();
+        }
 
         let start_button = self.add_widget(
             WidgetName::StartButton,
@@ -170,8 +175,11 @@ impl GothicOrganizerWindow for StartupWindow {
                 .with_label("Start"),
         );
 
-        start_button.borrow_mut().emit(sender, Message::Start);
-        start_button.borrow_mut().deactivate();
+        {
+            let mut start_button = start_button.borrow_mut();
+            start_button.emit(sender, Message::Start);
+            start_button.deactivate();
+        }
 
         let cancel_button = self.add_widget(
             WidgetName::CancelButton,
@@ -253,24 +261,20 @@ impl GothicOrganizerWindow for StartupWindow {
             }
 
             Message::SelectProfile(index) => {
-                let profile = self
-                    .profile_choices
-                    .get(index as usize)
-                    .map(|p| p.to_string());
+                let profiles_clone = self.profiles.clone();
+                let profiles_borrowed = profiles_clone.borrow();
+                let Some(profile) = profiles_borrowed.get(index as usize) else {
+                    return Ok(Task::None);
+                };
 
                 self.selected_profile_index = index;
-                self.selected_profile = profile;
+                self.current_profile = profile.clone();
                 self.activate_widget(&WidgetName::BrowseButton)?;
             }
 
             Message::SelectInstance(index) => {
-                self.selected_instance_index = index;
-
-                if let Some(available) = &self.instance_choices {
-                    if index != 0 && index - 1 < available.len() as i32 && !available.is_empty() {
-                        let instance = available.get((index as usize).saturating_sub(1)).cloned();
-                        self.selected_instance = instance;
-                    }
+                if index != 0 && index - 1 < self.instances.borrow().len() as i32 && !self.instances.borrow().is_empty() {
+                    self.selected_instance_index = index;
                 }
 
                 self.activate_widget(&WidgetName::StartButton)?;
@@ -281,21 +285,9 @@ impl GothicOrganizerWindow for StartupWindow {
                 file_dialog.set_title("Select game directory");
                 file_dialog.show();
 
-                match file_dialog.filename().to_string_lossy().to_string() {
-                    dir if !dir.is_empty() => {
-                        self.selected_directory = Some(dir);
-                        self.current_profile = match load_profile!(&self.selected_profile.clone().unwrap()) {
-                            Some(p) => Some(p),
-                            None => {
-                                init_profile(
-                                    &self.selected_profile.clone().unwrap(),
-                                    self.selected_directory.clone().unwrap(),
-                                    None,
-                                )?;
-
-                                load_profile!(&self.selected_profile.clone().unwrap())
-                            }
-                        };
+                match file_dialog.filename() {
+                    dir if dir.exists() => {
+                        self.current_profile.borrow_mut().game_path = dir;
 
                         self.activate_widget(&WidgetName::InstanceEntry)?;
                         self.activate_widget(&WidgetName::AddInstanceButton)?;
@@ -316,14 +308,33 @@ impl GothicOrganizerWindow for StartupWindow {
                     return Ok(Task::None);
                 }
 
-                if let Some(available) = &mut self.instance_choices {
-                    if available.contains(&self.instance_name_input) {
-                        return Ok(Task::None);
+                if !self.instances.borrow().is_empty() {
+                    let mut instances_borrowed = self.instances.borrow_mut();
+
+                    match instances_borrowed
+                        .iter()
+                        .find(|i| i.borrow().name.to_lowercase() == self.instance_name_input.to_lowercase())
+                    {
+                        Some(_) => {
+                            return Ok(Task::None);
+                        }
+                        None => {
+                            instances_borrowed.push(Rc::new(RefCell::new(Instance::new(
+                                &self.instance_name_input,
+                            ))));
+                        }
                     }
-                    available.push(self.instance_name_input.clone());
                 } else {
-                    self.instance_choices = Some(vec![self.instance_name_input.clone()]);
+                    self.instances.replace_with(|_| {
+                        vec![Rc::new(RefCell::new(Instance::new(
+                            &self.instance_name_input,
+                        )))]
+                    });
                 }
+
+                self.current_profile
+                    .borrow_mut()
+                    .add_instance(Instance::new(&self.instance_name_input));
 
                 if let AnyWidget::HoldBrowser(instance_selector) = self.widget(&WidgetName::InstanceSelector)? {
                     instance_selector
@@ -331,46 +342,40 @@ impl GothicOrganizerWindow for StartupWindow {
                         .add(&self.instance_name_input);
                 }
 
-                self.current_profile
-                    .as_mut()
-                    .unwrap()
-                    .add_instance(Instance::new(self.instance_name_input.clone()));
-
-                save_profile!(self.current_profile.clone().unwrap())?;
+                save_profile!(self.current_profile.borrow_mut().clone())?;
             }
 
             Message::RemoveInstance => {
                 let index = self.selected_instance_index;
 
-                let instance_selector = self.widget(&WidgetName::InstanceSelector)?;
-
-                let Some(selected_instance_name) = self.selected_instance.clone() else {
+                let AnyWidget::HoldBrowser(instance_selector) = self.widget(&WidgetName::InstanceSelector)? else {
                     return Ok(Task::None);
                 };
 
-                let Some(available) = &mut self.instance_choices else {
-                    return Ok(Task::None);
+                let available = self.instances.clone();
+
+                let selected_instance_name = match available.borrow().get(index.saturating_sub(1) as usize) {
+                    Some(instance) => instance.borrow().name.clone(),
+                    None => return Ok(Task::None),
                 };
 
-                if index != 0 && index - 1 < available.len() as i32 && !available.is_empty() {
-                    available.remove((index as usize).saturating_sub(1));
-
-                    if let AnyWidget::HoldBrowser(instance_selector) = instance_selector {
-                        instance_selector.borrow_mut().remove(index);
-                    }
+                if index != 0 && index - 1 < available.borrow().len() as i32 && !available.borrow().is_empty() {
+                    available
+                        .borrow_mut()
+                        .remove((index as usize).saturating_sub(1));
+                    instance_selector.borrow_mut().remove(index);
                 }
 
-                if available.is_empty() {
+                if available.borrow().is_empty() {
                     self.deactivate_widget(&WidgetName::StartButton)?;
-                    self.instance_choices = None;
+                    self.instances = Rc::new(RefCell::new(Vec::new()));
                 }
 
                 self.current_profile
-                    .as_mut()
-                    .unwrap()
-                    .remove_instance(selected_instance_name.clone());
+                    .borrow_mut()
+                    .remove_instance(&selected_instance_name);
 
-                read_dir(local_instances!(self.selected_profile.clone().unwrap()))?.find_map(|d| {
+                read_dir(local_instances!(&self.current_profile.borrow().name))?.find_map(|d| {
                     d.ok().and_then(|e| {
                         if e.file_name().to_string_lossy().to_lowercase() == selected_instance_name.to_lowercase() {
                             remove_dir_all(e.path()).ok()
@@ -409,11 +414,32 @@ impl GothicOrganizerWindow for StartupWindow {
 
 impl StartupWindow {
     pub fn new() -> Self {
+        let profiles = game_profile_list()
+            .iter()
+            .map(|p| Rc::new(RefCell::new(Profile::new(p, PathBuf::new()))))
+            .collect::<Vec<MutRc<Profile>>>();
+
+        let profiles = Rc::new(RefCell::new(profiles));
+
         Self {
             canceled: false,
-            profile_choices: game_profile_list().to_vec(),
+            profiles,
             ..Default::default()
         }
+    }
+
+    pub fn selected_profile(&self) -> Option<Rc<RefCell<Profile>>> {
+        self.profiles
+            .borrow()
+            .get(self.selected_profile_index as usize)
+            .cloned()
+    }
+
+    pub fn selected_instance(&self) -> Option<Rc<RefCell<Instance>>> {
+        self.instances
+            .borrow()
+            .get(self.selected_instance_index.saturating_sub(1) as usize)
+            .cloned()
     }
 }
 

@@ -26,6 +26,7 @@ use crate::constants::Style;
 use crate::error::GuiError;
 
 #[macro_export]
+/// Generates the `WidgetName` enum and `From<WidgetName> for String` impl
 macro_rules! impl_widget_name_enum {
     ($($name_variant:ident,)+) => {
         #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
@@ -43,6 +44,7 @@ macro_rules! impl_widget_name_enum {
     };
 }
 
+/// Generates the `From<Rc<RefCell<$ty>>> for AnyWidget` impl
 macro_rules! impl_from_widget {
     ($ty:ty => $variant:ident) => {
         impl From<Rc<RefCell<$ty>>> for AnyWidget {
@@ -317,7 +319,7 @@ impl_from_widget!(Input        => Input);
 
 impl AnyWidget {
     /// Get a `RefMut<dyn WidgetExt>` no matter which variant we are.
-    fn as_widget_ext_mut(&self) -> RefMut<dyn WidgetExt> {
+    pub fn as_widget_ext_mut(&self) -> RefMut<dyn WidgetExt> {
         match self {
             AnyWidget::Basic(w) => w.borrow_mut(),
             AnyWidget::Valuator(w) => RefMut::map(w.borrow_mut(), |v| v as &mut dyn WidgetExt),

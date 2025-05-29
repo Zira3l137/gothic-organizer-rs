@@ -33,7 +33,7 @@ pub struct Session {
     pub selected_instance_name: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct Profile {
     pub name: String,
     pub game_path: PathBuf,
@@ -41,9 +41,9 @@ pub struct Profile {
 }
 
 impl Profile {
-    pub fn new(name: String, game_path: PathBuf) -> Profile {
+    pub fn new(name: &str, game_path: PathBuf) -> Profile {
         Profile {
-            name,
+            name: name.to_owned(),
             game_path,
             instances: None,
         }
@@ -56,14 +56,14 @@ impl Profile {
         }
     }
 
-    pub fn remove_instance(&mut self, name: String) {
+    pub fn remove_instance(&mut self, name: &str) {
         if let Some(instances) = &mut self.instances {
             instances.retain(|i| i.name != name);
         }
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct Instance {
     pub name: String,
     pub mods: Option<Vec<ModInfo>>,
@@ -71,29 +71,29 @@ pub struct Instance {
 }
 
 impl Instance {
-    pub fn new(name: String) -> Instance {
+    pub fn new(name: &str) -> Instance {
         Instance {
-            name,
+            name: name.to_owned(),
             mods: None,
             downloads: None,
         }
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct ModInfo {
     pub name: String,
     pub path: PathBuf,
     pub config: ModConfig,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct ModConfig {
     pub enabled: bool,
     pub files: Option<HashMap<PathBuf, bool>>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct DownloadInfo {
     pub name: String,
     pub url: String,

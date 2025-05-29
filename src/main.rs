@@ -22,17 +22,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 return Ok(());
             }
 
-            let Some(selected_profile) = &startup_window.selected_profile else {
+            let Some(selected_profile) = &startup_window.selected_profile() else {
                 return Ok(());
             };
 
-            let Some(selected_instance) = &startup_window.selected_instance else {
+            let Some(selected_instance) = &startup_window.selected_instance() else {
                 return Ok(());
             };
 
             save_session!(
-                Some(selected_profile.clone()),
-                Some(selected_instance.clone())
+                Some(selected_profile.borrow().clone().name),
+                Some(selected_instance.borrow().clone().name)
             )?;
 
             load_session!().unwrap()
