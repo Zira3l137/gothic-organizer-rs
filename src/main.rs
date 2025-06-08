@@ -1,9 +1,11 @@
 mod application;
 mod constants;
+mod editor;
 mod error;
 mod profile;
 mod startup_window;
 
+use crate::editor::prelude::*;
 use crate::startup_window::prelude::*;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -15,31 +17,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(s) => s,
 
         None => {
-            let mut startup_window = StartupWindow::new();
-            startup_window.run()?;
+            let mut startup_wnd = StartupWindow::new();
+            startup_wnd.run()?;
 
-            if startup_window.canceled {
+            if startup_wnd.canceled {
                 return Ok(());
             }
 
-            let Some(selected_profile) = &startup_window.selected_profile() else {
-                return Ok(());
-            };
-
-            let Some(selected_instance) = &startup_window.selected_instance() else {
-                return Ok(());
-            };
-
             save_session!(
-                Some(selected_profile.borrow().clone().name),
-                Some(selected_instance.borrow().clone().name)
+                Some(startup_wnd.selected_profile()),
+                Some(startup_wnd.selected_instance()),
+                Some(startup_wnd.available_profiles()),
+                Some(startup_wnd.available_instances())
             )?;
 
             load_session!().unwrap()
         }
     };
 
-    println!("\nSession: {:?}", session);
+    let mut editor = EditorWindow::new(session);
+    editor.run()?;
 
     Ok(())
 }
