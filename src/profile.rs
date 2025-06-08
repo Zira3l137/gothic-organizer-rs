@@ -1,6 +1,5 @@
 #![allow(dead_code)]
 
-use std::collections::HashMap;
 use std::env::var;
 use std::fs::create_dir;
 use std::fs::create_dir_all;
@@ -12,6 +11,7 @@ use std::path::PathBuf;
 
 use serde::Deserialize;
 use serde::Serialize;
+use walkdir::WalkDir;
 
 use crate::constants::APP_NAME;
 use crate::error::*;
@@ -27,10 +27,17 @@ pub fn local_app_data() -> String {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct Session {
-    pub selected_profile_name: Option<String>,
-    pub selected_instance_name: Option<String>,
+    pub selected_profile: Option<i32>,
+    pub selected_instance: Option<i32>,
+    pub available_profiles: Option<Vec<String>>,
+}
+
+impl AsRef<Session> for Session {
+    fn as_ref(&self) -> &Session {
+        self
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -66,15 +73,29 @@ impl Profile {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct Instance {
     pub name: String,
+    pub files: Option<Vec<FileNode>>,
     pub mods: Option<Vec<ModInfo>>,
     pub downloads: Option<Vec<DownloadInfo>>,
 }
 
 impl Instance {
-    pub fn new(name: &str) -> Instance {
+    pub fn new<P: AsRef<Path>>(name: &str, files_path: P) -> Instance {
+        let mut files: Vec<FileNode> = Vec::new();
+
+        for entry in WalkDir::new(files_path.as_ref()).into_iter().flatten() {
+            let path = entry.path().to_path_buf();
+            files.push(FileNode::new(
+                path.clone(),
+                path.file_name().unwrap().to_str().unwrap().to_string(),
+                None,
+                true,
+            ))
+        }
+
         Instance {
             name: name.to_owned(),
             mods: None,
+            files: Some(files),
             downloads: None,
         }
     }
@@ -90,7 +111,7 @@ pub struct ModInfo {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct ModConfig {
     pub enabled: bool,
-    pub files: Option<HashMap<PathBuf, bool>>,
+    pub files: Option<Vec<FileNode>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -98,7 +119,38 @@ pub struct DownloadInfo {
     pub name: String,
     pub url: String,
     pub path: PathBuf,
-    pub files: Option<Vec<PathBuf>>,
+    pub files: Option<Vec<FileNode>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default, Ord, PartialOrd)]
+pub struct FileNode {
+    pub path: PathBuf,
+    pub name: String,
+    pub overriden_by: Option<(String, PathBuf)>,
+    pub enabled: bool,
+}
+
+impl FileNode {
+    pub fn new(path: PathBuf, name: String, overriden_by: Option<(String, PathBuf)>, enabled: bool) -> FileNode {
+        FileNode {
+            path,
+            name,
+            overriden_by,
+            enabled,
+        }
+    }
+
+    pub fn length(&self) -> usize {
+        self.path.components().count()
+    }
+
+    pub fn is_dir(&self) -> bool {
+        self.path.is_dir()
+    }
+
+    pub fn override_by(&mut self, name: String, path: PathBuf) {
+        self.overriden_by = Some((name, path));
+    }
 }
 
 fn load_instances(path: PathBuf) -> Option<Vec<Instance>> {
@@ -257,13 +309,15 @@ pub fn init_profile<P: AsRef<Path>>(name: &str, game_path: P, init_path: Option<
 }
 
 pub fn save_session<P: AsRef<Path>>(
-    selected_profile_name: Option<String>,
-    selected_instance_name: Option<String>,
+    selected_profile: Option<i32>,
+    selected_instance: Option<i32>,
+    available_profiles: Option<Vec<String>>,
     custom_path: Option<P>,
 ) -> Result<(), SessionError> {
     let session = Session {
-        selected_profile_name,
-        selected_instance_name,
+        selected_profile,
+        selected_instance,
+        available_profiles,
     };
 
     let default_path = match custom_path {
@@ -298,11 +352,22 @@ pub fn load_session<P: AsRef<Path>>(custom_path: Option<P>) -> Option<Session> {
 
 #[macro_export]
 macro_rules! save_session {
-    ($selected_profile_name: expr, $selected_instance_name: expr, $custom_path: expr) => {
-        $crate::profile::save_session($selected_profile_name, $selected_instance_name, expr)
+    ($selected_profile: expr, $selected_instance: expr, $available_profiles: expr, $available_instances: expr, $custom_path: expr) => {
+        $crate::profile::save_session(
+            $selected_profile,
+            $selected_instance,
+            $available_profiles,
+            $available_instances,
+            expr,
+        )
     };
-    ($selected_profile_name: expr, $selected_instance_name: expr) => {
-        $crate::profile::save_session::<String>($selected_profile_name, $selected_instance_name, None)
+    ($selected_profile: expr, $selected_instance: expr, $available_profiles: expr, $available_instances: expr) => {
+        $crate::profile::save_session::<String>(
+            $selected_profile,
+            $selected_instance,
+            $available_profiles,
+            None,
+        )
     };
 }
 
