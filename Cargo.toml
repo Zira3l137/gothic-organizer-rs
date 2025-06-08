@@ -9,8 +9,9 @@ serde_json = "1.0.140"
 thiserror = "2.0.12"
 fltk = "1.5.8"
 fltk-theme = "0.7.9"
-hashbrown = "0.15.3"
 chrono = "0.4.41"
+walkdir = "2.5.0"
+indexmap = "2.9.0"
 
 #####################
 ### OPTIMIZATION ####
