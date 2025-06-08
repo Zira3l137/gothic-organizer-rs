@@ -16,6 +16,7 @@ use fltk::prelude::*;
 use fltk::table::*;
 use fltk::terminal::*;
 use fltk::text::*;
+use fltk::tree::Tree;
 use fltk::window::Window;
 
 use fltk_theme::ColorTheme;
@@ -250,6 +251,7 @@ pub enum AnyWidget {
     MultiBrowser(Rc<RefCell<MultiBrowser>>),
     SelectBrowser(Rc<RefCell<SelectBrowser>>),
     Table(Rc<RefCell<Table>>),
+    Tree(Rc<RefCell<Tree>>),
     TableRow(Rc<RefCell<TableRow>>),
     Basic(Rc<RefCell<dyn WidgetExt>>),
     Valuator(Rc<RefCell<dyn ValuatorExt>>),
@@ -316,6 +318,8 @@ impl_from_widget!(Terminal     => Terminal);
 impl_from_widget!(Choice       => Menu);
 impl_from_widget!(Button       => Button);
 impl_from_widget!(Input        => Input);
+impl_from_widget!(Flex         => Group);
+impl_from_widget!(Tree         => Tree);
 
 impl AnyWidget {
     /// Get a `RefMut<dyn WidgetExt>` no matter which variant we are.
@@ -342,6 +346,7 @@ impl AnyWidget {
             AnyWidget::TextDisplay(w) => RefMut::map(w.borrow_mut(), |t| t as &mut dyn WidgetExt),
             AnyWidget::TextEditor(w) => RefMut::map(w.borrow_mut(), |t| t as &mut dyn WidgetExt),
             AnyWidget::Terminal(w) => RefMut::map(w.borrow_mut(), |t| t as &mut dyn WidgetExt),
+            AnyWidget::Tree(w) => RefMut::map(w.borrow_mut(), |t| t as &mut dyn WidgetExt),
         }
     }
 }
