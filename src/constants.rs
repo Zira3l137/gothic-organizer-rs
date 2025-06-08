@@ -1,7 +1,8 @@
+use fltk::image::IcoImage;
+use fltk::image::PngImage;
 use fltk_theme::color_themes::fleet::*;
 use fltk_theme::ColorMap;
 use fltk_theme::SchemeType;
-use fltk_theme::ThemeType;
 
 pub const APP_NAME: &str = env!("CARGO_PKG_NAME");
 pub const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -142,4 +143,16 @@ impl From<ColorScheme> for &[ColorMap] {
             ColorScheme::Gray => &GRAY,
         }
     }
+}
+
+pub fn app_icon() -> Option<IcoImage> {
+    IcoImage::load("resources/icon.ico").ok()
+}
+
+pub fn checked_icon() -> Option<PngImage> {
+    PngImage::load("resources/checked.png").ok()
+}
+
+pub fn unchecked_icon() -> Option<PngImage> {
+    PngImage::load("resources/unchecked.png").ok()
 }
