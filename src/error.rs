@@ -42,3 +42,9 @@ pub enum GuiError {
     #[error("Widget not found: {0}")]
     WidgetNotFound(String),
 }
+
+impl GuiError {
+    pub fn err_io<T>(msg: &str, kind: std::io::ErrorKind) -> Result<T, GuiError> {
+        Err(GuiError::IO(std::io::Error::new(kind, msg)))
+    }
+}
