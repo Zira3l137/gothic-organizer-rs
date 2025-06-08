@@ -35,13 +35,13 @@ type MutRc<T> = Rc<RefCell<T>>;
 
 #[derive(Default)]
 pub struct StartupWindow {
-    widgets: HashMap<WidgetName, AnyWidget>,
-    profiles: MutRc<Vec<MutRc<Profile>>>,
-    instances: MutRc<Vec<MutRc<Instance>>>,
     current_profile: MutRc<Profile>,
     instance_name_input: String,
+    widgets: HashMap<WidgetName, AnyWidget>,
     selected_profile_index: i32,
     selected_instance_index: i32,
+    pub profiles: MutRc<Vec<MutRc<Profile>>>,
+    pub instances: MutRc<Vec<MutRc<Instance>>>,
     pub canceled: bool,
 }
 
@@ -308,6 +308,9 @@ impl GothicOrganizerWindow for StartupWindow {
                     return Ok(Task::None);
                 }
 
+                let profile_directory = self.current_profile.borrow().game_path.clone();
+                let new_instance = Instance::new(&self.instance_name_input, &profile_directory);
+
                 if !self.instances.borrow().is_empty() {
                     let mut instances_borrowed = self.instances.borrow_mut();
 
@@ -319,22 +322,15 @@ impl GothicOrganizerWindow for StartupWindow {
                             return Ok(Task::None);
                         }
                         None => {
-                            instances_borrowed.push(Rc::new(RefCell::new(Instance::new(
-                                &self.instance_name_input,
-                            ))));
+                            instances_borrowed.push(Rc::new(RefCell::new(new_instance.clone())));
                         }
                     }
                 } else {
-                    self.instances.replace_with(|_| {
-                        vec![Rc::new(RefCell::new(Instance::new(
-                            &self.instance_name_input,
-                        )))]
-                    });
+                    self.instances
+                        .replace_with(|_| vec![Rc::new(RefCell::new(new_instance.clone()))]);
                 }
 
-                self.current_profile
-                    .borrow_mut()
-                    .add_instance(Instance::new(&self.instance_name_input));
+                self.current_profile.borrow_mut().add_instance(new_instance);
 
                 if let AnyWidget::HoldBrowser(instance_selector) = self.widget(&WidgetName::InstanceSelector)? {
                     instance_selector
@@ -428,18 +424,20 @@ impl StartupWindow {
         }
     }
 
-    pub fn selected_profile(&self) -> Option<Rc<RefCell<Profile>>> {
-        self.profiles
-            .borrow()
-            .get(self.selected_profile_index as usize)
-            .cloned()
+    pub fn selected_profile(&self) -> i32 {
+        self.selected_profile_index
     }
 
-    pub fn selected_instance(&self) -> Option<Rc<RefCell<Instance>>> {
-        self.instances
+    pub fn selected_instance(&self) -> i32 {
+        self.selected_instance_index.saturating_sub(1)
+    }
+
+    pub fn available_profiles(&self) -> Vec<String> {
+        self.profiles
             .borrow()
-            .get(self.selected_instance_index.saturating_sub(1) as usize)
-            .cloned()
+            .iter()
+            .map(|i| i.borrow().name.clone())
+            .collect()
     }
 }
 
@@ -462,7 +460,6 @@ pub enum Task {
 }
 
 impl_widget_name_enum!(
-    ProfileSelector,
     ProfileChoice,
     InstanceSelector,
     InstanceEntry,
