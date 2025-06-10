@@ -238,37 +238,34 @@ impl GothicOrganizerWindow for EditorWindow {
             files_group.set_frame(FrameType::DownBox);
             files_group.begin();
 
-            {
-                let file_controls_group = self.add_widget(
-                    WidgetName::FileControlsGroup,
-                    Flex::default().row().with_align(Align::Left),
-                );
+            let file_controls_group = self.add_widget(
+                WidgetName::FileControlsGroup,
+                Flex::default().row().with_align(Align::Left),
+            );
 
+            {
                 let mut file_controls_group = file_controls_group.borrow_mut();
                 file_controls_group.set_spacing(5);
                 file_controls_group.set_frame(FrameType::DownBox);
                 file_controls_group.begin();
 
-                let _view_overrides_button = self.add_widget(
+                let view_overrides_button = self.add_widget(
                     WidgetName::ViewOverridesButton,
                     Button::default()
-                        .with_size(30, 30)
                         .with_align(Align::Center)
                         .with_label("View Overrides"),
                 );
 
-                let _include_button = self.add_widget(
+                let include_button = self.add_widget(
                     WidgetName::IncludeButton,
                     Button::default()
-                        .with_size(30, 30)
                         .with_align(Align::Center)
                         .with_label("Include"),
                 );
 
-                let _exclude_button = self.add_widget(
+                let exclude_button = self.add_widget(
                     WidgetName::ExcludeButton,
                     Button::default()
-                        .with_size(30, 30)
                         .with_align(Align::Center)
                         .with_label("Exclude"),
                 );
@@ -339,6 +336,7 @@ impl GothicOrganizerWindow for EditorWindow {
             }
 
             files_group.end();
+            files_group.fixed(file_controls_group.borrow_mut().deref_mut(), 30);
             main_group.end();
 
             if let Some(mut grid_layout) = layout.as_grid_mut() {
