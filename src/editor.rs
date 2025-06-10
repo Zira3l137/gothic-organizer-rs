@@ -1,7 +1,7 @@
+use fltk::enums::CallbackTrigger;
 use fltk::tree::TreeItem;
 use fltk::tree::TreeReason;
 use indexmap::IndexMap;
-use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ops::DerefMut;
@@ -14,6 +14,7 @@ use fltk::enums::Align;
 use fltk::enums::FrameType;
 use fltk::group::Flex;
 use fltk::group::GridAlign;
+use fltk::input::Input;
 use fltk::menu::Choice;
 use fltk::prelude::*;
 use fltk::tree::Tree;
@@ -31,6 +32,7 @@ use crate::impl_widget_name_enum;
 use crate::load_profile;
 use crate::profile::FileNode;
 use crate::profile::Instance;
+use crate::profile::ModInfo;
 use crate::profile::Profile;
 use crate::profile::Session;
 
@@ -45,8 +47,7 @@ pub struct EditorWindow {
     instances: MutRc<Vec<MutRc<Instance>>>,
     current_profile: MutRc<Profile>,
     current_instance: MutRc<Instance>,
-    instance_name_input: String,
-    current_directory: PathBuf,
+    file_tree_cache: IndexMap<PathBuf, FileNode>,
     _selected_file_index: i32,
     _selected_profile_index: i32,
     _selected_instance_index: i32,
@@ -232,7 +233,8 @@ impl GothicOrganizerWindow for EditorWindow {
             );
 
             let mut files_group = files_group.borrow_mut();
-            files_group.set_spacing(5);
+            files_group.set_spacing(15);
+            files_group.set_margin(10);
             files_group.set_frame(FrameType::DownBox);
             files_group.begin();
 
@@ -277,17 +279,23 @@ impl GothicOrganizerWindow for EditorWindow {
 
                 {
                     let mut files_tree = files_tree.borrow_mut();
+
+                    let current_instance = self.current_instance.borrow();
+                    let game_dir: &PathBuf = &self.current_profile.borrow().game_path;
+
+                    let instance_files = &current_instance.files;
+                    let mod_files = &current_instance.mods;
+
+                    if let Some(files) = instance_files {
+                        let nodes = assume_target_structure(files, mod_files.as_deref(), game_dir)?;
+                        self.file_tree_cache = nodes.clone();
+                        let tree_items = prepare_tree_items(&files_tree, game_dir, &nodes)?;
+                        populate_file_tree(&mut files_tree, &tree_items)?;
+                    }
+
+                    files_tree.set_root_label(&game_dir.file_stem().unwrap_or_default().to_string_lossy());
                     files_tree.set_sort_order(TreeSort::None);
                     files_tree.set_select_mode(TreeSelect::Multi);
-
-                    let game_dir: &PathBuf = &self.current_profile.borrow().game_path;
-                    self.current_directory = game_dir.clone();
-                    populate_file_tree(
-                        &mut files_tree,
-                        &self.current_instance.borrow(),
-                        game_dir.clone(),
-                    )?;
-
                     files_tree.set_callback(move |w| {
                         if let TreeReason::Selected = w.callback_reason() {
                             let mut selected_file_names: Vec<String> = Vec::new();
@@ -295,6 +303,7 @@ impl GothicOrganizerWindow for EditorWindow {
                             let Some(selected_items) = w.get_selected_items() else {
                                 return;
                             };
+
                             selected_items.iter().for_each(|item| {
                                 collect_children_recursively(item, &mut selected_file_names);
                                 selected_file_names.iter().for_each(|item_name| {
@@ -307,6 +316,24 @@ impl GothicOrganizerWindow for EditorWindow {
 
                             sender.send(Message::FilesSelected(selected_file_names));
                         }
+                    });
+                }
+
+                let search_bar = self.add_widget(
+                    WidgetName::SearchBar,
+                    Input::default()
+                        .with_label("Search")
+                        .with_align(Align::TopLeft),
+                );
+
+                {
+                    let mut search_bar = search_bar.borrow_mut();
+                    files_group.fixed(search_bar.deref_mut(), 30);
+
+                    search_bar.set_trigger(CallbackTrigger::EnterKey);
+                    search_bar.set_callback(move |w| {
+                        let search_term = w.value();
+                        sender.send(Message::SearchForItem(search_term));
                     });
                 }
             }
@@ -338,10 +365,6 @@ impl GothicOrganizerWindow for EditorWindow {
                 todo!()
             }
 
-            Message::_InputInstanceName(name) => {
-                self.instance_name_input = name;
-            }
-
             Message::SelectProfile(_index) => {
                 todo!()
             }
@@ -363,6 +386,50 @@ impl GothicOrganizerWindow for EditorWindow {
             }
 
             Message::FilesSelected(_files) => {}
+
+            Message::SearchForItem(term) => {
+                if let AnyWidget::Tree(files_tree) = self.widget(&WidgetName::FilesList)? {
+                    let mut files_tree = files_tree.borrow_mut();
+
+                    if term.is_empty() {
+                        files_tree.clear();
+                        let new_items = prepare_tree_items(
+                            &files_tree,
+                            &self.current_profile.borrow().game_path,
+                            &self.file_tree_cache,
+                        )?;
+                        populate_file_tree(&mut files_tree, &new_items)?;
+                        return Ok(Task::None);
+                    }
+
+                    let found_nodes = self
+                        .file_tree_cache
+                        .iter()
+                        .filter_map(|(path, node)| {
+                            let name = &node.name;
+                            if name.to_lowercase().contains(&term.to_lowercase()) {
+                                Some((path.clone(), node.clone()))
+                            } else {
+                                None
+                            }
+                        })
+                        .collect::<IndexMap<PathBuf, FileNode>>();
+
+                    if found_nodes.is_empty() {
+                        files_tree.clear();
+                        files_tree.redraw();
+                        return Ok(Task::None);
+                    }
+
+                    let new_items = prepare_tree_items(
+                        &files_tree,
+                        &self.current_profile.borrow().game_path,
+                        &found_nodes,
+                    )?;
+
+                    populate_file_tree(&mut files_tree, &new_items)?;
+                };
+            }
         }
 
         Ok(Task::None)
@@ -435,11 +502,11 @@ impl EditorWindow {
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    _InputInstanceName(String),
     SelectProfile(i32),
     SelectInstance(i32),
     _SelectProfileDirectory,
     FilesSelected(Vec<String>),
+    SearchForItem(String),
     RemoveInstance,
     AddInstance,
     Run,
@@ -462,6 +529,7 @@ impl_widget_name_enum!(
     IncludeButton,
     ExcludeButton,
     ViewOverridesButton,
+    SearchBar,
     FilesList,
     ProfileChoice,
     InstanceChoice,
@@ -505,65 +573,46 @@ fn get_tree_item_path(item: &TreeItem) -> String {
     path.join("/")
 }
 
-fn populate_file_tree(tree: &mut Tree, instance: &Instance, root: PathBuf) -> Result<(), GuiError> {
+fn populate_file_tree(tree: &mut Tree, items: &IndexMap<String, TreeItem>) -> Result<(), GuiError> {
     tree.clear();
+    items.iter().for_each(|(path, item)| {
+        let tree_item = item.clone();
+        tree.add_item(path, &tree_item);
+    });
+    tree.redraw();
+    Ok(())
+}
 
-    let target_file_tree = assume_target_file_tree(instance, &root)?;
+fn prepare_tree_items(tree: &Tree, root: &Path, nodes: &IndexMap<PathBuf, FileNode>) -> Result<IndexMap<String, TreeItem>, GuiError> {
+    let mut tree_items: IndexMap<String, TreeItem> = IndexMap::with_capacity(nodes.len());
 
-    for (path, node) in target_file_tree {
+    for (path, node) in nodes {
         let target_path = path
-            .strip_prefix(&root)
-            .unwrap()
+            .strip_prefix(root)?
             .components()
             .map(|c| c.as_os_str().to_string_lossy().to_string())
             .collect::<Vec<_>>()
             .join("/");
 
-        let root_component = root
-            .components()
-            .next_back()
-            .unwrap()
-            .as_os_str()
-            .to_string_lossy()
-            .to_string();
-
-        if let Some(mut added) = tree.add(&format!("{}/{}", root_component, target_path)) {
-            if node.enabled {
-                added.set_user_icon(crate::constants::checked_icon());
-                added.set_user_data(target_path);
-                added.set_label_color(fltk::enums::Color::Green);
-            } else {
-                added.set_user_icon(crate::constants::unchecked_icon());
-                added.set_user_data(target_path);
-                added.set_label_color(fltk::enums::Color::Red);
-            }
-
-            if node.overriden_by.is_some() {
-                added.set_label_color(fltk::enums::Color::Yellow);
-            }
-        }
+        tree_items.insert(target_path.clone(), node.clone().into_tree_item(tree));
     }
 
-    Ok(())
+    Ok(tree_items)
 }
 
-fn assume_target_file_tree<'a>(instance: &'a Instance, root: &Path) -> Result<IndexMap<PathBuf, Cow<'a, FileNode>>, GuiError> {
+fn assume_target_structure(files: &[FileNode], mods: Option<&[ModInfo]>, root: &Path) -> Result<IndexMap<PathBuf, FileNode>, GuiError> {
     let base_root = root.to_path_buf();
-
-    let Some(files) = &instance.files else {
-        return GuiError::err_io("No files found in instance", std::io::ErrorKind::NotFound);
-    };
 
     let mut target_file_tree: Vec<&FileNode> = files.iter().collect();
     target_file_tree.sort_by_key(|f| (!f.is_dir(), f.length()));
 
-    let mut base: IndexMap<PathBuf, Cow<'a, FileNode>> = IndexMap::with_capacity(target_file_tree.len());
+    let mut base: IndexMap<PathBuf, FileNode> = IndexMap::with_capacity(target_file_tree.len());
 
     for f in target_file_tree {
-        base.insert(f.path.clone(), Cow::Borrowed(f));
+        base.insert(f.path.clone(), f.clone());
     }
 
-    if let Some(mods) = &instance.mods {
+    if let Some(mods) = mods {
         mods.iter().filter(|m| m.config.enabled).for_each(|m| {
             let Some(mod_files) = &m.config.files else {
                 return;
@@ -577,10 +626,9 @@ fn assume_target_file_tree<'a>(instance: &'a Instance, root: &Path) -> Result<In
                 let destination_path = base_root.join(relative_path);
                 base.entry(destination_path)
                     .and_modify(|existing| {
-                        let owned = existing.to_mut();
-                        owned.override_by(f.name.clone(), f.path.clone());
+                        existing.override_by(f.name.clone(), f.path.clone());
                     })
-                    .or_insert_with(|| Cow::Owned(f.clone()));
+                    .or_insert_with(|| f.clone());
             });
         });
     }

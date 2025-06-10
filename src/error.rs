@@ -41,6 +41,8 @@ pub enum GuiError {
     Session(#[from] SessionError),
     #[error("Widget not found: {0}")]
     WidgetNotFound(String),
+    #[error("Strip prefix error: {0}")]
+    StripPrefixError(#[from] std::path::StripPrefixError),
 }
 
 impl GuiError {
