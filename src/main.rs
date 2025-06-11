@@ -27,8 +27,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             save_session!(
                 Some(startup_wnd.selected_profile()),
                 Some(startup_wnd.selected_instance()),
-                Some(startup_wnd.available_profiles()),
-                Some(startup_wnd.available_instances())
+                Some(startup_wnd.available_profiles())
             )?;
 
             load_session!().unwrap()

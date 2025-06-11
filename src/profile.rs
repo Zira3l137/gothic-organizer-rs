@@ -369,16 +369,15 @@ pub fn load_session<P: AsRef<Path>>(custom_path: Option<P>) -> Option<Session> {
 
 #[macro_export]
 macro_rules! save_session {
-    ($selected_profile: expr, $selected_instance: expr, $available_profiles: expr, $available_instances: expr, $custom_path: expr) => {
+    ($selected_profile: expr, $selected_instance: expr, $available_profiles: expr, $custom_path: expr) => {
         $crate::profile::save_session(
             $selected_profile,
             $selected_instance,
             $available_profiles,
-            $available_instances,
-            expr,
+            $custom_path,
         )
     };
-    ($selected_profile: expr, $selected_instance: expr, $available_profiles: expr, $available_instances: expr) => {
+    ($selected_profile: expr, $selected_instance: expr, $available_profiles: expr) => {
         $crate::profile::save_session::<String>(
             $selected_profile,
             $selected_instance,
