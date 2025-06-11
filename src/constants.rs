@@ -156,3 +156,7 @@ pub fn checked_icon() -> Option<PngImage> {
 pub fn unchecked_icon() -> Option<PngImage> {
     PngImage::load("resources/unchecked.png").ok()
 }
+
+pub fn dir_icon() -> Option<PngImage> {
+    PngImage::load("resources/dir.png").ok()
+}

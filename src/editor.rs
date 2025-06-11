@@ -1,7 +1,3 @@
-use fltk::enums::CallbackTrigger;
-use fltk::tree::TreeItem;
-use fltk::tree::TreeReason;
-use indexmap::IndexMap;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ops::DerefMut;
@@ -11,6 +7,7 @@ use std::rc::Rc;
 
 use fltk::button::Button;
 use fltk::enums::Align;
+use fltk::enums::CallbackTrigger;
 use fltk::enums::FrameType;
 use fltk::group::Flex;
 use fltk::group::GridAlign;
@@ -18,8 +15,12 @@ use fltk::input::Input;
 use fltk::menu::Choice;
 use fltk::prelude::*;
 use fltk::tree::Tree;
+use fltk::tree::TreeItem;
+use fltk::tree::TreeReason;
 use fltk::tree::TreeSelect;
 use fltk::tree::TreeSort;
+
+use indexmap::IndexMap;
 
 use crate::application::AnyWidget;
 use crate::application::ApplicationSettings;
@@ -263,12 +264,22 @@ impl GothicOrganizerWindow for EditorWindow {
                         .with_label("Include"),
                 );
 
+                {
+                    let mut include_button = include_button.borrow_mut();
+                    include_button.emit(sender, Message::IncludeItem);
+                }
+
                 let exclude_button = self.add_widget(
                     WidgetName::ExcludeButton,
                     Button::default()
                         .with_align(Align::Center)
                         .with_label("Exclude"),
                 );
+
+                {
+                    let mut exclude_button = exclude_button.borrow_mut();
+                    exclude_button.emit(sender, Message::ExcludeItem);
+                }
 
                 file_controls_group.end();
 
@@ -286,7 +297,7 @@ impl GothicOrganizerWindow for EditorWindow {
                     if let Some(files) = instance_files {
                         let nodes = assume_target_structure(files, mod_files.as_deref(), game_dir)?;
                         self.file_tree_cache = nodes.clone();
-                        let tree_items = prepare_tree_items(&files_tree, game_dir, &nodes)?;
+                        let tree_items = prepare_tree_items(&files_tree, game_dir, nodes.iter().collect())?;
                         populate_file_tree(&mut files_tree, &tree_items)?;
                     }
 
@@ -351,10 +362,6 @@ impl GothicOrganizerWindow for EditorWindow {
 
     fn handle_message(&mut self, msg: Self::Message) -> Result<Task, GuiError> {
         match msg {
-            Message::_Exit => {
-                return Ok(Task::CloseWindow);
-            }
-
             Message::Run => {
                 todo!()
             }
@@ -394,8 +401,9 @@ impl GothicOrganizerWindow for EditorWindow {
                         let new_items = prepare_tree_items(
                             &files_tree,
                             &self.current_profile.borrow().game_path,
-                            &self.file_tree_cache,
+                            self.file_tree_cache.iter().collect(),
                         )?;
+
                         populate_file_tree(&mut files_tree, &new_items)?;
                         return Ok(Task::None);
                     }
@@ -406,12 +414,12 @@ impl GothicOrganizerWindow for EditorWindow {
                         .filter_map(|(path, node)| {
                             let name = &node.name;
                             if name.to_lowercase().contains(&term.to_lowercase()) {
-                                Some((path.clone(), node.clone()))
+                                Some((path, node))
                             } else {
                                 None
                             }
                         })
-                        .collect::<IndexMap<PathBuf, FileNode>>();
+                        .collect::<IndexMap<&PathBuf, &FileNode>>();
 
                     if found_nodes.is_empty() {
                         files_tree.clear();
@@ -422,11 +430,75 @@ impl GothicOrganizerWindow for EditorWindow {
                     let new_items = prepare_tree_items(
                         &files_tree,
                         &self.current_profile.borrow().game_path,
-                        &found_nodes,
+                        found_nodes,
                     )?;
 
                     populate_file_tree(&mut files_tree, &new_items)?;
                 };
+            }
+
+            Message::IncludeItem => {
+                let AnyWidget::Tree(files_tree) = self.widget(&WidgetName::FilesList)? else {
+                    return Err(GuiError::WidgetNotFound(WidgetName::FilesList.into()));
+                };
+
+                let mut files_tree = files_tree.borrow_mut();
+
+                if let Some(mut selected_items) = files_tree.get_selected_items() {
+                    selected_items.iter_mut().for_each(|item| {
+                        if item.has_children() {
+                            return;
+                        }
+
+                        if let Some(name) = item.label() {
+                            if let Some((_, node)) = self
+                                .file_tree_cache
+                                .iter_mut()
+                                .find(|(_, node)| node.name == name)
+                            {
+                                if !node.enabled {
+                                    node.enabled = true;
+                                    item.set_user_icon(crate::constants::checked_icon());
+                                    item.set_label_color(fltk::enums::Color::Green);
+                                }
+                            }
+                        }
+                    });
+                }
+
+                files_tree.redraw();
+            }
+
+            Message::ExcludeItem => {
+                let AnyWidget::Tree(files_tree) = self.widget(&WidgetName::FilesList)? else {
+                    return Err(GuiError::WidgetNotFound(WidgetName::FilesList.into()));
+                };
+
+                let mut files_tree = files_tree.borrow_mut();
+
+                if let Some(mut selected_items) = files_tree.get_selected_items() {
+                    selected_items.iter_mut().for_each(|item| {
+                        if item.has_children() {
+                            return;
+                        }
+
+                        if let Some(name) = item.label() {
+                            if let Some((_, node)) = self
+                                .file_tree_cache
+                                .iter_mut()
+                                .find(|(_, node)| node.name == name)
+                            {
+                                if node.enabled {
+                                    node.enabled = false;
+                                    item.set_user_icon(crate::constants::unchecked_icon());
+                                    item.set_label_color(fltk::enums::Color::Red);
+                                }
+                            }
+                        }
+                    });
+                }
+
+                files_tree.redraw();
             }
         }
 
@@ -442,10 +514,6 @@ impl GothicOrganizerWindow for EditorWindow {
         while app.wait() {
             if let Some(msg) = receiver.recv() {
                 match self.handle_message(msg)? {
-                    Task::CloseWindow => {
-                        window.hide();
-                        break;
-                    }
                     Task::None => (),
                 }
             }
@@ -505,16 +573,16 @@ pub enum Message {
     _SelectProfileDirectory,
     FilesSelected(Vec<String>),
     SearchForItem(String),
+    ExcludeItem,
+    IncludeItem,
     RemoveInstance,
     AddInstance,
     Run,
     Settings,
-    _Exit,
 }
 
 #[derive(Debug, Clone)]
 pub enum Task {
-    CloseWindow,
     None,
 }
 
@@ -581,7 +649,7 @@ fn populate_file_tree(tree: &mut Tree, items: &IndexMap<String, TreeItem>) -> Re
     Ok(())
 }
 
-fn prepare_tree_items(tree: &Tree, root: &Path, nodes: &IndexMap<PathBuf, FileNode>) -> Result<IndexMap<String, TreeItem>, GuiError> {
+fn prepare_tree_items(tree: &Tree, root: &Path, nodes: IndexMap<&PathBuf, &FileNode>) -> Result<IndexMap<String, TreeItem>, GuiError> {
     let mut tree_items: IndexMap<String, TreeItem> = IndexMap::with_capacity(nodes.len());
 
     for (path, node) in nodes {
@@ -592,7 +660,13 @@ fn prepare_tree_items(tree: &Tree, root: &Path, nodes: &IndexMap<PathBuf, FileNo
             .collect::<Vec<_>>()
             .join("/");
 
-        tree_items.insert(target_path.clone(), node.clone().into_tree_item(tree));
+        let mut tree_item = node.clone().into_tree_item(tree);
+
+        if path.is_dir() {
+            tree_item.set_user_icon(crate::constants::dir_icon());
+        }
+
+        tree_items.insert(target_path.clone(), tree_item);
     }
 
     Ok(tree_items)
