@@ -297,7 +297,7 @@ impl GothicOrganizerWindow for EditorWindow {
                     if let Some(files) = instance_files {
                         let nodes = assume_target_structure(files, mod_files.as_deref(), game_dir)?;
                         self.file_tree_cache = nodes.clone();
-                        let tree_items = prepare_tree_items(&files_tree, game_dir, nodes.iter().collect())?;
+                        let tree_items = prepare_tree_items(&files_tree, game_dir, &nodes)?;
                         populate_file_tree(&mut files_tree, &tree_items)?;
                     }
 
@@ -401,7 +401,7 @@ impl GothicOrganizerWindow for EditorWindow {
                         let new_items = prepare_tree_items(
                             &files_tree,
                             &self.current_profile.borrow().game_path,
-                            self.file_tree_cache.iter().collect(),
+                            &self.file_tree_cache,
                         )?;
 
                         populate_file_tree(&mut files_tree, &new_items)?;
@@ -414,12 +414,12 @@ impl GothicOrganizerWindow for EditorWindow {
                         .filter_map(|(path, node)| {
                             let name = &node.name;
                             if name.to_lowercase().contains(&term.to_lowercase()) {
-                                Some((path, node))
+                                Some((path.clone(), node.clone()))
                             } else {
                                 None
                             }
                         })
-                        .collect::<IndexMap<&PathBuf, &FileNode>>();
+                        .collect::<IndexMap<PathBuf, FileNode>>();
 
                     if found_nodes.is_empty() {
                         files_tree.clear();
@@ -430,7 +430,7 @@ impl GothicOrganizerWindow for EditorWindow {
                     let new_items = prepare_tree_items(
                         &files_tree,
                         &self.current_profile.borrow().game_path,
-                        found_nodes,
+                        &found_nodes,
                     )?;
 
                     populate_file_tree(&mut files_tree, &new_items)?;
@@ -649,7 +649,7 @@ fn populate_file_tree(tree: &mut Tree, items: &IndexMap<String, TreeItem>) -> Re
     Ok(())
 }
 
-fn prepare_tree_items(tree: &Tree, root: &Path, nodes: IndexMap<&PathBuf, &FileNode>) -> Result<IndexMap<String, TreeItem>, GuiError> {
+fn prepare_tree_items(tree: &Tree, root: &Path, nodes: &IndexMap<PathBuf, FileNode>) -> Result<IndexMap<String, TreeItem>, GuiError> {
     let mut tree_items: IndexMap<String, TreeItem> = IndexMap::with_capacity(nodes.len());
 
     for (path, node) in nodes {
@@ -685,24 +685,26 @@ fn assume_target_structure(files: &[FileNode], mods: Option<&[ModInfo]>, root: &
     }
 
     if let Some(mods) = mods {
-        mods.iter().filter(|m| m.config.enabled).for_each(|m| {
-            let Some(mod_files) = &m.config.files else {
-                return;
-            };
-
-            mod_files.iter().for_each(|f| {
-                let Ok(relative_path) = f.path.strip_prefix(&m.path) else {
+        mods.iter()
+            .filter(|mod_info| mod_info.config.enabled)
+            .for_each(|mod_info| {
+                let Some(mod_files) = &mod_info.config.files else {
                     return;
                 };
 
-                let destination_path = base_root.join(relative_path);
-                base.entry(destination_path)
-                    .and_modify(|existing| {
-                        existing.override_by(f.name.clone(), f.path.clone());
-                    })
-                    .or_insert_with(|| f.clone());
+                mod_files.iter().for_each(|file_node| {
+                    let Ok(relative_path) = file_node.path.strip_prefix(&mod_info.path) else {
+                        return;
+                    };
+
+                    let destination_path = base_root.join(relative_path);
+                    base.entry(destination_path)
+                        .and_modify(|existing| {
+                            existing.override_by(file_node.name.clone(), file_node.path.clone());
+                        })
+                        .or_insert_with(|| file_node.clone());
+                });
             });
-        });
     }
 
     Ok(base)
