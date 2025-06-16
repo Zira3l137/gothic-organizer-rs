@@ -152,7 +152,7 @@ impl FileNode {
         self.overriden_by = Some((name, path));
     }
 
-    pub fn into_tree_item(self, tree: &fltk::tree::Tree) -> fltk::tree::TreeItem {
+    pub fn as_tree_item(&self, tree: &fltk::tree::Tree) -> fltk::tree::TreeItem {
         let mut item = fltk::tree::TreeItem::new(tree, &self.name);
         if self.enabled {
             item.set_user_icon(crate::constants::checked_icon());
@@ -162,7 +162,6 @@ impl FileNode {
             if self.overriden_by.is_none() {
                 item.set_label_color(fltk::enums::Color::Red);
             } else {
-                item.set_user_data(self.overriden_by.unwrap());
                 item.set_label_color(fltk::enums::Color::Yellow);
             }
         }

@@ -48,7 +48,7 @@ pub struct EditorWindow {
     instances: MutRc<Vec<MutRc<Instance>>>,
     current_profile: MutRc<Profile>,
     current_instance: MutRc<Instance>,
-    file_tree_cache: IndexMap<PathBuf, FileNode>,
+    file_tree_cache: MutRc<IndexMap<PathBuf, MutRc<FileNode>>>,
     _selected_file_index: i32,
     _selected_profile_index: i32,
     _selected_instance_index: i32,
@@ -292,12 +292,17 @@ impl GothicOrganizerWindow for EditorWindow {
                     let game_dir: &PathBuf = &self.current_profile.borrow().game_path;
 
                     let instance_files = &current_instance.files;
-                    let mod_files = &current_instance.mods;
+                    let mod_files = match &current_instance.mods {
+                        Some(mods) => mods,
+                        None => &Vec::new(),
+                    };
 
                     if let Some(files) = instance_files {
-                        let nodes = assume_target_structure(files, mod_files.as_deref(), game_dir)?;
+                        let nodes = Rc::new(RefCell::new(assume_target_structure(
+                            files, mod_files, game_dir,
+                        )?));
                         self.file_tree_cache = nodes.clone();
-                        let tree_items = prepare_tree_items(&files_tree, game_dir, &nodes)?;
+                        let tree_items = build_tree_items(&files_tree, game_dir, &nodes.borrow())?;
                         populate_file_tree(&mut files_tree, &tree_items)?;
                     }
 
@@ -398,10 +403,10 @@ impl GothicOrganizerWindow for EditorWindow {
 
                     if term.is_empty() {
                         files_tree.clear();
-                        let new_items = prepare_tree_items(
+                        let new_items = build_tree_items(
                             &files_tree,
                             &self.current_profile.borrow().game_path,
-                            &self.file_tree_cache,
+                            &self.file_tree_cache.borrow(),
                         )?;
 
                         populate_file_tree(&mut files_tree, &new_items)?;
@@ -410,16 +415,17 @@ impl GothicOrganizerWindow for EditorWindow {
 
                     let found_nodes = self
                         .file_tree_cache
+                        .borrow()
                         .iter()
                         .filter_map(|(path, node)| {
-                            let name = &node.name;
+                            let name = &node.borrow().name;
                             if name.to_lowercase().contains(&term.to_lowercase()) {
                                 Some((path.clone(), node.clone()))
                             } else {
                                 None
                             }
                         })
-                        .collect::<IndexMap<PathBuf, FileNode>>();
+                        .collect::<IndexMap<PathBuf, MutRc<FileNode>>>();
 
                     if found_nodes.is_empty() {
                         files_tree.clear();
@@ -427,7 +433,7 @@ impl GothicOrganizerWindow for EditorWindow {
                         return Ok(Task::None);
                     }
 
-                    let new_items = prepare_tree_items(
+                    let new_items = build_tree_items(
                         &files_tree,
                         &self.current_profile.borrow().game_path,
                         &found_nodes,
@@ -453,11 +459,12 @@ impl GothicOrganizerWindow for EditorWindow {
                         if let Some(name) = item.label() {
                             if let Some((_, node)) = self
                                 .file_tree_cache
+                                .borrow_mut()
                                 .iter_mut()
-                                .find(|(_, node)| node.name == name)
+                                .find(|(_, node)| node.borrow().name == name)
                             {
-                                if !node.enabled {
-                                    node.enabled = true;
+                                if !node.borrow().enabled {
+                                    node.borrow_mut().enabled = true;
                                     item.set_user_icon(crate::constants::checked_icon());
                                     item.set_label_color(fltk::enums::Color::Green);
                                 }
@@ -485,11 +492,12 @@ impl GothicOrganizerWindow for EditorWindow {
                         if let Some(name) = item.label() {
                             if let Some((_, node)) = self
                                 .file_tree_cache
+                                .borrow_mut()
                                 .iter_mut()
-                                .find(|(_, node)| node.name == name)
+                                .find(|(_, node)| node.borrow().name == name)
                             {
-                                if node.enabled {
-                                    node.enabled = false;
+                                if node.borrow().enabled {
+                                    node.borrow_mut().enabled = false;
                                     item.set_user_icon(crate::constants::unchecked_icon());
                                     item.set_label_color(fltk::enums::Color::Red);
                                 }
@@ -642,69 +650,58 @@ fn get_tree_item_path(item: &TreeItem) -> String {
 fn populate_file_tree(tree: &mut Tree, items: &IndexMap<String, TreeItem>) -> Result<(), GuiError> {
     tree.clear();
     items.iter().for_each(|(path, item)| {
-        let tree_item = item.clone();
-        tree.add_item(path, &tree_item);
+        tree.add_item(path, item);
     });
-    tree.redraw();
     Ok(())
 }
 
-fn prepare_tree_items(tree: &Tree, root: &Path, nodes: &IndexMap<PathBuf, FileNode>) -> Result<IndexMap<String, TreeItem>, GuiError> {
-    let mut tree_items: IndexMap<String, TreeItem> = IndexMap::with_capacity(nodes.len());
+fn build_tree_items(tree: &Tree, root: &Path, nodes: &IndexMap<PathBuf, MutRc<FileNode>>) -> Result<IndexMap<String, TreeItem>, GuiError> {
+    let mut items = IndexMap::with_capacity(nodes.len());
 
-    for (path, node) in nodes {
-        let target_path = path
-            .strip_prefix(root)?
+    for (path, mutrc_node) in nodes {
+        let key = path
+            .strip_prefix(root)
+            .unwrap()
             .components()
-            .map(|c| c.as_os_str().to_string_lossy().to_string())
+            .map(|c| c.as_os_str().to_string_lossy())
             .collect::<Vec<_>>()
             .join("/");
 
-        let mut tree_item = node.clone().into_tree_item(tree);
-
+        let mut ti = mutrc_node.borrow().as_tree_item(tree);
         if path.is_dir() {
-            tree_item.set_user_icon(crate::constants::dir_icon());
+            ti.set_user_icon(crate::constants::dir_icon());
         }
-
-        tree_items.insert(target_path.clone(), tree_item);
+        items.insert(key, ti);
     }
 
-    Ok(tree_items)
+    Ok(items)
 }
 
-fn assume_target_structure(files: &[FileNode], mods: Option<&[ModInfo]>, root: &Path) -> Result<IndexMap<PathBuf, FileNode>, GuiError> {
+fn assume_target_structure(files: &[FileNode], mods: &[ModInfo], root: &Path) -> Result<IndexMap<PathBuf, MutRc<FileNode>>, GuiError> {
     let base_root = root.to_path_buf();
 
-    let mut target_file_tree: Vec<&FileNode> = files.iter().collect();
-    target_file_tree.sort_by_key(|f| (!f.is_dir(), f.length()));
+    let mut base: IndexMap<PathBuf, MutRc<FileNode>> = files
+        .iter()
+        .map(|f| (f.path.clone(), Rc::new(RefCell::new(f.clone()))))
+        .collect();
 
-    let mut base: IndexMap<PathBuf, FileNode> = IndexMap::with_capacity(target_file_tree.len());
-
-    for f in target_file_tree {
-        base.insert(f.path.clone(), f.clone());
-    }
-
-    if let Some(mods) = mods {
-        mods.iter()
-            .filter(|mod_info| mod_info.config.enabled)
-            .for_each(|mod_info| {
-                let Some(mod_files) = &mod_info.config.files else {
-                    return;
-                };
-
-                mod_files.iter().for_each(|file_node| {
-                    let Ok(relative_path) = file_node.path.strip_prefix(&mod_info.path) else {
-                        return;
-                    };
-
-                    let destination_path = base_root.join(relative_path);
-                    base.entry(destination_path)
+    for mod_info in mods.iter().filter(|m| m.config.enabled) {
+        if let Some(mod_files) = &mod_info.config.files {
+            for file_node in mod_files {
+                if let Ok(relative) = file_node.path.strip_prefix(&mod_info.path) {
+                    let dst = base_root.join(relative);
+                    let rc_node = Rc::new(RefCell::new(file_node.clone()));
+                    base.entry(dst)
                         .and_modify(|existing| {
-                            existing.override_by(file_node.name.clone(), file_node.path.clone());
+                            existing.borrow_mut().override_by(
+                                Rc::clone(&rc_node).borrow().name.clone(),
+                                Rc::clone(&rc_node).borrow().path.clone(),
+                            )
                         })
-                        .or_insert_with(|| file_node.clone());
-                });
-            });
+                        .or_insert(rc_node);
+                }
+            }
+        }
     }
 
     Ok(base)

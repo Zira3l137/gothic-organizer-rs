@@ -43,6 +43,8 @@ pub enum GuiError {
     WidgetNotFound(String),
     #[error("Strip prefix error: {0}")]
     StripPrefixError(#[from] std::path::StripPrefixError),
+    #[error("Thread Error: {0}")]
+    Thread(String),
 }
 
 impl GuiError {
