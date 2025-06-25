@@ -1,24 +1,8 @@
 use std::path::PathBuf;
 
-use iced::alignment::Horizontal;
-use iced::alignment::Vertical;
-use iced::widget::button;
-use iced::widget::checkbox;
-use iced::widget::column;
-use iced::widget::combo_box;
 use iced::widget::combo_box::State;
-use iced::widget::container;
-use iced::widget::horizontal_space;
-use iced::widget::image;
-use iced::widget::row;
-use iced::widget::scrollable;
-use iced::widget::text;
-use iced::widget::Column;
-use iced::widget::Container;
-use iced::widget::Row;
 use iced::window;
 use iced::Element;
-use iced::Length;
 use iced::Task;
 
 use rfd::FileDialog;
@@ -27,39 +11,34 @@ use ignore::WalkBuilder;
 
 use chrono::Local;
 
-use crate::constants::APP_TITLE;
-use crate::constants::APP_VERSION;
-use crate::constants::GAME_PROFILES;
-use crate::cutstom_widgets::clickable_text::ClickableText;
-use crate::error::GothicOrganizerError;
+use crate::core::error::GothicOrganizerError;
+use crate::core::profile::Instance;
+use crate::core::profile::Lookup;
+use crate::core::profile::Profile;
 use crate::load_profile;
 use crate::load_session;
-use crate::profile::Instance;
-use crate::profile::Lookup;
-use crate::profile::Profile;
 use crate::save_profile;
 use crate::save_session;
-use crate::styled_container;
 
 #[derive(Debug, Default)]
-pub struct Editor {
-    current_directory_buffer: Vec<(PathBuf, bool)>,
-    profile_selected: Option<String>,
-    instance_selected: Option<String>,
-    profiles: Lookup<String, Profile>,
-    files: Lookup<PathBuf, bool>,
-    state: InnerState,
+pub struct GothicOrganizer {
+    pub profile_selected: Option<String>,
+    pub instance_selected: Option<String>,
+    pub profiles: Lookup<String, Profile>,
+    pub files: Lookup<PathBuf, bool>,
+    pub state: InnerState,
 }
 
 #[derive(Debug, Default)]
 pub struct InnerState {
-    instance_input: Option<String>,
-    profile_choices: State<String>,
-    instance_choices: State<String>,
-    current_directory: PathBuf,
+    pub instance_input: Option<String>,
+    pub profile_choices: State<String>,
+    pub instance_choices: State<String>,
+    pub current_directory_entries: Vec<(PathBuf, bool)>,
+    pub current_directory: PathBuf,
 }
 
-impl Editor {
+impl GothicOrganizer {
     pub const WINDOW_TITLE: &str = "Startup Window";
     pub const WINDOW_SIZE: (f32, f32) = (768.0, 768.0);
 
@@ -97,7 +76,8 @@ impl Editor {
 
             Message::FileToggle(path, new_state) => {
                 if let Some(state) = self
-                    .current_directory_buffer
+                    .state
+                    .current_directory_entries
                     .iter_mut()
                     .find(|(p, _)| p == path)
                 {
@@ -140,138 +120,7 @@ impl Editor {
     }
 
     pub fn view(&self) -> Element<Message> {
-        let current_profile = self
-            .profile_selected
-            .as_ref()
-            .and_then(|s| self.profiles.get(s));
-
-        let header: Row<_> = row!(
-            image("./resources/icon.ico"),
-            text!("{} v{}", APP_TITLE, APP_VERSION)
-                .align_y(Vertical::Center)
-                .align_x(Horizontal::Left)
-                .size(30)
-        )
-        .spacing(10);
-
-        let instance_controls: Container<_> = container(row!(
-            combo_box(
-                &self.state.instance_choices,
-                "Instance",
-                self.instance_selected.as_ref(),
-                Message::InstanceSelected,
-            )
-            .on_input(Message::InstanceInput),
-            button("Add").on_press_maybe(self.profile_selected.as_ref().and_then(|s| {
-                let profile = self.profiles.get(s)?;
-                if profile.path.display().to_string() != "" {
-                    Some(Message::InstanceAdd(s.clone()))
-                } else {
-                    None
-                }
-            })),
-            button("Remove").on_press_maybe(self.profile_selected.as_ref().and_then(|s| {
-                let profile = self.profiles.get(s)?;
-                if profile.path.display().to_string() != "" {
-                    Some(Message::InstanceRemove(s.clone()))
-                } else {
-                    None
-                }
-            })),
-        ));
-
-        let profile_controls: Container<_> = container(
-            row!(
-                combo_box(
-                    &self.state.profile_choices,
-                    "Profile",
-                    self.profile_selected.as_ref(),
-                    Message::ProfileSelected,
-                ),
-                if let Some(profile) = current_profile {
-                    if profile.path.display().to_string() == "" {
-                        container(button("Browse").on_press(Message::BrowseGameDir(profile.name.clone())))
-                    } else {
-                        instance_controls
-                    }
-                } else {
-                    container(horizontal_space())
-                }
-            )
-            .spacing(10),
-        )
-        .center_x(Length::Fill);
-
-        let mut files_column: Column<_> = Column::new();
-
-        if self.instance_selected.is_some() {
-            files_column = self
-                .current_directory_buffer
-                .iter()
-                .fold(Column::new(), |column, (path, enabled)| {
-                    let file_name = path.file_name().unwrap().to_string_lossy().to_string();
-                    let label: Element<'_, Message>;
-                    let icon: Element<'_, Message>;
-
-                    match path.is_dir() {
-                        false => {
-                            icon = image("./resources/asset.png").into();
-                            label = text(file_name).into();
-                        }
-                        true => {
-                            icon = image("./resources/dir.png").into();
-                            label = ClickableText::new(file_name, Message::TraverseIntoDir(path.clone())).into();
-                        }
-                    };
-
-                    column.push(
-                        styled_container!(
-                            row![
-                                checkbox("", *enabled).on_toggle(move |new_state| Message::FileToggle(path.clone(), new_state)),
-                                icon,
-                                label
-                            ],
-                            border_width = 1.0,
-                            border_radius = 4.0
-                        )
-                        .padding(5)
-                        .align_left(Length::Fill),
-                    )
-                });
-        }
-
-        let mods_menu: Container<_> = styled_container!(
-            column!(text("mods menu")),
-            border_width = 4.0,
-            border_radius = 8.0
-        )
-        .center(Length::Fill);
-
-        let files_controls: Row<_> = row!(
-            button("Home").on_press_maybe(current_profile.and_then(|profile| {
-                if profile.path == self.state.current_directory {
-                    None
-                } else {
-                    Some(Message::TraverseIntoDir(profile.path.clone()))
-                }
-            }))
-        );
-
-        let files_menu: Container<_> = styled_container!(
-            column!(files_controls, scrollable(files_column)).spacing(10),
-            border_width = 4.0,
-            border_radius = 8.0
-        )
-        .padding(10)
-        .align_y(Vertical::Top)
-        .center_x(Length::Fill);
-
-        let editor_space: Container<_> = container(row!(mods_menu, files_menu).spacing(10)).center(Length::Fill);
-
-        column![header, profile_controls, editor_space]
-            .spacing(10)
-            .padding(10)
-            .into()
+        crate::gui::editor_view::editor_view(self)
     }
 
     pub fn try_reload_last_session(app: &mut Self) -> Result<(), GothicOrganizerError> {
@@ -356,7 +205,8 @@ impl Editor {
             return;
         };
 
-        self.current_directory_buffer
+        self.state
+            .current_directory_entries
             .iter()
             .for_each(|(path, enabled)| {
                 self.files.insert(path.clone(), *enabled);
@@ -481,14 +331,14 @@ impl Editor {
 
         // If not instance is selected, just show the profile directory
         let Some(selected_instance) = &self.instance_selected else {
-            self.current_directory_buffer = profile_dir_entries;
+            self.state.current_directory_entries = profile_dir_entries;
             return Task::none();
         };
 
         if let Some(instances) = &current_profile.instances {
             // If couldn't find the selected instance, just show the profile directory
             let Some(current_instance) = instances.get(selected_instance) else {
-                self.current_directory_buffer = profile_dir_entries;
+                self.state.current_directory_entries = profile_dir_entries;
                 return Task::none();
             };
 
@@ -502,16 +352,18 @@ impl Editor {
             }
 
             // Update the current directory buffer
-            self.current_directory_buffer.clear();
+            self.state.current_directory_entries.clear();
             profile_dir_entries.iter().for_each(|(path, _)| {
                 if let Some(displayed_state) = self.files.get(path) {
-                    self.current_directory_buffer
+                    self.state
+                        .current_directory_entries
                         .push((path.clone(), *displayed_state));
                 }
             })
         }
 
-        self.current_directory_buffer
+        self.state
+            .current_directory_entries
             .sort_unstable_by_key(|(path, _)| !path.is_dir());
 
         Task::none()
@@ -540,13 +392,12 @@ impl Editor {
 
     fn preload_profiles() -> Lookup<String, Profile> {
         Lookup::from(
-            GAME_PROFILES
-                .iter()
-                .map(|profile_name| match load_profile!(profile_name) {
+            crate::core::constants::Profile::into_iter()
+                .map(|profile_name| match load_profile!((*profile_name).into()) {
                     Some(p) => (profile_name.to_string(), p),
                     None => (
                         profile_name.to_string(),
-                        Profile::default().with_name(profile_name),
+                        Profile::default().with_name((*profile_name).into()),
                     ),
                 })
                 .collect::<Vec<(String, Profile)>>(),

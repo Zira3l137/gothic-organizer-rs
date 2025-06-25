@@ -1,7 +1,7 @@
 /// Creates a container with optional arguments for styling
 /// # Example
 /// ```rust
-/// let container = styled_container(
+/// let container = styled_container!(
 ///     text("Hello"),
 ///     border_width = 2.0,
 ///     border_color = iced::Color::BLACK,
@@ -27,7 +27,7 @@ macro_rules! styled_container {
         $(, background = $background:expr)?
         $(,)?
     ) => {
-        $crate::helpers::styled_container(
+        $crate::core::helpers::styled_container(
             $content,
             styled_container!(@some_opt $($border_width)?; f32),
             styled_container!(@some_opt $($border_color)?; iced::Color),
@@ -37,6 +37,39 @@ macro_rules! styled_container {
             styled_container!(@some_opt $($shadow_offset)?; iced::Vector<f32>),
             styled_container!(@some_opt $($text_color)?; iced::Color),
             styled_container!(@some_opt $($background)?; iced::Background),
+        )
+    };
+
+    // Helper to wrap with Some(...) or None::<Type>
+    (@some_opt $val:expr; $ty:ty) => {
+        Some($val)
+    };
+    (@some_opt ; $ty:ty) => {
+        None::<$ty>
+    };
+}
+
+/// Creates a container with optional arguments for styling
+/// # Example
+/// ```rust
+/// let container = svg_with_color!(
+///     "ferris_nude_pic.svg",
+///     color_idle = iced::Color::BLACK,
+///     color_hovered = iced::Color::WHITE
+/// );
+///```
+#[macro_export]
+macro_rules! svg_with_color {
+    (
+        $content:expr
+        $(, color_idle = $color_idle:expr)?
+        $(, color_hovered = $color_hovered:expr)?
+        $(,)?
+    ) => {
+        $crate::core::helpers::svg_with_color(
+            $content,
+            styled_container!(@some_opt $($color_idle)?; iced::Color),
+            styled_container!(@some_opt $($color_hovered)?; iced::Color),
         )
     };
 
@@ -65,7 +98,7 @@ macro_rules! save_session {
         $crate::helpers::save_session($selected_profile, $selected_instance, $custom_path)
     };
     ($selected_profile: expr, $selected_instance: expr) => {
-        $crate::helpers::save_session::<String>($selected_profile, $selected_instance, None)
+        $crate::core::helpers::save_session::<String>($selected_profile, $selected_instance, None)
     };
 }
 
@@ -78,11 +111,11 @@ macro_rules! save_session {
 #[macro_export]
 macro_rules! load_session {
     () => {
-        $crate::helpers::load_session::<String>(None)
+        $crate::core::helpers::load_session::<String>(None)
     };
 
     ($custom_path: expr) => {
-        $crate::helpers::load_session($custom_path)
+        $crate::core::helpers::load_session($custom_path)
     };
 }
 
@@ -96,10 +129,10 @@ macro_rules! load_session {
 #[macro_export]
 macro_rules! load_profile {
     ($name: expr) => {
-        $crate::helpers::load_profile::<String>($name, None)
+        $crate::core::helpers::load_profile::<String>($name, None)
     };
     ($name: expr, $custom_path: expr) => {
-        $crate::helpers::load_profile($name, $custom_path)
+        $crate::core::helpers::load_profile($name, $custom_path)
     };
 }
 
@@ -114,10 +147,10 @@ macro_rules! load_profile {
 #[macro_export]
 macro_rules! save_profile {
     ($profile: expr) => {
-        $crate::helpers::save_profile::<String>($profile, None)
+        $crate::core::helpers::save_profile::<String>($profile, None)
     };
     ($profile: expr, $custom_path: expr) => {
-        $crate::helpers::save_profile($profile, $custom_path)
+        $crate::core::helpers::save_profile($profile, $custom_path)
     };
 }
 

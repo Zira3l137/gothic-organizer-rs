@@ -8,11 +8,13 @@ use std::path::PathBuf;
 
 use iced::border::Radius;
 use iced::widget::Container;
-use iced::{Border, Shadow};
+use iced::widget::Svg;
+use iced::Border;
+use iced::Shadow;
 
-use crate::constants::APP_NAME;
-use crate::profile::Profile;
-use crate::profile::Session;
+use crate::core::constants::APP_NAME;
+use crate::core::profile::Profile;
+use crate::core::profile::Session;
 
 pub fn local_app_data() -> String {
     #[cfg(windows)]
@@ -188,6 +190,33 @@ where
                 color: shadow_color,
                 offset: shadow_offset,
                 blur_radius: shadow_blur_radius.unwrap_or(1.0),
+            },
+        }
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn svg_with_color<'a, C>(handle: impl Into<iced_core::svg::Handle>, color_idle: Option<C>, color_hovered: Option<C>) -> Svg<'a>
+where
+    C: Into<iced::Color> + Clone + 'a,
+{
+    Svg::new(handle).style(move |theme: &iced::Theme, status| {
+        let palette = theme.palette();
+
+        let idle_color = match color_idle.clone() {
+            Some(idle_color) => idle_color.into(),
+            None => palette.text,
+        };
+
+        let hovered_color = match color_hovered.clone() {
+            Some(hovered_color) => hovered_color.into(),
+            None => palette.text,
+        };
+
+        iced::widget::svg::Style {
+            color: match status {
+                iced::widget::svg::Status::Idle => Some(idle_color),
+                iced::widget::svg::Status::Hovered => Some(hovered_color),
             },
         }
     })
