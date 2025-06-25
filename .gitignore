@@ -1,1 +1,4 @@
 /target
+.ps1
+.bat
+/.cargo
