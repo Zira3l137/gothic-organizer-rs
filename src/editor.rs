@@ -23,12 +23,15 @@ use iced::Task;
 
 use rfd::FileDialog;
 
+use ignore::WalkBuilder;
+
 use chrono::Local;
 
 use crate::constants::APP_TITLE;
 use crate::constants::APP_VERSION;
 use crate::constants::GAME_PROFILES;
 use crate::cutstom_widgets::clickable_text::ClickableText;
+use crate::error::GothicOrganizerError;
 use crate::load_profile;
 use crate::load_session;
 use crate::profile::Instance;
@@ -40,10 +43,11 @@ use crate::styled_container;
 
 #[derive(Debug, Default)]
 pub struct Editor {
-    files_buffer: Option<Lookup<PathBuf, bool>>,
+    current_directory_buffer: Vec<(PathBuf, bool)>,
     profile_selected: Option<String>,
     instance_selected: Option<String>,
     profiles: Lookup<String, Profile>,
+    files: Lookup<PathBuf, bool>,
     state: InnerState,
 }
 
@@ -52,6 +56,7 @@ pub struct InnerState {
     instance_input: Option<String>,
     profile_choices: State<String>,
     instance_choices: State<String>,
+    current_directory: PathBuf,
 }
 
 impl Editor {
@@ -59,45 +64,13 @@ impl Editor {
     pub const WINDOW_SIZE: (f32, f32) = (768.0, 768.0);
 
     pub fn new() -> (Self, Task<Message>) {
-        let last_session = load_session!();
-        let profiles = Self::preload_profiles();
-        let profile_choices = State::new(profiles.keys().cloned().collect());
+        let mut app = Self::default();
 
-        let mut instance_choices = State::new(Vec::new());
-        let mut profile_selected = None;
-        let mut instance_selected = None;
-        let mut files_buffer = None;
-
-        if let Some(session) = last_session {
-            if let Some(selected_profile_name) = &session.selected_profile {
-                if let Some(profile) = profiles.get(selected_profile_name) {
-                    profile_selected = Some(selected_profile_name.clone());
-                    if let Some(instances) = &profile.instances {
-                        instance_choices = State::new(instances.keys().cloned().collect());
-                        if let Some(selected_instance_name) = &session.selected_instance {
-                            if let Some(instance) = instances.get(selected_instance_name) {
-                                instance_selected = Some(selected_instance_name.clone());
-                                files_buffer = instance.files.clone();
-                            }
-                        }
-                    }
-                }
-            }
+        if let Err(err) = Self::try_reload_last_session(&mut app) {
+            eprintln!("{}", err);
         }
 
-        let app = Self {
-            profiles,
-            profile_selected,
-            instance_selected,
-            files_buffer,
-            state: InnerState {
-                profile_choices,
-                instance_choices,
-                ..Default::default()
-            },
-        };
-
-        (app, Task::none())
+        (app, Task::done(Message::RefreshFiles))
     }
 
     pub fn update(&mut self, message: Message) -> Task<Message> {
@@ -123,12 +96,12 @@ impl Editor {
             }
 
             Message::FileToggle(path, new_state) => {
-                let Some(files) = self.files_buffer.as_mut() else {
-                    return Task::none();
-                };
-
-                if let Some(state) = files.get_mut(path) {
-                    *state = *new_state;
+                if let Some(state) = self
+                    .current_directory_buffer
+                    .iter_mut()
+                    .find(|(p, _)| p == path)
+                {
+                    state.1 = *new_state;
                 }
             }
 
@@ -137,18 +110,17 @@ impl Editor {
             }
 
             Message::TraverseIntoDir(path) => {
-                println!("traverse into dir: {}", path.display());
+                self.write_current_changes();
+                self.state.current_directory = path.clone();
+                return self.refresh_files(Some(path.clone()));
             }
 
             Message::RefreshFiles => {
-                return self.refresh_files();
-            }
-
-            Message::ExtendFilesFromInstance => {
-                return self.extend_from_instance();
+                return self.refresh_files(None);
             }
 
             Message::Exit => {
+                self.write_current_changes();
                 self.save_current_session();
                 return window::get_latest().and_then(window::close);
             }
@@ -233,8 +205,10 @@ impl Editor {
         let mut files_column: Column<_> = Column::new();
 
         if self.instance_selected.is_some() {
-            if let Some(files) = self.files_buffer.as_ref() {
-                files_column = files.iter().fold(Column::new(), |column, (path, enabled)| {
+            files_column = self
+                .current_directory_buffer
+                .iter()
+                .fold(Column::new(), |column, (path, enabled)| {
                     let file_name = path.file_name().unwrap().to_string_lossy().to_string();
                     let label: Element<'_, Message>;
                     let icon: Element<'_, Message>;
@@ -257,14 +231,13 @@ impl Editor {
                                 icon,
                                 label
                             ],
-                            border_width = 2.0,
+                            border_width = 1.0,
                             border_radius = 4.0
                         )
                         .padding(5)
                         .align_left(Length::Fill),
                     )
                 });
-            }
         }
 
         let mods_menu: Container<_> = styled_container!(
@@ -274,8 +247,18 @@ impl Editor {
         )
         .center(Length::Fill);
 
+        let files_controls: Row<_> = row!(
+            button("Home").on_press_maybe(current_profile.and_then(|profile| {
+                if profile.path == self.state.current_directory {
+                    None
+                } else {
+                    Some(Message::TraverseIntoDir(profile.path.clone()))
+                }
+            }))
+        );
+
         let files_menu: Container<_> = styled_container!(
-            column!(scrollable(files_column)).spacing(10),
+            column!(files_controls, scrollable(files_column)).spacing(10),
             border_width = 4.0,
             border_radius = 8.0
         )
@@ -289,6 +272,56 @@ impl Editor {
             .spacing(10)
             .padding(10)
             .into()
+    }
+
+    pub fn try_reload_last_session(app: &mut Self) -> Result<(), GothicOrganizerError> {
+        let profiles = Self::preload_profiles();
+        app.profiles = profiles.clone();
+        app.state.profile_choices = State::new(profiles.keys().cloned().collect());
+
+        let last_session = load_session!().ok_or(GothicOrganizerError::new("failed to load last session"))?;
+
+        let selected_profile_name = last_session
+            .selected_profile
+            .ok_or(GothicOrganizerError::new("no selected profile"))?
+            .clone();
+
+        app.profile_selected = Some(selected_profile_name.clone());
+
+        let selected_profile = profiles
+            .get(&selected_profile_name)
+            .ok_or(GothicOrganizerError::new(&format!(
+                "no profile with name {}",
+                &selected_profile_name
+            )))?
+            .clone();
+
+        let selected_profile_instances = selected_profile.instances.ok_or(GothicOrganizerError::new(
+            "no instances for selected profile",
+        ))?;
+
+        app.state.instance_choices = State::new(selected_profile_instances.keys().cloned().collect());
+
+        let selected_instance_name = last_session
+            .selected_instance
+            .ok_or(GothicOrganizerError::new("no selected instance"))?
+            .clone();
+
+        app.instance_selected = Some(selected_instance_name.clone());
+
+        let selected_instance = selected_profile_instances
+            .get(&selected_instance_name)
+            .ok_or(GothicOrganizerError::new(&format!(
+                "no instance with name {} for profile {}",
+                &selected_instance_name, &selected_profile_name
+            )))?
+            .clone();
+
+        app.files = selected_instance
+            .files
+            .ok_or(GothicOrganizerError::new("no files for selected instance"))?;
+
+        Ok(())
     }
 
     fn switch_profile(&mut self, profile_name: &str) -> Task<Message> {
@@ -323,9 +356,15 @@ impl Editor {
             return;
         };
 
+        self.current_directory_buffer
+            .iter()
+            .for_each(|(path, enabled)| {
+                self.files.insert(path.clone(), *enabled);
+            });
+
         if let Some(instances) = current_profile.instances.as_mut() {
             if let Some(current_instance) = instances.get_mut(&self.instance_selected.clone().unwrap_or_default()) {
-                current_instance.files = self.files_buffer.clone();
+                current_instance.files = Some(self.files.clone());
             }
         }
     }
@@ -353,7 +392,7 @@ impl Editor {
         instances.insert(instance_name.to_owned(), new_instance.clone());
         self.state.instance_choices = State::new(instances.keys().cloned().collect::<Vec<String>>());
 
-        Task::none()
+        Task::done(Message::RefreshFiles)
     }
 
     fn remove_instance_from_profile(&mut self, profile_name: &str) -> Task<Message> {
@@ -402,11 +441,20 @@ impl Editor {
         };
 
         profile.path = path.clone();
+        self.state.current_directory = path.clone();
+
+        WalkBuilder::new(path)
+            .ignore(false)
+            .build()
+            .filter_map(Result::ok)
+            .for_each(|entry| {
+                self.files.insert(entry.path().to_path_buf(), true);
+            });
 
         Task::done(Message::RefreshFiles)
     }
 
-    fn refresh_files(&mut self) -> Task<Message> {
+    fn refresh_files(&mut self, root: Option<PathBuf>) -> Task<Message> {
         let Some(current_profile) = self
             .profiles
             .get_mut(&self.profile_selected.clone().unwrap_or_default())
@@ -414,50 +462,57 @@ impl Editor {
             return Task::none();
         };
 
-        let Ok(profile_dir) = current_profile.path.read_dir() else {
+        let root_dir = match root {
+            Some(root) => root,
+            None => current_profile.path.clone(),
+        };
+
+        self.state.current_directory = root_dir.clone();
+
+        let Ok(root_dir) = root_dir.read_dir() else {
             return Task::none();
         };
 
-        match self.files_buffer.as_mut() {
-            Some(files) => {
-                files.clear();
-                profile_dir.flatten().for_each(|entry| {
-                    files.insert(entry.path(), true);
-                });
-            }
-            None => {
-                let mut files: Lookup<PathBuf, bool> = Lookup::default();
-                profile_dir.flatten().for_each(|entry| {
-                    files.insert(entry.path(), true);
-                });
-                self.files_buffer = Some(files);
-            }
-        }
+        // Get all the files in the profile directory
+        let profile_dir_entries = root_dir
+            .flatten()
+            .map(|entry| (entry.path(), true))
+            .collect::<Vec<(PathBuf, bool)>>();
 
-        Task::done(Message::ExtendFilesFromInstance)
-    }
-
-    fn extend_from_instance(&mut self) -> Task<Message> {
-        let Some(current_profile) = self
-            .profiles
-            .get_mut(&self.profile_selected.clone().unwrap_or_default())
-        else {
+        // If not instance is selected, just show the profile directory
+        let Some(selected_instance) = &self.instance_selected else {
+            self.current_directory_buffer = profile_dir_entries;
             return Task::none();
         };
 
         if let Some(instances) = &current_profile.instances {
-            let Some(current_instance) = instances.get(&self.instance_selected.clone().unwrap_or_default()) else {
+            // If couldn't find the selected instance, just show the profile directory
+            let Some(current_instance) = instances.get(selected_instance) else {
+                self.current_directory_buffer = profile_dir_entries;
                 return Task::none();
             };
 
+            // If current instance has any files listed, update the files cache with them
             if let Some(instance_files) = &current_instance.files {
-                if let Some(files_buffer) = self.files_buffer.as_mut() {
+                if !instance_files.is_empty() {
                     instance_files.iter().for_each(|(path, enabled)| {
-                        files_buffer.insert(path.clone(), *enabled);
-                    })
+                        self.files.insert(path.clone(), *enabled);
+                    });
                 }
             }
+
+            // Update the current directory buffer
+            self.current_directory_buffer.clear();
+            profile_dir_entries.iter().for_each(|(path, _)| {
+                if let Some(displayed_state) = self.files.get(path) {
+                    self.current_directory_buffer
+                        .push((path.clone(), *displayed_state));
+                }
+            })
         }
+
+        self.current_directory_buffer
+            .sort_unstable_by_key(|(path, _)| !path.is_dir());
 
         Task::none()
     }
@@ -510,6 +565,5 @@ pub enum Message {
     FileToggle(PathBuf, bool),
     TraverseIntoDir(PathBuf),
     RefreshFiles,
-    ExtendFilesFromInstance,
     Exit,
 }

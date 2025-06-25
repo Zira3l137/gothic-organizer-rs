@@ -24,6 +24,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ..Default::default()
         })
         .subscription(Editor::subscription)
+        .theme(|_| iced::theme::Theme::CatppuccinMocha)
         .window_size(Size::from(Editor::WINDOW_SIZE))
         .run_with(Editor::new)?;
     Ok(())
