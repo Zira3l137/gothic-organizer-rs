@@ -15,13 +15,13 @@ use iced::widget::Row;
 use iced::Element;
 use iced::Length;
 
+use crate::app::Message;
 use crate::core::constants::app_title_full;
-use crate::gui::app::Message;
 use crate::gui::custom_widgets::clickable_text::ClickableText;
 use crate::styled_container;
 use crate::svg_with_color;
 
-pub fn editor_view(app: &crate::gui::app::GothicOrganizer) -> Element<Message> {
+pub fn editor_view(app: &crate::app::GothicOrganizer) -> Element<Message> {
     /////////////////////////[States]/////////////////////////////
     let current_profile = app
         .profile_selected

@@ -1,4 +1,6 @@
+mod app;
 mod core;
+mod error;
 mod gui;
 mod macros;
 
@@ -8,7 +10,7 @@ use iced::window::Position;
 use iced::window::Settings;
 use iced::Size;
 
-use gui::app::GothicOrganizer;
+use app::GothicOrganizer;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     application(

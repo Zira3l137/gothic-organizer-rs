@@ -11,10 +11,10 @@ use ignore::WalkBuilder;
 
 use chrono::Local;
 
-use crate::core::error::GothicOrganizerError;
 use crate::core::profile::Instance;
 use crate::core::profile::Lookup;
 use crate::core::profile::Profile;
+use crate::error::GothicOrganizerError;
 use crate::load_profile;
 use crate::load_session;
 use crate::save_profile;
