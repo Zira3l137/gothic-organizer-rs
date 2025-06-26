@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::path::PathBuf;
 
 use iced::widget::combo_box::State;
@@ -39,14 +40,14 @@ pub struct InnerState {
 }
 
 impl GothicOrganizer {
-    pub const WINDOW_TITLE: &str = "Startup Window";
+    pub const WINDOW_TITLE: &str = "Gothic Organizer";
     pub const WINDOW_SIZE: (f32, f32) = (768.0, 768.0);
 
     pub fn new() -> (Self, Task<Message>) {
         let mut app = Self::default();
 
         if let Err(err) = Self::try_reload_last_session(&mut app) {
-            eprintln!("{}", err);
+            eprintln!("{err}");
         }
 
         (app, Task::done(Message::RefreshFiles))
@@ -55,10 +56,12 @@ impl GothicOrganizer {
     pub fn update(&mut self, message: Message) -> Task<Message> {
         match &message {
             Message::ProfileSelected(profile_name) => {
+                self.print_debug();
                 return self.switch_profile(profile_name);
             }
 
             Message::InstanceSelected(instance) => {
+                self.print_debug();
                 return self.select_instance(instance);
             }
 
@@ -67,45 +70,46 @@ impl GothicOrganizer {
             }
 
             Message::InstanceAdd(profile_name) => {
+                self.print_debug();
                 return self.add_instance_for_profile(profile_name);
             }
 
             Message::InstanceRemove(profile_name) => {
-                return self.remove_instance_from_profile(profile_name);
+                self.remove_instance_from_profile(profile_name);
             }
 
-            Message::FileToggle(path, new_state) => {
-                if let Some(state) = self
-                    .state
-                    .current_directory_entries
-                    .iter_mut()
-                    .find(|(p, _)| p == path)
-                {
-                    state.1 = *new_state;
-                }
+            Message::FileToggle(path) => {
+                self.toggle_state_recursive(Some(path));
+            }
+
+            Message::FileToggleAll => {
+                self.toggle_state_recursive(None);
             }
 
             Message::BrowseGameDir(profile_name) => {
+                self.print_debug();
                 return self.browse_game_dir(profile_name);
             }
 
             Message::TraverseIntoDir(path) => {
                 self.write_current_changes();
                 self.state.current_directory = path.clone();
-                return self.refresh_files(Some(path.clone()));
+                self.refresh_files(Some(path.clone()))
             }
 
             Message::RefreshFiles => {
-                return self.refresh_files(None);
+                self.refresh_files(None);
             }
 
             Message::Exit => {
                 self.write_current_changes();
                 self.save_current_session();
+                self.print_debug();
                 return window::get_latest().and_then(window::close);
             }
         }
 
+        self.print_debug();
         Task::none()
     }
 
@@ -145,9 +149,10 @@ impl GothicOrganizer {
             )))?
             .clone();
 
-        let selected_profile_instances = selected_profile.instances.ok_or(GothicOrganizerError::new(
-            "no instances for selected profile",
-        ))?;
+        let selected_profile_instances = selected_profile.instances.ok_or_else(|| {
+            app.files = last_session.cache.unwrap_or_default();
+            GothicOrganizerError::new("no instances for selected profile")
+        })?;
 
         app.state.instance_choices = State::new(selected_profile_instances.keys().cloned().collect());
 
@@ -212,10 +217,10 @@ impl GothicOrganizer {
                 self.files.insert(path.clone(), *enabled);
             });
 
-        if let Some(instances) = current_profile.instances.as_mut() {
-            if let Some(current_instance) = instances.get_mut(&self.instance_selected.clone().unwrap_or_default()) {
-                current_instance.files = Some(self.files.clone());
-            }
+        if let Some(instances) = current_profile.instances.as_mut()
+            && let Some(current_instance) = instances.get_mut(&self.instance_selected.clone().unwrap_or_default())
+        {
+            current_instance.files = Some(self.files.clone());
         }
     }
 
@@ -232,7 +237,7 @@ impl GothicOrganizer {
             let new_instances = Lookup::from(vec![new_instance]);
             self.state.instance_choices = State::new(new_instances.keys().cloned().collect::<Vec<String>>());
             current_profile.instances = Some(new_instances);
-            return Task::none();
+            return Task::done(Message::RefreshFiles);
         };
 
         if instances.contains_key(&instance_name) {
@@ -245,25 +250,21 @@ impl GothicOrganizer {
         Task::done(Message::RefreshFiles)
     }
 
-    fn remove_instance_from_profile(&mut self, profile_name: &str) -> Task<Message> {
+    fn remove_instance_from_profile(&mut self, profile_name: &str) {
         let profile_name = profile_name.to_owned();
         let selected_instance_name = self.instance_selected.clone().unwrap_or_default();
 
-        let Some(profile) = self.profiles.get_mut(&profile_name) else {
-            return Task::none();
-        };
-
-        let Some(instances) = profile.instances.as_mut() else {
-            return Task::none();
-        };
-
-        instances.remove(&selected_instance_name);
-
-        self.state.instance_choices = State::new(instances.keys().cloned().collect::<Vec<String>>());
-        self.instance_selected = None;
-        self.state.instance_input = None;
-
-        Task::none()
+        if let Some(profile) = self.profiles.get_mut(&profile_name)
+            && let Some(instances) = profile.instances.as_mut()
+        {
+            instances.remove(&selected_instance_name);
+            self.state.instance_choices = State::new(instances.keys().cloned().collect::<Vec<String>>());
+            self.instance_selected = None;
+            self.state.instance_input = None;
+            if instances.is_empty() {
+                profile.instances = None;
+            }
+        }
     }
 
     fn select_instance(&mut self, instance_name: &str) -> Task<Message> {
@@ -304,82 +305,76 @@ impl GothicOrganizer {
         Task::done(Message::RefreshFiles)
     }
 
-    fn refresh_files(&mut self, root: Option<PathBuf>) -> Task<Message> {
+    fn refresh_files(&mut self, root: Option<PathBuf>) {
         let Some(current_profile) = self
             .profiles
             .get_mut(&self.profile_selected.clone().unwrap_or_default())
         else {
-            return Task::none();
+            return;
         };
 
-        let root_dir = match root {
-            Some(root) => root,
-            None => current_profile.path.clone(),
-        };
-
+        let root_dir = root.unwrap_or_else(|| current_profile.path.clone());
         self.state.current_directory = root_dir.clone();
 
-        let Ok(root_dir) = root_dir.read_dir() else {
-            return Task::none();
+        let Ok(root_dir_iter) = root_dir.read_dir() else {
+            return;
         };
 
-        // Get all the files in the profile directory
-        let profile_dir_entries = root_dir
+        let profile_dir_entries: Vec<(PathBuf, bool)> = root_dir_iter
             .flatten()
             .map(|entry| (entry.path(), true))
-            .collect::<Vec<(PathBuf, bool)>>();
+            .collect();
 
-        // If not instance is selected, just show the profile directory
-        let Some(selected_instance) = &self.instance_selected else {
-            self.state.current_directory_entries = profile_dir_entries;
-            return Task::none();
-        };
-
-        if let Some(instances) = &current_profile.instances {
-            // If couldn't find the selected instance, just show the profile directory
-            let Some(current_instance) = instances.get(selected_instance) else {
-                self.state.current_directory_entries = profile_dir_entries;
-                return Task::none();
-            };
-
-            // If current instance has any files listed, update the files cache with them
-            if let Some(instance_files) = &current_instance.files {
-                if !instance_files.is_empty() {
-                    instance_files.iter().for_each(|(path, enabled)| {
-                        self.files.insert(path.clone(), *enabled);
-                    });
+        if let Some(selected_instance) = &self.instance_selected
+            && let Some(instances) = &current_profile.instances
+            && let Some(current_instance) = instances.get(selected_instance)
+        {
+            if let Some(instance_files) = &current_instance.files
+                && !instance_files.is_empty()
+            {
+                for (path, enabled) in instance_files.iter() {
+                    self.files.insert(path.clone(), *enabled);
                 }
             }
 
-            // Update the current directory buffer
             self.state.current_directory_entries.clear();
-            profile_dir_entries.iter().for_each(|(path, _)| {
+
+            for (path, _) in &profile_dir_entries {
                 if let Some(displayed_state) = self.files.get(path) {
                     self.state
                         .current_directory_entries
                         .push((path.clone(), *displayed_state));
                 }
-            })
+            }
+        } else {
+            self.state.current_directory_entries = profile_dir_entries;
         }
 
         self.state
             .current_directory_entries
             .sort_unstable_by_key(|(path, _)| !path.is_dir());
-
-        Task::none()
     }
 
     fn save_current_session(&self) {
         self.profiles.values().for_each(|p| match save_profile!(p) {
             Ok(_) => {}
-            Err(e) => eprintln!("Failed saving profile: {}", e),
+            Err(e) => eprintln!("Failed saving profile: {e}"),
         });
+
+        let cache = match self
+            .profiles
+            .get(&self.profile_selected.clone().unwrap_or_default())
+        {
+            Some(current_profile) if current_profile.instances.is_some() => None,
+            _ => Some(self.files.clone()),
+        };
 
         if let Err(e) = save_session!(
             self.profile_selected.clone(),
-            self.instance_selected.clone()
+            self.instance_selected.clone(),
+            cache
         ) {
-            eprintln!("Failed saving session: {}", e);
+            eprintln!("Failed saving session: {e}");
         }
     }
 
@@ -388,6 +383,40 @@ impl GothicOrganizer {
             .instance_input
             .clone()
             .unwrap_or_else(|| format!("{}_instance_{}", profile_name, Local::now().timestamp()))
+    }
+
+    fn toggle_state_recursive(&mut self, path: Option<&Path>) {
+        if let Some(path) = path
+            && let Some(old_state) = self
+                .state
+                .current_directory_entries
+                .iter_mut()
+                .find_map(|(p, s)| if p == path { Some(s) } else { None })
+        {
+            let new_state = !(*old_state);
+            *old_state = new_state;
+            if path.is_dir() {
+                self.files.insert(path.to_path_buf(), new_state);
+                self.files.iter_mut().for_each(|(p, s)| {
+                    if p.starts_with(path) {
+                        *s = !(*s);
+                    }
+                })
+            }
+        } else {
+            for (path, state) in self.state.current_directory_entries.iter_mut() {
+                let new_state = !(*state);
+                *state = new_state;
+                if path.is_dir() {
+                    self.files.insert(path.clone(), new_state);
+                    self.files.iter_mut().for_each(|(p, s)| {
+                        if p.starts_with(path.clone()) {
+                            *s = new_state;
+                        }
+                    })
+                }
+            }
+        }
     }
 
     fn preload_profiles() -> Lookup<String, Profile> {
@@ -403,6 +432,19 @@ impl GothicOrganizer {
                 .collect::<Vec<(String, Profile)>>(),
         )
     }
+
+    fn print_debug(&self) {
+        println!(
+            "{}\nSelected profile: {:#?}\nSelected instance: {:#?}\nFiles: {:#?}\nCurrent directory entries: {:#?}\nCurrent directory: {:#?}\n{}\n",
+            "-----".repeat(10),
+            self.profile_selected,
+            self.instance_selected,
+            self.files.iter().count(),
+            self.state.current_directory_entries.len(),
+            self.state.current_directory,
+            "-----".repeat(10),
+        )
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -413,8 +455,9 @@ pub enum Message {
     InstanceAdd(String),
     InstanceRemove(String),
     InstanceInput(String),
-    FileToggle(PathBuf, bool),
+    FileToggle(PathBuf),
     TraverseIntoDir(PathBuf),
+    FileToggleAll,
     RefreshFiles,
     Exit,
 }

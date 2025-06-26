@@ -94,11 +94,11 @@ macro_rules! svg_with_color {
 /// Optionally `$custom_path` can be provided.
 #[macro_export]
 macro_rules! save_session {
-    ($selected_profile: expr, $selected_instance: expr, $custom_path: expr) => {
-        $crate::helpers::save_session($selected_profile, $selected_instance, $custom_path)
+    ($selected_profile: expr, $selected_instance: expr, $cache: expr, $custom_path: expr) => {
+        $crate::helpers::save_session($selected_profile, $selected_instance, $cache, $custom_path)
     };
-    ($selected_profile: expr, $selected_instance: expr) => {
-        $crate::core::helpers::save_session::<String>($selected_profile, $selected_instance, None)
+    ($selected_profile: expr, $selected_instance: expr, $cache: expr) => {
+        $crate::core::helpers::save_session::<String>($selected_profile, $selected_instance, $cache, None)
     };
 }
 

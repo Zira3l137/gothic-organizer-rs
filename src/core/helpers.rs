@@ -37,11 +37,13 @@ fn default_path<P: AsRef<Path>>(custom_path: Option<P>) -> PathBuf {
 pub fn save_session<P: AsRef<Path>>(
     selected_profile: Option<String>,
     selected_instance: Option<String>,
+    cache: Option<crate::core::profile::Lookup<PathBuf, bool>>,
     custom_path: Option<P>,
 ) -> Result<(), std::io::Error> {
     let session = Session {
         selected_profile,
         selected_instance,
+        cache,
     };
 
     let default_path = default_path(custom_path);

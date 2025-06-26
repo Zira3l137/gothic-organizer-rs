@@ -10,6 +10,7 @@ use serde::Serialize;
 pub struct Session {
     pub selected_profile: Option<String>,
     pub selected_instance: Option<String>,
+    pub cache: Option<Lookup<PathBuf, bool>>,
 }
 
 impl AsRef<Session> for Session {
@@ -109,13 +110,7 @@ impl Instance {
 pub struct ModInfo {
     pub name: String,
     pub path: PathBuf,
-    pub config: ModConfig,
-}
-
-#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ModConfig {
-    pub enabled: bool,
-    pub files: Option<Lookup<PathBuf, bool>>,
+    pub files: Lookup<PathBuf, bool>,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]

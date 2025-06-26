@@ -98,8 +98,8 @@ pub fn editor_view(app: &crate::app::GothicOrganizer) -> Element<Message> {
             }
         )
         .spacing(10),
-        border_width = 4.0,
-        border_radius = 8.0
+        border_width = 2.0,
+        border_radius = 4.0
     )
     .padding(10)
     .center_x(Length::Fill);
@@ -132,13 +132,15 @@ pub fn editor_view(app: &crate::app::GothicOrganizer) -> Element<Message> {
     });
     let button_home = button(icon_home).on_press_maybe(button_home_message);
 
+    let button_toggle_all = button("Toggle all").on_press(Message::FileToggleAll);
+
     let controls_files = styled_container!(
-        row!(button_back, button_home).spacing(10),
+        row!(button_back, button_home, button_toggle_all).spacing(10),
         border_width = 1.0,
         border_radius = 4.0
     )
     .padding(10)
-    .center_x(Length::Fill);
+    .align_left(Length::Fill);
 
     let mut column_files: Column<_> = Column::new();
 
@@ -164,7 +166,7 @@ pub fn editor_view(app: &crate::app::GothicOrganizer) -> Element<Message> {
 
                 let icon: Element<_> = svg_with_color!(icon_path).height(20).width(20).into();
 
-                let checkbox = checkbox("", *enabled).on_toggle(move |new_state| Message::FileToggle(path.clone(), new_state));
+                let checkbox = checkbox("", *enabled).on_toggle(|_| Message::FileToggle(path.clone()));
 
                 let group_file = styled_container!(
                     row![checkbox, icon, label],
@@ -180,8 +182,8 @@ pub fn editor_view(app: &crate::app::GothicOrganizer) -> Element<Message> {
 
     let files_menu = styled_container!(
         column!(controls_files, scrollable(column_files)).spacing(10),
-        border_width = 4.0,
-        border_radius = 8.0
+        border_width = 2.0,
+        border_radius = 4.0
     )
     .padding(10)
     .align_y(Vertical::Top)
@@ -192,8 +194,8 @@ pub fn editor_view(app: &crate::app::GothicOrganizer) -> Element<Message> {
     // TODO: Implement mod list
     let mods_menu = styled_container!(
         column!(text("mods menu")),
-        border_width = 4.0,
-        border_radius = 8.0
+        border_width = 2.0,
+        border_radius = 4.0
     )
     .center(Length::Fill);
 
