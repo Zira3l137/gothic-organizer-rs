@@ -28,7 +28,7 @@ where
     wrapping: Wrapping,
     size: Option<Pixels>,
     fragment: Fragment<'a>,
-    passed_message: Message,
+    passed_message: Option<Message>,
     line_height: LineHeight,
     font: Option<Renderer::Font>,
     horizontal_alignment: alignment::Horizontal,
@@ -39,7 +39,7 @@ impl<'a, Renderer, Message> ClickableText<'a, Renderer, Message>
 where
     Renderer: text::Renderer,
 {
-    pub fn new(fragment: impl text::IntoFragment<'a>, message: Message) -> Self {
+    pub fn new(fragment: impl text::IntoFragment<'a>) -> Self {
         ClickableText {
             fragment: fragment.into_fragment(),
             size: None,
@@ -51,7 +51,7 @@ where
             vertical_alignment: alignment::Vertical::Top,
             shaping: Shaping::default(),
             wrapping: Wrapping::default(),
-            passed_message: message,
+            passed_message: None,
         }
     }
 
@@ -87,6 +87,11 @@ where
 
     pub fn font(mut self, font: impl Into<Renderer::Font>) -> Self {
         self.font = Some(font.into());
+        self
+    }
+
+    pub fn on_press(mut self, message: impl FnOnce() -> Message) -> Self {
+        self.passed_message = Some(message());
         self
     }
 }
@@ -196,13 +201,17 @@ where
         shell: &mut iced::advanced::Shell<'_, Message>,
         _viewport: &Rectangle,
     ) -> iced::advanced::graphics::core::event::Status {
-        if cursor.is_over(layout.bounds()) {
-            match event {
-                iced::Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
-                    shell.publish(self.passed_message.clone());
-                    event::Status::Captured
+        if let Some(passed_message) = &self.passed_message {
+            if cursor.is_over(layout.bounds()) {
+                match event {
+                    iced::Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
+                        shell.publish(passed_message.clone());
+                        event::Status::Captured
+                    }
+                    _ => event::Status::Ignored,
                 }
-                _ => event::Status::Ignored,
+            } else {
+                event::Status::Ignored
             }
         } else {
             event::Status::Ignored

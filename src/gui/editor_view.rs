@@ -9,6 +9,7 @@ use iced::widget::horizontal_space;
 use iced::widget::image;
 use iced::widget::row;
 use iced::widget::scrollable;
+use iced::widget::svg;
 use iced::widget::text;
 use iced::widget::Column;
 use iced::widget::Row;
@@ -42,7 +43,9 @@ pub fn editor_view(app: &crate::app::GothicOrganizer) -> Element<Message> {
     title = title.align_x(Horizontal::Left);
     title = title.size(30);
 
-    let header: Row<_> = row!(logo, title).spacing(10);
+    let button_options_icon: svg::Svg<_> = svg("./resources/options.svg").height(20).width(20);
+    let button_options = button(button_options_icon).on_press(Message::OpenOptions);
+    let header: Row<_> = row!(logo, title, horizontal_space(), button_options).spacing(10);
     //////////////////////////////////////////////////////////////
     /////////////////////////[Top Profile Controls]///////////////
     let choice_profile = combo_box(
@@ -155,7 +158,9 @@ pub fn editor_view(app: &crate::app::GothicOrganizer) -> Element<Message> {
                 let file_name = path.file_name().unwrap().to_string_lossy().to_string();
 
                 let label: Element<_> = match &is_dir {
-                    true => ClickableText::new(file_name, Message::TraverseIntoDir(path.clone())).into(),
+                    true => ClickableText::new(file_name)
+                        .on_press(|| Message::TraverseIntoDir(path.clone()))
+                        .into(),
                     false => text(file_name).into(),
                 };
 

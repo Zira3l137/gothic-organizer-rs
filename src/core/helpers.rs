@@ -38,11 +38,13 @@ pub fn save_session<P: AsRef<Path>>(
     selected_profile: Option<String>,
     selected_instance: Option<String>,
     cache: Option<crate::core::profile::Lookup<PathBuf, bool>>,
+    theme: Option<String>,
     custom_path: Option<P>,
 ) -> Result<(), std::io::Error> {
     let session = Session {
         selected_profile,
         selected_instance,
+        theme,
         cache,
     };
 

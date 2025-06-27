@@ -2,7 +2,6 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use iced::widget::combo_box::State;
-use iced::window;
 use iced::Element;
 use iced::Task;
 
@@ -27,16 +26,25 @@ pub struct GothicOrganizer {
     pub instance_selected: Option<String>,
     pub profiles: Lookup<String, Profile>,
     pub files: Lookup<PathBuf, bool>,
+    pub theme: Option<String>,
     pub state: InnerState,
+    pub windows: Lookup<Option<iced::window::Id>, WindowState>,
 }
 
 #[derive(Debug, Default)]
 pub struct InnerState {
     pub instance_input: Option<String>,
     pub profile_choices: State<String>,
+    pub theme_choices: State<String>,
     pub instance_choices: State<String>,
     pub current_directory_entries: Vec<(PathBuf, bool)>,
     pub current_directory: PathBuf,
+}
+
+#[derive(Debug, Default)]
+pub struct WindowState {
+    pub name: String,
+    pub closed: bool,
 }
 
 impl GothicOrganizer {
@@ -50,18 +58,46 @@ impl GothicOrganizer {
             eprintln!("{err}");
         }
 
-        (app, Task::done(Message::RefreshFiles))
+        app.state.theme_choices = State::new(
+            crate::core::constants::Theme::into_iter()
+                .map(|t| t.to_string())
+                .collect(),
+        );
+
+        (app, Task::done(Message::InitWindow))
     }
 
     pub fn update(&mut self, message: Message) -> Task<Message> {
         match &message {
+            Message::InitWindow => {
+                let (id, task) = iced::window::open(iced::window::Settings {
+                    size: iced::Size::from(Self::WINDOW_SIZE),
+                    position: iced::window::Position::Centered,
+                    icon: iced::window::icon::from_file("./resources/icon.ico").ok(),
+                    exit_on_close_request: false,
+                    ..Default::default()
+                });
+                self.windows.insert(
+                    Some(id),
+                    WindowState {
+                        name: "editor".to_owned(),
+                        closed: false,
+                    },
+                );
+                return task.then(|_| Task::done(Message::RefreshFiles));
+            }
+
+            Message::ThemeSwitch(theme) => {
+                self.theme = Some(theme.clone());
+            }
+
             Message::ProfileSelected(profile_name) => {
-                self.print_debug();
+                self.print_debug(message.clone());
                 return self.switch_profile(profile_name);
             }
 
             Message::InstanceSelected(instance) => {
-                self.print_debug();
+                self.print_debug(message.clone());
                 return self.select_instance(instance);
             }
 
@@ -70,7 +106,7 @@ impl GothicOrganizer {
             }
 
             Message::InstanceAdd(profile_name) => {
-                self.print_debug();
+                self.print_debug(message.clone());
                 return self.add_instance_for_profile(profile_name);
             }
 
@@ -87,7 +123,7 @@ impl GothicOrganizer {
             }
 
             Message::BrowseGameDir(profile_name) => {
-                self.print_debug();
+                self.print_debug(message.clone());
                 return self.browse_game_dir(profile_name);
             }
 
@@ -101,30 +137,78 @@ impl GothicOrganizer {
                 self.refresh_files(None);
             }
 
-            Message::Exit => {
+            Message::OpenOptions => {
+                let (id, task) = iced::window::open(iced::window::Settings {
+                    size: iced::Size {
+                        width: 400.0,
+                        height: 400.0,
+                    },
+                    icon: iced::window::icon::from_file("./resources/icon.ico").ok(),
+                    exit_on_close_request: false,
+                    ..Default::default()
+                });
+
+                self.windows.insert(
+                    Some(id),
+                    WindowState {
+                        name: "options".to_owned(),
+                        closed: false,
+                    },
+                );
+
+                self.print_debug(message.clone());
+                return task.then(|_| Task::none());
+            }
+
+            Message::Exit(wnd_id) => {
                 self.write_current_changes();
                 self.save_current_session();
-                self.print_debug();
-                return window::get_latest().and_then(window::close);
+                self.print_debug(message.clone());
+                if let Some(wnd_state) = self.windows.get_mut(&Some(*wnd_id)) {
+                    wnd_state.closed = true;
+                }
+                if self.windows.iter().all(|(_, wnd_state)| wnd_state.closed) {
+                    return iced::exit();
+                } else {
+                    return iced::window::get_latest().and_then(iced::window::close);
+                }
             }
         }
 
-        self.print_debug();
+        self.print_debug(message.clone());
         Task::none()
     }
 
     pub fn subscription(&self) -> iced::Subscription<Message> {
-        iced::event::listen_with(|event, _, _| {
+        iced::event::listen_with(|event, _, id| {
             if let iced::Event::Window(iced::window::Event::CloseRequested) = event {
-                Some(Message::Exit)
+                Some(Message::Exit(id))
             } else {
                 None
             }
         })
     }
 
-    pub fn view(&self) -> Element<Message> {
-        crate::gui::editor_view::editor_view(self)
+    pub fn theme(&self) -> iced::Theme {
+        match &self.theme {
+            Some(theme) => {
+                let theme = crate::core::constants::Theme::from(theme.clone());
+                theme.into()
+            }
+            None => iced::Theme::Dark,
+        }
+    }
+
+    pub fn view(&self, id: iced::window::Id) -> Element<Message> {
+        if let Some((_, wnd_state)) = self.windows.iter().find(|(wnd_id, _)| **wnd_id == Some(id)) {
+            if wnd_state.name == "options" {
+                crate::gui::options_view::options_view(self)
+            } else {
+                crate::gui::editor_view::editor_view(self)
+            }
+        } else {
+            iced::widget::container(iced::widget::text("no window")).into()
+        }
     }
 
     pub fn try_reload_last_session(app: &mut Self) -> Result<(), GothicOrganizerError> {
@@ -133,6 +217,8 @@ impl GothicOrganizer {
         app.state.profile_choices = State::new(profiles.keys().cloned().collect());
 
         let last_session = load_session!().ok_or(GothicOrganizerError::new("failed to load last session"))?;
+
+        app.theme = last_session.theme;
 
         let selected_profile_name = last_session
             .selected_profile
@@ -372,7 +458,8 @@ impl GothicOrganizer {
         if let Err(e) = save_session!(
             self.profile_selected.clone(),
             self.instance_selected.clone(),
-            cache
+            cache,
+            self.theme.clone()
         ) {
             eprintln!("Failed saving session: {e}");
         }
@@ -433,10 +520,11 @@ impl GothicOrganizer {
         )
     }
 
-    fn print_debug(&self) {
+    fn print_debug(&self, message: Message) {
         println!(
-            "{}\nSelected profile: {:#?}\nSelected instance: {:#?}\nFiles: {:#?}\nCurrent directory entries: {:#?}\nCurrent directory: {:#?}\n{}\n",
+            "{}\nMessage: {:#?}\nSelected profile: {:#?}\nSelected instance: {:#?}\nFiles: {:#?}\nCurrent directory entries: {:#?}\nCurrent directory: {:#?}\n{}\n",
             "-----".repeat(10),
+            message,
             self.profile_selected,
             self.instance_selected,
             self.files.iter().count(),
@@ -457,7 +545,10 @@ pub enum Message {
     InstanceInput(String),
     FileToggle(PathBuf),
     TraverseIntoDir(PathBuf),
+    ThemeSwitch(String),
+    InitWindow,
+    OpenOptions,
     FileToggleAll,
     RefreshFiles,
-    Exit,
+    Exit(iced::window::Id),
 }

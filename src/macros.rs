@@ -49,10 +49,10 @@ macro_rules! styled_container {
     };
 }
 
-/// Creates a container with optional arguments for styling
+/// Creates an svg widget with optional arguments for color
 /// # Example
 /// ```rust
-/// let container = svg_with_color!(
+/// let svg = svg_with_color!(
 ///     "ferris_nude_pic.svg",
 ///     color_idle = iced::Color::BLACK,
 ///     color_hovered = iced::Color::WHITE
@@ -94,11 +94,17 @@ macro_rules! svg_with_color {
 /// Optionally `$custom_path` can be provided.
 #[macro_export]
 macro_rules! save_session {
-    ($selected_profile: expr, $selected_instance: expr, $cache: expr, $custom_path: expr) => {
-        $crate::helpers::save_session($selected_profile, $selected_instance, $cache, $custom_path)
+    ($selected_profile: expr, $selected_instance: expr, $cache: expr, $theme: expr, $custom_path: expr) => {
+        $crate::helpers::save_session(
+            $selected_profile,
+            $selected_instance,
+            $cache,
+            $theme,
+            $custom_path,
+        )
     };
-    ($selected_profile: expr, $selected_instance: expr, $cache: expr) => {
-        $crate::core::helpers::save_session::<String>($selected_profile, $selected_instance, $cache, None)
+    ($selected_profile: expr, $selected_instance: expr, $cache: expr, $theme: expr) => {
+        $crate::core::helpers::save_session::<String>($selected_profile, $selected_instance, $cache, $theme, None)
     };
 }
 

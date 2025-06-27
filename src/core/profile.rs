@@ -11,6 +11,7 @@ pub struct Session {
     pub selected_profile: Option<String>,
     pub selected_instance: Option<String>,
     pub cache: Option<Lookup<PathBuf, bool>>,
+    pub theme: Option<String>,
 }
 
 impl AsRef<Session> for Session {
