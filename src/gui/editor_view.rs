@@ -44,7 +44,7 @@ pub fn editor_view(app: &crate::app::GothicOrganizer) -> Element<Message> {
     title = title.size(30);
 
     let button_options_icon: svg::Svg<_> = svg("./resources/options.svg").height(20).width(20);
-    let button_options = button(button_options_icon).on_press(Message::OpenOptions);
+    let button_options = button(button_options_icon).on_press(Message::InvokeOptionsMenu);
     let header: Row<_> = row!(logo, title, horizontal_space(), button_options).spacing(10);
     //////////////////////////////////////////////////////////////
     /////////////////////////[Top Profile Controls]///////////////
