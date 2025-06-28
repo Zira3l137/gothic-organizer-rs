@@ -159,11 +159,3 @@ macro_rules! save_profile {
         $crate::core::helpers::save_profile($profile, $custom_path)
     };
 }
-
-/// Returns the path to the local profiles directory.
-#[macro_export]
-macro_rules! local_profiles_dir {
-    () => {
-        std::path::PathBuf::from($crate::profile::local_app_data()).join($crate::constants::APP_NAME)
-    };
-}

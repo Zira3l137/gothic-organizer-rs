@@ -9,6 +9,7 @@ use log::warn;
 use scopeguard::defer;
 
 use crate::core::logic;
+use crate::core::profile::FileInfo;
 use crate::core::profile::Lookup;
 use crate::core::profile::Profile;
 
@@ -17,9 +18,10 @@ pub struct GothicOrganizer {
     pub profile_selected: Option<String>,
     pub instance_selected: Option<String>,
     pub profiles: Lookup<String, Profile>,
-    pub files: Lookup<PathBuf, bool>,
+    pub files: Lookup<PathBuf, FileInfo>,
     pub theme: Option<String>,
     pub state: InnerState,
+    pub mods_storage_dir: Option<PathBuf>,
     pub windows: Lookup<Option<iced::window::Id>, WindowState>,
 }
 
@@ -30,7 +32,7 @@ pub struct InnerState {
     pub profile_choices: State<String>,
     pub theme_choices: State<String>,
     pub instance_choices: State<String>,
-    pub current_directory_entries: Vec<(PathBuf, bool)>,
+    pub current_directory_entries: Vec<(PathBuf, FileInfo)>,
     pub current_directory: PathBuf,
 }
 
@@ -115,11 +117,23 @@ impl GothicOrganizer {
             Message::TraverseIntoDir(path) => {
                 logic::write_current_changes(self);
                 self.state.current_directory = path.clone();
-                logic::refresh_files(self, Some(path.clone()))
+                logic::load_files(self, Some(path.clone()))
             }
 
             Message::RefreshFiles => {
-                logic::refresh_files(self, None);
+                logic::load_files(self, None);
+            }
+
+            Message::ModToggle(_) => {
+                return Task::none();
+            }
+
+            Message::ModUninstall(_) => {
+                return Task::none();
+            }
+
+            Message::ModAdd(path) => {
+                return logic::add_mod(self, None, None, path.clone());
             }
 
             Message::InvokeOptionsMenu => {
@@ -135,12 +149,10 @@ impl GothicOrganizer {
     }
 
     pub fn subscription(&self) -> iced::Subscription<Message> {
-        iced::event::listen_with(|event, _, id| {
-            if let iced::Event::Window(iced::window::Event::CloseRequested) = event {
-                Some(Message::Exit(id))
-            } else {
-                None
-            }
+        iced::event::listen_with(|event, _, id| match event {
+            iced::Event::Window(iced::window::Event::CloseRequested) => Some(Message::Exit(id)),
+            iced::Event::Window(iced::window::Event::FileDropped(path)) => Some(Message::ModAdd(Some(path))),
+            _ => None,
         })
     }
 
@@ -180,6 +192,9 @@ pub enum Message {
     FileToggle(PathBuf),
     TraverseIntoDir(PathBuf),
     ThemeSwitch(String),
+    ModToggle(String),
+    ModUninstall(String),
+    ModAdd(Option<PathBuf>),
     InitWindow,
     InvokeOptionsMenu,
     FileToggleAll,

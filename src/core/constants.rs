@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 pub const APP_NAME: &str = env!("CARGO_PKG_NAME");
 pub const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const APP_TITLE: &str = "Gothic Organizer";
@@ -5,14 +7,30 @@ pub const APP_AUTHOR: &str = "Zira3l137";
 pub const APP_REPOSITORY: &str = "https://github.com/Zira3l137/gothic-organizer-rs";
 
 pub fn app_title_full() -> String {
-    format!("{} v{}", APP_TITLE, APP_VERSION)
+    format!("{APP_TITLE} v{APP_VERSION}")
 }
 
 pub fn app_info() -> String {
-    format!(
-        "{}\nVersion: {}\nAuthor: {}\nRepository: {}",
-        APP_TITLE, APP_VERSION, APP_AUTHOR, APP_REPOSITORY
-    )
+    format!("{APP_TITLE}\nVersion: {APP_VERSION}\nAuthor: {APP_AUTHOR}\nRepository: {APP_REPOSITORY}")
+}
+
+pub fn local_app_data() -> String {
+    #[cfg(windows)]
+    {
+        std::env::var("LOCALAPPDATA").unwrap_or(String::from(""))
+    }
+    #[cfg(unix)]
+    {
+        std::env::var("XDG_DATA_HOME").unwrap_or(String::from("~/.local/share"))
+    }
+}
+
+pub fn local_profiles_dir() -> PathBuf {
+    PathBuf::from(local_app_data()).join(APP_NAME)
+}
+
+pub fn mod_storage_dir() -> PathBuf {
+    PathBuf::from("./mods")
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -11,6 +11,7 @@ use iced::widget::row;
 use iced::widget::scrollable;
 use iced::widget::svg;
 use iced::widget::text;
+use iced::widget::tooltip;
 use iced::widget::Column;
 use iced::widget::Row;
 use iced::Element;
@@ -30,6 +31,11 @@ pub fn editor_view(app: &crate::app::GothicOrganizer) -> Element<Message> {
         .and_then(|s| app.profiles.get(s));
 
     let instance_selected = app
+        .instance_selected
+        .as_ref()
+        .and_then(|s| current_profile.and_then(|p| p.instances.as_ref().and_then(|i| i.get(s))));
+
+    let current_instance = app
         .instance_selected
         .as_ref()
         .and_then(|s| current_profile.and_then(|p| p.instances.as_ref().and_then(|i| i.get(s))));
@@ -152,7 +158,7 @@ pub fn editor_view(app: &crate::app::GothicOrganizer) -> Element<Message> {
             .state
             .current_directory_entries
             .iter()
-            .fold(Column::new(), |column, (path, enabled)| {
+            .fold(Column::new(), |column, (path, info)| {
                 let is_dir = path.is_dir();
 
                 let file_name = path.file_name().unwrap().to_string_lossy().to_string();
@@ -171,15 +177,23 @@ pub fn editor_view(app: &crate::app::GothicOrganizer) -> Element<Message> {
 
                 let icon: Element<_> = svg_with_color!(icon_path).height(20).width(20).into();
 
-                let checkbox = checkbox("", *enabled).on_toggle(|_| Message::FileToggle(path.clone()));
+                let parent_name = info.parent_name.clone().unwrap_or(String::from("Default"));
+                let tooltip_text = text(format!("Supplied by: {parent_name}"));
+                let tooltip_body = styled_container!(tooltip_text, border_width = 1.0, border_radius = 4.0).padding(5);
 
-                let group_file = styled_container!(
-                    row![checkbox, icon, label],
-                    border_width = 1.0,
-                    border_radius = 4.0
-                )
-                .padding(5)
-                .align_left(Length::Fill);
+                let checkbox = checkbox("", info.enabled).on_toggle(|_| Message::FileToggle(path.clone()));
+
+                let group_file = tooltip(
+                    styled_container!(
+                        row![checkbox, icon, label],
+                        border_width = 1.0,
+                        border_radius = 4.0
+                    )
+                    .padding(5)
+                    .align_left(Length::Fill),
+                    tooltip_body,
+                    tooltip::Position::Left,
+                );
 
                 column.push(group_file)
             });
@@ -191,23 +205,63 @@ pub fn editor_view(app: &crate::app::GothicOrganizer) -> Element<Message> {
         border_radius = 4.0
     )
     .padding(10)
+    .align_top(Length::Fill);
+
+    //////////////////////////////////////////////////////////////
+    /////////////////////////[Left-side Mods List]////////////////
+
+    let icon_add = svg_with_color!(
+        "./resources/add_mod.svg",
+        color_idle = iced::Color::from_rgb(0.0, 230.0, 0.0),
+        color_hovered = iced::Color::from_rgb(0.0, 255.0, 0.0)
+    )
+    .height(20)
+    .width(20);
+    let button_add_mod = button(icon_add).on_press(Message::ModAdd(None));
+
+    let group_mod_controls = styled_container!(
+        row!(button_add_mod),
+        border_width = 1.0,
+        border_radius = 4.0
+    )
+    .padding(10)
+    .center_x(Length::Fill);
+
+    let mut column_mods: Column<_> = Column::new();
+
+    if let Some(instance) = current_instance
+        && let Some(mods) = &instance.mods
+    {
+        column_mods = mods.iter().fold(Column::new(), |column, mod_info| {
+            let mod_name: Element<_> = text(mod_info.name.clone()).into();
+            let checkbox = checkbox("", mod_info.enabled).on_toggle(|_| Message::ModToggle(mod_info.name.clone()));
+            let button_uninstall = ClickableText::new("Uninstall").on_press(|| Message::ModUninstall(mod_info.name.clone()));
+
+            let group_mod = styled_container!(
+                row![checkbox, mod_name, horizontal_space(), button_uninstall],
+                border_width = 1.0,
+                border_radius = 4.0
+            )
+            .padding(5)
+            .align_left(Length::Fill);
+
+            column.push(group_mod)
+        })
+    }
+
+    let mods_menu = styled_container!(
+        column!(group_mod_controls, scrollable(column_mods)),
+        border_width = 2.0,
+        border_radius = 4.0
+    )
+    .padding(10)
     .align_y(Vertical::Top)
     .center_x(Length::Fill);
 
     //////////////////////////////////////////////////////////////
-    /////////////////////////[Left-side Mods List]////////////////
-    // TODO: Implement mod list
-    let mods_menu = styled_container!(
-        column!(text("mods menu")),
-        border_width = 2.0,
-        border_radius = 4.0
-    )
-    .center(Length::Fill);
-
-    //////////////////////////////////////////////////////////////
     /////////////////////////[Final Layout]///////////////////////
 
-    let group_editor = container(row!(mods_menu, files_menu).spacing(10)).center(Length::Fill);
+    let group_editor = container(row!(mods_menu, files_menu).spacing(10)).align_top(Length::Fill);
 
     column![header, profile_controls, group_editor]
         .spacing(10)

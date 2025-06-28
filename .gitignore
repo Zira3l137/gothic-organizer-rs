@@ -1,4 +1,5 @@
 target/
+mods/
 .cargo/
 .ps1
 .bat

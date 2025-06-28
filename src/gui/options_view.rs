@@ -1,3 +1,4 @@
+use iced::widget::button;
 use iced::widget::column;
 use iced::widget::combo_box;
 use iced::widget::row;
@@ -29,8 +30,8 @@ pub fn options_view(app: &crate::app::GothicOrganizer) -> Element<Message> {
             Some(app.state.profile_directory_input.clone().into()),
         ))
         .into();
-
-    let group_profile_dir = row!(label_profile_dir, input_profile_dir).spacing(10);
+    let button_browse = button("Browse").on_press(Message::BrowseGameDir(None, None));
+    let group_profile_dir = row!(label_profile_dir, input_profile_dir, button_browse).spacing(10);
 
     styled_container!(
         column!(group_theme, group_profile_dir)

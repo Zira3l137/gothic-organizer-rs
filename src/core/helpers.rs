@@ -1,4 +1,3 @@
-use std::env::var;
 use std::fs::create_dir_all;
 use std::fs::read_dir;
 use std::fs::read_to_string;
@@ -13,31 +12,21 @@ use iced::Border;
 use iced::Shadow;
 
 use crate::core::constants::APP_NAME;
+use crate::core::profile::FileInfo;
 use crate::core::profile::Profile;
 use crate::core::profile::Session;
-
-pub fn local_app_data() -> String {
-    #[cfg(windows)]
-    {
-        var("LOCALAPPDATA").unwrap_or(String::from(""))
-    }
-    #[cfg(unix)]
-    {
-        var("XDG_DATA_HOME").unwrap_or(String::from("~/.local/share"))
-    }
-}
 
 fn default_path<P: AsRef<Path>>(custom_path: Option<P>) -> PathBuf {
     match custom_path {
         Some(p) => p.as_ref().to_path_buf(),
-        None => PathBuf::from(local_app_data()).join(APP_NAME),
+        None => PathBuf::from(crate::core::constants::local_app_data()).join(APP_NAME),
     }
 }
 
 pub fn save_session<P: AsRef<Path>>(
     selected_profile: Option<String>,
     selected_instance: Option<String>,
-    cache: Option<crate::core::profile::Lookup<PathBuf, bool>>,
+    cache: Option<crate::core::profile::Lookup<PathBuf, FileInfo>>,
     theme: Option<String>,
     custom_path: Option<P>,
 ) -> Result<(), std::io::Error> {

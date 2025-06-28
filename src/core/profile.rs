@@ -10,7 +10,7 @@ use serde::Serialize;
 pub struct Session {
     pub selected_profile: Option<String>,
     pub selected_instance: Option<String>,
-    pub cache: Option<Lookup<PathBuf, bool>>,
+    pub cache: Option<Lookup<PathBuf, FileInfo>>,
     pub theme: Option<String>,
 }
 
@@ -78,12 +78,12 @@ impl Profile {
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Instance {
     pub name: String,
-    pub files: Option<Lookup<PathBuf, bool>>,
+    pub files: Option<Lookup<PathBuf, FileInfo>>,
     pub mods: Option<Vec<ModInfo>>,
 }
 
 impl Instance {
-    pub fn new(name: &str, files: Option<Lookup<PathBuf, bool>>, mods: Option<Vec<ModInfo>>) -> Self {
+    pub fn new(name: &str, files: Option<Lookup<PathBuf, FileInfo>>, mods: Option<Vec<ModInfo>>) -> Self {
         Self {
             name: name.to_owned(),
             files,
@@ -96,7 +96,7 @@ impl Instance {
         self
     }
 
-    pub fn with_files(mut self, files: Option<Lookup<PathBuf, bool>>) -> Self {
+    pub fn with_files(mut self, files: Option<Lookup<PathBuf, FileInfo>>) -> Self {
         self.files = files;
         self
     }
@@ -109,9 +109,80 @@ impl Instance {
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ModInfo {
+    pub enabled: bool,
     pub name: String,
     pub path: PathBuf,
-    pub files: Lookup<PathBuf, bool>,
+    pub files: Lookup<PathBuf, FileInfo>,
+}
+
+impl ModInfo {
+    pub fn new(enabled: bool, name: &str, path: &Path, files: Lookup<PathBuf, FileInfo>) -> Self {
+        Self {
+            enabled,
+            name: name.to_owned(),
+            path: path.to_owned(),
+            files,
+        }
+    }
+
+    pub fn with_enabled(mut self, enabled: bool) -> Self {
+        self.enabled = enabled;
+        self
+    }
+
+    pub fn with_name(mut self, name: &str) -> Self {
+        self.name = name.to_owned();
+        self
+    }
+
+    pub fn with_path(mut self, path: &Path) -> Self {
+        self.path = path.to_owned();
+        self
+    }
+
+    pub fn with_files(mut self, files: Lookup<PathBuf, FileInfo>) -> Self {
+        self.files = files;
+        self
+    }
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FileInfo {
+    pub enabled: bool,
+    pub source_path: PathBuf,
+    pub target_path: PathBuf,
+    pub parent_name: Option<String>,
+}
+
+impl FileInfo {
+    pub fn new(enabled: bool, source_path: &Path, target_path: &Path, parent_name: Option<String>) -> Self {
+        Self {
+            enabled,
+            source_path: source_path.to_owned(),
+            target_path: target_path.to_owned(),
+            parent_name,
+        }
+    }
+
+    pub fn with_enabled(mut self, enabled: bool) -> Self {
+        self.enabled = enabled;
+        self
+    }
+
+    pub fn with_source_path(mut self, source_path: &Path) -> Self {
+        self.source_path = source_path.to_owned();
+        self
+    }
+
+    pub fn with_target_path(mut self, target_path: &Path) -> Self {
+        self.target_path = target_path.to_owned();
+        self
+    }
+
+    pub fn with_parent_name(mut self, parent_name: String) -> Self {
+        self.parent_name = Some(parent_name);
+        self
+    }
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -256,6 +327,21 @@ where
     fn from(value: Vec<(K, V)>) -> Self {
         let mut map = hashbrown::HashMap::with_capacity_and_hasher(value.len(), ahash::RandomState::new());
         for (key, value) in value {
+            map.insert(key, value);
+        }
+        Lookup { access: map }
+    }
+}
+
+impl<K, V> FromIterator<(K, V)> for Lookup<K, V>
+where
+    K: std::hash::Hash + Eq + Sized,
+{
+    fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
+        let iterator = iter.into_iter();
+        let possible_size = iterator.size_hint().1.unwrap_or(10);
+        let mut map = hashbrown::HashMap::with_capacity_and_hasher(possible_size, ahash::RandomState::new());
+        for (key, value) in iterator {
             map.insert(key, value);
         }
         Lookup { access: map }
