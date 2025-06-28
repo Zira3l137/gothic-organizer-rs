@@ -42,7 +42,7 @@ fn setup_logger(verbosity: u8) -> Result<(), Box<dyn std::error::Error>> {
     };
 
     env_logger::Builder::new()
-        .filter_module(&format!("{}::app", module_path!()), log_level)
+        .filter_module(module_path!(), log_level)
         .format_timestamp(None)
         .init();
 

@@ -81,7 +81,7 @@ pub fn editor_view(app: &crate::app::GothicOrganizer) -> Element<Message> {
         }
     }));
 
-    let button_browse = |profile: &crate::core::profile::Profile| button("Browse").on_press(Message::BrowseGameDir(profile.name.clone()));
+    let button_browse = |profile: &crate::core::profile::Profile| button("Browse").on_press(Message::BrowseGameDir(Some(profile.name.clone()), None));
     let group_instance = container(row!(choice_instance, button_add, button_remove));
 
     let profile_controls = styled_container!(

@@ -5,6 +5,7 @@ use iced::Element;
 use iced::Task;
 
 use log::info;
+use log::warn;
 use scopeguard::defer;
 
 use crate::core::logic;
@@ -25,6 +26,7 @@ pub struct GothicOrganizer {
 #[derive(Debug, Default)]
 pub struct InnerState {
     pub instance_input: Option<String>,
+    pub profile_directory_input: String,
     pub profile_choices: State<String>,
     pub theme_choices: State<String>,
     pub instance_choices: State<String>,
@@ -48,7 +50,7 @@ impl GothicOrganizer {
 
         info!("Loading last session");
         if let Err(err) = logic::try_reload_last_session(&mut app) {
-            eprintln!("{err}");
+            warn!("Failed to load last session: {err}");
         }
 
         app.state.theme_choices = State::new(
@@ -102,8 +104,12 @@ impl GothicOrganizer {
                 logic::toggle_state_recursive(self, None);
             }
 
-            Message::BrowseGameDir(profile_name) => {
-                return logic::browse_game_dir(self, profile_name);
+            Message::BrowseGameDir(profile_name, path) => {
+                return logic::set_game_dir(self, profile_name.clone(), path.clone());
+            }
+
+            Message::ProfileDirInput(input) => {
+                self.state.profile_directory_input = input.clone();
             }
 
             Message::TraverseIntoDir(path) => {
@@ -164,12 +170,13 @@ impl GothicOrganizer {
 #[derive(Debug, Clone)]
 pub enum Message {
     Exit(iced::window::Id),
-    BrowseGameDir(String),
+    BrowseGameDir(Option<String>, Option<PathBuf>),
     ProfileSelected(String),
     InstanceSelected(String),
     InstanceAdd(String),
     InstanceRemove(String),
     InstanceInput(String),
+    ProfileDirInput(String),
     FileToggle(PathBuf),
     TraverseIntoDir(PathBuf),
     ThemeSwitch(String),

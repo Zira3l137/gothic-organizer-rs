@@ -16,6 +16,8 @@ use crate::save_session;
 
 pub fn invoke_options_window(app: &mut GothicOrganizer) -> Task<Message> {
     let (id, task) = iced::window::open(iced::window::Settings {
+        position: iced::window::Position::Centered,
+        level: iced::window::Level::AlwaysOnTop,
         size: iced::Size {
             width: 400.0,
             height: 400.0,
@@ -220,12 +222,16 @@ pub fn select_instance(app: &mut GothicOrganizer, instance_name: &str) -> Task<M
     Task::done(Message::RefreshFiles)
 }
 
-pub fn browse_game_dir(app: &mut GothicOrganizer, profile_name: &str) -> Task<Message> {
-    let profile_name = profile_name.to_owned();
-    let Some(path) = rfd::FileDialog::new()
-        .set_title(format!("Select {} directory", &profile_name))
-        .pick_folder()
-    else {
+pub fn set_game_dir(app: &mut GothicOrganizer, profile_name: Option<String>, path: Option<PathBuf>) -> Task<Message> {
+    let Some(profile_name) = profile_name.or(app.profile_selected.clone()) else {
+        return Task::none();
+    };
+
+    let Some(path) = path.or_else(|| {
+        rfd::FileDialog::new()
+            .set_title(format!("Select {} directory", &profile_name))
+            .pick_folder()
+    }) else {
         return Task::none();
     };
 
