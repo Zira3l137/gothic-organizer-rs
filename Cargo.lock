@@ -1661,7 +1661,6 @@ dependencies = [
  "ignore",
  "log",
  "rfd",
- "scopeguard",
  "serde",
  "serde_json",
  "thiserror 2.0.12",

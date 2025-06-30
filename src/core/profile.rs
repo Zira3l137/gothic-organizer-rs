@@ -79,6 +79,7 @@ impl Profile {
 pub struct Instance {
     pub name: String,
     pub files: Option<Lookup<PathBuf, FileInfo>>,
+    pub overwrtites: Option<Lookup<PathBuf, FileInfo>>,
     pub mods: Option<Vec<ModInfo>>,
 }
 
@@ -87,6 +88,7 @@ impl Instance {
         Self {
             name: name.to_owned(),
             files,
+            overwrtites: None,
             mods,
         }
     }
@@ -103,6 +105,11 @@ impl Instance {
 
     pub fn with_mods(mut self, mods: Option<Vec<ModInfo>>) -> Self {
         self.mods = mods;
+        self
+    }
+
+    pub fn with_overwrtites(mut self, overwrtites: Option<Lookup<PathBuf, FileInfo>>) -> Self {
+        self.overwrtites = overwrtites;
         self
     }
 }
@@ -239,8 +246,8 @@ where
     /// If the map did have this key present, the value is updated, and the old
     /// value is returned. The key is not updated, though; this matters for
     /// types that can be `==` without being identical.
-    pub fn insert(&mut self, key: K, value: V) {
-        self.access.insert(key, value);
+    pub fn insert(&mut self, key: K, value: V) -> Option<V> {
+        self.access.insert(key, value)
     }
 
     /// An iterator visiting all keys in arbitrary order.

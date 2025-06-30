@@ -6,7 +6,6 @@ use iced::Task;
 
 use log::info;
 use log::warn;
-use scopeguard::defer;
 
 use crate::core::logic;
 use crate::core::profile::FileInfo;
@@ -69,9 +68,7 @@ impl GothicOrganizer {
     }
 
     pub fn update(&mut self, message: Message) -> Task<Message> {
-        defer! {
-            info!("Message: {message:?}");
-        }
+        info!("Message: {message:?}");
 
         match &message {
             Message::InitWindow => {
@@ -119,7 +116,7 @@ impl GothicOrganizer {
             }
 
             Message::TraverseIntoDir(path) => {
-                logic::write_current_changes(self);
+                logic::write_changes_to_instance(self);
                 self.state.current_directory = path.clone();
                 logic::load_files(self, Some(path.clone()))
             }
@@ -133,11 +130,15 @@ impl GothicOrganizer {
             }
 
             Message::ModUninstall(name) => {
-                logic::remove_mod(self, None, None, name.clone());
+                return logic::remove_mod(self, None, None, name.clone());
             }
 
             Message::ModAdd(path) => {
                 return logic::add_mod(self, None, None, path.clone());
+            }
+
+            Message::LoadMods => {
+                return logic::load_mods(self, None, None);
             }
 
             Message::InvokeOptionsMenu => {
@@ -201,6 +202,7 @@ pub enum Message {
     ModToggle(String),
     ModUninstall(String),
     ModAdd(Option<PathBuf>),
+    LoadMods,
     InitWindow,
     InvokeOptionsMenu,
     FileToggleAll,

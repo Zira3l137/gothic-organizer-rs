@@ -18,6 +18,163 @@ use crate::load_session;
 use crate::save_profile;
 use crate::save_session;
 
+pub fn add_mod(
+    app: &mut GothicOrganizer,
+    profile_name: Option<String>,
+    instance_name: Option<String>,
+    mod_source_path: Option<PathBuf>,
+) -> Task<Message> {
+    let Some(mod_source_path) = mod_source_path.or_else(|| {
+        rfd::FileDialog::new()
+            .set_title("Select a zip archive with mod files")
+            .add_filter("Zip archive", &["zip"])
+            .pick_file()
+    }) else {
+        return Task::none();
+    };
+    log::trace!("Attempting to add mod from: {}", mod_source_path.display());
+
+    let mod_path = match move_mod_to_storage(app, &mod_source_path) {
+        Ok(path) => path,
+        Err(e) => {
+            log::error!("Failed to move mod to storage: {e}");
+            return Task::none();
+        }
+    };
+
+    if let Some(profile_name) = profile_name.or_else(|| app.profile_selected.clone())
+        && let Some(instance_name) = instance_name.or_else(|| app.instance_selected.clone())
+        && let Some(profile) = app.profiles.get_mut(&profile_name)
+        && let Some(instances) = profile.instances.as_mut()
+        && let Some(instance) = instances.get_mut(&instance_name)
+    {
+        if !is_valid_mod_source(&mod_path) {
+            log::error!("Invalid mod source: {}", mod_path.display());
+            return Task::none();
+        }
+
+        let mod_name = mod_path
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or(format!(
+                "Unknown#{}",
+                chrono::Local::now().timestamp_millis()
+            ));
+        log::trace!("Assigned name: {mod_name}");
+
+        let file_info = |path: &Path| {
+            profile::FileInfo::default()
+                .with_enabled(true)
+                .with_source_path(path)
+                .with_parent_name(mod_name.clone())
+        };
+
+        let mod_files = ignore::WalkBuilder::new(mod_path.clone())
+            .ignore(false)
+            .build()
+            .filter_map(|e| {
+                e.map(|e| (e.path().to_path_buf(), file_info(e.path())))
+                    .ok()
+            })
+            .collect::<profile::Lookup<PathBuf, profile::FileInfo>>();
+
+        let new_mod_info = profile::ModInfo::default()
+            .with_enabled(true)
+            .with_name(&mod_name)
+            .with_path(&mod_path)
+            .with_files(mod_files);
+
+        log::trace!("Adding mod to instance");
+        if let Some(mods) = instance.mods.as_mut() {
+            mods.push(new_mod_info);
+        } else {
+            instance.mods = Some(vec![new_mod_info]);
+        }
+
+        return Task::done(Message::LoadMods);
+    }
+
+    Task::none()
+}
+
+pub fn remove_mod(app: &mut GothicOrganizer, profile_name: Option<String>, instance_name: Option<String>, mod_name: String) -> Task<Message> {
+    let storage_dir = app.mods_storage_dir.clone().unwrap_or_else(|| {
+        constants::default_mod_storage_dir().unwrap_or_else(|e| {
+            log::error!("Failed to get default mod storage dir: {e}");
+            PathBuf::new()
+        })
+    });
+
+    if let Some(profile_name) = profile_name.or_else(|| app.profile_selected.clone())
+        && let Some(instance_name) = instance_name.or_else(|| app.instance_selected.clone())
+        && let Some(profile) = app.profiles.get_mut(&profile_name)
+        && let Some(instances) = profile.instances.as_mut()
+        && let Some(instance) = instances.get_mut(&instance_name)
+        && let Some(mods) = instance.mods.as_mut()
+    {
+        mods.retain(|m| m.name != mod_name);
+
+        if mods.is_empty() {
+            instance.mods = None;
+        }
+
+        let mod_dir = storage_dir.join(&mod_name);
+        if mod_dir.exists() {
+            log::trace!("Removing mod directory {}", mod_dir.display());
+            std::fs::remove_dir_all(mod_dir).unwrap_or_else(|e| {
+                log::error!("Failed to remove mod directory: {e}");
+            });
+        }
+
+        return Task::chain(
+            Task::done(Message::RefreshFiles),
+            Task::done(Message::LoadMods),
+        );
+    }
+
+    Task::none()
+}
+
+pub fn load_mods(app: &mut GothicOrganizer, profile_name: Option<String>, instance_name: Option<String>) -> Task<Message> {
+    if let Some(profile_name) = profile_name.or_else(|| app.profile_selected.clone())
+        && let Some(instance_name) = instance_name.or_else(|| app.instance_selected.clone())
+        && let Some(profile) = app.profiles.get_mut(&profile_name)
+        && let Some(instances) = profile.instances.as_mut()
+        && let Some(instance) = instances.get_mut(&instance_name)
+        && let Some(instance_files) = instance.files.as_mut()
+        && let Some(instance_mods) = instance.mods.as_mut()
+    {
+        if instance_mods.is_empty() {
+            log::trace!("No mods to load");
+            return Task::done(Message::RefreshFiles);
+        };
+
+        instance_mods.iter().for_each(|mod_info| {
+            log::trace!("Loading mod {}", mod_info.name);
+            mod_info.files.iter().for_each(|(path, info)| {
+                let Ok(relative_path) = path.strip_prefix(&mod_info.path) else {
+                    return;
+                };
+                let dst_path = profile.path.join(relative_path);
+
+                log::trace!("Inserting file {} to instance files", path.display());
+                let existing_file = instance_files.insert(dst_path.clone(), info.clone().with_target_path(&dst_path));
+                if let Some(existing_file) = existing_file {
+                    log::trace!("Overwriting file {}", existing_file.source_path.display());
+                    if let Some(overwrites) = instance.overwrtites.as_mut() {
+                        overwrites.insert(path.clone(), existing_file);
+                    } else {
+                        instance.overwrtites = Some(profile::Lookup::from(vec![(path.clone(), existing_file)]));
+                    }
+                }
+            })
+        });
+        return Task::done(Message::RefreshFiles);
+    }
+
+    Task::none()
+}
+
 pub fn invoke_options_window(app: &mut GothicOrganizer) -> Task<Message> {
     let (id, task) = iced::window::open(iced::window::Settings {
         position: iced::window::Position::Centered,
@@ -43,7 +200,7 @@ pub fn invoke_options_window(app: &mut GothicOrganizer) -> Task<Message> {
 }
 
 pub fn exit(app: &mut GothicOrganizer, wnd_id: &iced::window::Id) -> Task<Message> {
-    write_current_changes(app);
+    write_changes_to_instance(app);
     save_current_session(app);
 
     if let Some(wnd_state) = app.windows.get_mut(&Some(*wnd_id)) {
@@ -131,7 +288,7 @@ pub fn init_window(app: &mut GothicOrganizer) -> Task<Message> {
 }
 
 pub fn switch_profile(app: &mut GothicOrganizer, profile_name: &str) -> Task<Message> {
-    write_current_changes(app);
+    write_changes_to_instance(app);
     let next_profile_name = profile_name.to_owned();
 
     let Some(next_profile) = app.profiles.get(&next_profile_name) else {
@@ -154,7 +311,7 @@ pub fn switch_profile(app: &mut GothicOrganizer, profile_name: &str) -> Task<Mes
     }
 }
 
-pub fn write_current_changes(app: &mut GothicOrganizer) {
+pub fn write_changes_to_instance(app: &mut GothicOrganizer) {
     let Some(current_profile) = app
         .profiles
         .get_mut(&app.profile_selected.clone().unwrap_or_default())
@@ -162,6 +319,7 @@ pub fn write_current_changes(app: &mut GothicOrganizer) {
         return;
     };
 
+    log::trace!("Fetching current directory changes");
     app.state
         .current_directory_entries
         .iter()
@@ -172,6 +330,10 @@ pub fn write_current_changes(app: &mut GothicOrganizer) {
     if let Some(instances) = current_profile.instances.as_mut()
         && let Some(current_instance) = instances.get_mut(&app.instance_selected.clone().unwrap_or_default())
     {
+        log::trace!(
+            "Writing current changes into instance {}",
+            current_instance.name
+        );
         current_instance.files = Some(app.files.clone());
     }
 }
@@ -220,9 +382,10 @@ pub fn remove_instance_from_profile(app: &mut GothicOrganizer, profile_name: &st
 }
 
 pub fn select_instance(app: &mut GothicOrganizer, instance_name: &str) -> Task<Message> {
-    write_current_changes(app);
+    write_changes_to_instance(app);
     let instance_name = instance_name.to_owned();
     app.instance_selected = Some(instance_name.clone());
+    write_changes_to_instance(app);
     Task::done(Message::RefreshFiles)
 }
 
@@ -277,26 +440,26 @@ pub fn load_files(app: &mut GothicOrganizer, root: Option<PathBuf>) {
     let root_dir = root.unwrap_or_else(|| current_profile.path.clone());
     app.state.current_directory = root_dir.clone();
 
-    let Ok(root_dir_iter) = root_dir.read_dir() else {
-        return;
+    let current_dir_entries = |app_files: &profile::Lookup<PathBuf, profile::FileInfo>| {
+        app_files
+            .iter()
+            .filter_map(|(path, info)| {
+                path.parent().and_then(|parent| {
+                    if parent == root_dir {
+                        Some((path.clone(), info.clone()))
+                    } else {
+                        None
+                    }
+                })
+            })
+            .collect::<Vec<(PathBuf, profile::FileInfo)>>()
     };
-
-    let profile_dir_entries: Vec<(PathBuf, profile::FileInfo)> = root_dir_iter
-        .flatten()
-        .map(|entry| {
-            (
-                entry.path(),
-                profile::FileInfo::default()
-                    .with_source_path(&entry.path())
-                    .with_enabled(true),
-            )
-        })
-        .collect();
 
     if let Some(selected_instance) = &app.instance_selected
         && let Some(instances) = &current_profile.instances
         && let Some(current_instance) = instances.get(selected_instance)
     {
+        log::trace!("Fetching files from current instance");
         if let Some(instance_files) = &current_instance.files
             && !instance_files.is_empty()
         {
@@ -305,19 +468,23 @@ pub fn load_files(app: &mut GothicOrganizer, root: Option<PathBuf>) {
             }
         }
 
+        log::trace!("Clearing current directory entries");
         app.state.current_directory_entries.clear();
 
-        for (path, _) in &profile_dir_entries {
-            if let Some(displayed_state) = app.files.get(path) {
+        log::trace!("Displaying fetched files for current directory");
+        current_dir_entries(&app.files)
+            .iter()
+            .for_each(|(path, info)| {
                 app.state
                     .current_directory_entries
-                    .push((path.clone(), displayed_state.clone()));
-            }
-        }
+                    .push((path.clone(), info.clone()));
+            })
     } else {
-        app.state.current_directory_entries = profile_dir_entries;
+        log::warn!("No instance selected, displaying only base files for current directory");
+        app.state.current_directory_entries = current_dir_entries(&app.files);
     }
 
+    log::trace!("Sorting current directory entries");
     app.state
         .current_directory_entries
         .sort_unstable_by_key(|(path, _)| !path.is_dir());
@@ -531,10 +698,12 @@ pub fn extract_zip(zip_path: &Path, dst_path: &Path) -> Result<(), crate::error:
 pub fn move_mod_to_storage(app: &mut GothicOrganizer, mod_path: &Path) -> Result<PathBuf, crate::error::GothicOrganizerError> {
     let mut is_zip = false;
 
-    let storage_dir = app
-        .mods_storage_dir
-        .clone()
-        .unwrap_or(constants::mod_storage_dir());
+    let storage_dir = app.mods_storage_dir.clone().unwrap_or_else(|| {
+        constants::default_mod_storage_dir().unwrap_or_else(|e| {
+            log::error!("Failed to get default mod storage dir: {e}");
+            PathBuf::from("mods")
+        })
+    });
     log::trace!("Mod storage dir: {}", storage_dir.display());
 
     let mut mod_name = mod_path
@@ -571,112 +740,4 @@ pub fn move_mod_to_storage(app: &mut GothicOrganizer, mod_path: &Path) -> Result
     }
 
     Ok(storage_dir.join(mod_name))
-}
-
-pub fn add_mod(
-    app: &mut GothicOrganizer,
-    profile_name: Option<String>,
-    instance_name: Option<String>,
-    mod_source_path: Option<PathBuf>,
-) -> Task<Message> {
-    let Some(mod_source_path) = mod_source_path.or_else(|| {
-        rfd::FileDialog::new()
-            .set_title("Select a zip archive with mod files")
-            .add_filter("Zip archive", &["zip"])
-            .pick_file()
-    }) else {
-        return Task::none();
-    };
-    log::trace!("Attempting to add mod from: {}", mod_source_path.display());
-
-    let mod_path = match move_mod_to_storage(app, &mod_source_path) {
-        Ok(path) => path,
-        Err(e) => {
-            log::error!("Failed to move mod to storage: {e}");
-            return Task::none();
-        }
-    };
-
-    if let Some(profile_name) = profile_name.or_else(|| app.profile_selected.clone())
-        && let Some(instance_name) = instance_name.or_else(|| app.instance_selected.clone())
-        && let Some(profile) = app.profiles.get_mut(&profile_name)
-        && let Some(instances) = profile.instances.as_mut()
-        && let Some(instance) = instances.get_mut(&instance_name)
-    {
-        if !is_valid_mod_source(&mod_path) {
-            log::error!("Invalid mod source: {}", mod_path.display());
-            return Task::none();
-        }
-
-        let mod_name = mod_path
-            .file_name()
-            .map(|n| n.to_string_lossy().to_string())
-            .unwrap_or(format!(
-                "Unknown#{}",
-                chrono::Local::now().timestamp_millis()
-            ));
-        log::trace!("Assigned name: {mod_name}");
-
-        let file_info = |path: &Path| {
-            profile::FileInfo::default()
-                .with_enabled(true)
-                .with_source_path(path)
-                .with_parent_name(mod_name.clone())
-        };
-
-        let mod_files = ignore::WalkBuilder::new(mod_path.clone())
-            .ignore(false)
-            .build()
-            .filter_map(|e| {
-                e.map(|e| (e.path().to_path_buf(), file_info(e.path())))
-                    .ok()
-            })
-            .collect::<profile::Lookup<PathBuf, profile::FileInfo>>();
-
-        let new_mod_info = profile::ModInfo::default()
-            .with_enabled(true)
-            .with_name(&mod_name)
-            .with_path(&mod_path)
-            .with_files(mod_files);
-        log::trace!("Mod info: {new_mod_info:#?}");
-
-        if let Some(mods) = instance.mods.as_mut() {
-            mods.push(new_mod_info);
-        } else {
-            instance.mods = Some(vec![new_mod_info]);
-        }
-
-        return Task::none();
-    }
-
-    Task::none()
-}
-
-pub fn remove_mod(app: &mut GothicOrganizer, profile_name: Option<String>, instance_name: Option<String>, mod_name: String) {
-    let storage_dir = app
-        .mods_storage_dir
-        .clone()
-        .unwrap_or(constants::mod_storage_dir());
-
-    if let Some(profile_name) = profile_name.or_else(|| app.profile_selected.clone())
-        && let Some(instance_name) = instance_name.or_else(|| app.instance_selected.clone())
-        && let Some(profile) = app.profiles.get_mut(&profile_name)
-        && let Some(instances) = profile.instances.as_mut()
-        && let Some(instance) = instances.get_mut(&instance_name)
-        && let Some(mods) = instance.mods.as_mut()
-    {
-        mods.retain(|m| m.name != mod_name);
-
-        if mods.is_empty() {
-            instance.mods = None;
-        }
-
-        let mod_dir = storage_dir.join(&mod_name);
-        if mod_dir.exists() {
-            log::trace!("Removing mod directory {}", mod_dir.display());
-            std::fs::remove_dir_all(mod_dir).unwrap_or_else(|e| {
-                log::error!("Failed to remove mod directory: {e}");
-            });
-        }
-    }
 }
