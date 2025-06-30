@@ -652,25 +652,31 @@ pub fn add_mod(
     Task::none()
 }
 
-// TODO: implement mod loading from instance
-//
-// pub fn load_mods(app: &mut GothicOrganizer, profile_name: Option<String>, instance_name: Option<String>) -> Task<Message> {
-//     let Some(profile_name) = profile_name.or(app.profile_selected.clone()) else {
-//         return Task::none();
-//     };
-//
-//     let Some(instance_name) = instance_name.or(app.instance_selected.clone()) else {
-//         return Task::none();
-//     };
-//
-//     if let Some(profile) = app.profiles.get_mut(&profile_name)
-//         && let Some(instances) = profile.instances.as_mut()
-//         && let Some(instance) = instances.get_mut(&instance_name)
-//         && let Some(files) = instance.files.as_mut()
-//         && let Some(mods) = instance.mods.as_mut()
-//     {
-//         mods.iter().for_each(|mod_info| {
-//
-//         })
-//     }
-// }
+pub fn remove_mod(app: &mut GothicOrganizer, profile_name: Option<String>, instance_name: Option<String>, mod_name: String) {
+    let storage_dir = app
+        .mods_storage_dir
+        .clone()
+        .unwrap_or(constants::mod_storage_dir());
+
+    if let Some(profile_name) = profile_name.or_else(|| app.profile_selected.clone())
+        && let Some(instance_name) = instance_name.or_else(|| app.instance_selected.clone())
+        && let Some(profile) = app.profiles.get_mut(&profile_name)
+        && let Some(instances) = profile.instances.as_mut()
+        && let Some(instance) = instances.get_mut(&instance_name)
+        && let Some(mods) = instance.mods.as_mut()
+    {
+        mods.retain(|m| m.name != mod_name);
+
+        if mods.is_empty() {
+            instance.mods = None;
+        }
+
+        let mod_dir = storage_dir.join(&mod_name);
+        if mod_dir.exists() {
+            log::trace!("Removing mod directory {}", mod_dir.display());
+            std::fs::remove_dir_all(mod_dir).unwrap_or_else(|e| {
+                log::error!("Failed to remove mod directory: {e}");
+            });
+        }
+    }
+}

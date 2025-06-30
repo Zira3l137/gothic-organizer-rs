@@ -132,8 +132,8 @@ impl GothicOrganizer {
                 return Task::none();
             }
 
-            Message::ModUninstall(_) => {
-                return Task::none();
+            Message::ModUninstall(name) => {
+                logic::remove_mod(self, None, None, name.clone());
             }
 
             Message::ModAdd(path) => {
