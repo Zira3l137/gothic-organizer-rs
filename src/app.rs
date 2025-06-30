@@ -7,7 +7,10 @@ use iced::Task;
 use log::info;
 use log::warn;
 
-use crate::core::logic;
+use crate::core::logic::{
+    app_lifecycle, mod_management, profile_management,
+    ui_logic::{self, load_files},
+};
 use crate::core::profile::FileInfo;
 use crate::core::profile::Lookup;
 use crate::core::profile::Profile;
@@ -51,11 +54,11 @@ impl GothicOrganizer {
         let mut app = Self::default();
 
         info!("Loading last session");
-        if let Err(err) = logic::try_reload_last_session(&mut app) {
+        if let Err(err) = app_lifecycle::try_reload_last_session(&mut app) {
             warn!("Failed to load last session: {err}");
         }
 
-        app.state.themes = logic::load_default_themes();
+        app.state.themes = app_lifecycle::load_default_themes();
         app.state.theme_choices = State::new(
             app.state
                 .themes
@@ -72,7 +75,7 @@ impl GothicOrganizer {
 
         match &message {
             Message::InitWindow => {
-                return logic::init_window(self);
+                return app_lifecycle::init_window(self);
             }
 
             Message::ThemeSwitch(theme) => {
@@ -80,11 +83,11 @@ impl GothicOrganizer {
             }
 
             Message::ProfileSelected(profile_name) => {
-                return logic::switch_profile(self, profile_name);
+                return profile_management::switch_profile(self, profile_name);
             }
 
             Message::InstanceSelected(instance) => {
-                return logic::select_instance(self, instance);
+                return profile_management::select_instance(self, instance);
             }
 
             Message::InstanceInput(input) => {
@@ -92,23 +95,23 @@ impl GothicOrganizer {
             }
 
             Message::InstanceAdd(profile_name) => {
-                return logic::add_instance_for_profile(self, profile_name);
+                return profile_management::add_instance_for_profile(self, profile_name);
             }
 
             Message::InstanceRemove(profile_name) => {
-                logic::remove_instance_from_profile(self, profile_name);
+                profile_management::remove_instance_from_profile(self, profile_name);
             }
 
             Message::FileToggle(path) => {
-                logic::toggle_state_recursive(self, Some(path));
+                ui_logic::toggle_state_recursive(self, Some(path));
             }
 
             Message::FileToggleAll => {
-                logic::toggle_state_recursive(self, None);
+                ui_logic::toggle_state_recursive(self, None);
             }
 
             Message::BrowseGameDir(profile_name, path) => {
-                return logic::set_game_dir(self, profile_name.clone(), path.clone());
+                return profile_management::set_game_dir(self, profile_name.clone(), path.clone());
             }
 
             Message::ProfileDirInput(input) => {
@@ -116,13 +119,13 @@ impl GothicOrganizer {
             }
 
             Message::TraverseIntoDir(path) => {
-                logic::write_changes_to_instance(self);
+                profile_management::write_changes_to_instance(self);
                 self.state.current_directory = path.clone();
-                logic::load_files(self, Some(path.clone()))
+                load_files(self, Some(path.clone()))
             }
 
             Message::RefreshFiles => {
-                logic::load_files(self, None);
+                load_files(self, None);
             }
 
             Message::ModToggle(_) => {
@@ -130,23 +133,23 @@ impl GothicOrganizer {
             }
 
             Message::ModUninstall(name) => {
-                return logic::remove_mod(self, None, None, name.clone());
+                return mod_management::remove_mod(self, name.clone());
             }
 
             Message::ModAdd(path) => {
-                return logic::add_mod(self, None, None, path.clone());
+                return mod_management::add_mod(self, path.clone());
             }
 
             Message::LoadMods => {
-                return logic::load_mods(self, None, None);
+                return mod_management::load_mods(self);
             }
 
             Message::InvokeOptionsMenu => {
-                return logic::invoke_options_window(self);
+                return app_lifecycle::invoke_options_window(self);
             }
 
             Message::Exit(wnd_id) => {
-                return logic::exit(self, wnd_id);
+                return app_lifecycle::exit(self, wnd_id);
             }
         }
 

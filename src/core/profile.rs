@@ -293,7 +293,7 @@ where
     pub fn contains_key<Q>(&self, key: &Q) -> bool
     where
         K: std::borrow::Borrow<Q>,
-        Q: std::hash::Hash + Eq + Sized,
+        Q: std::hash::Hash + Eq + ?Sized,
     {
         self.access.contains_key(key)
     }
@@ -302,7 +302,7 @@ where
     pub fn get<Q>(&self, key: &Q) -> Option<&V>
     where
         K: std::borrow::Borrow<Q>,
-        Q: std::hash::Hash + Eq + Sized,
+        Q: std::hash::Hash + Eq + ?Sized,
     {
         self.access.get(key)
     }
@@ -311,7 +311,7 @@ where
     pub fn get_mut<Q>(&mut self, key: &Q) -> Option<&mut V>
     where
         K: std::borrow::Borrow<Q>,
-        Q: std::hash::Hash + Eq + Sized,
+        Q: std::hash::Hash + Eq + ?Sized,
     {
         self.access.get_mut(key)
     }

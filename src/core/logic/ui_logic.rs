@@ -1,102 +1,68 @@
 use std::path::{Path, PathBuf};
 
-use crate::{
-    app::GothicOrganizer,
-    core::profile::{self, FileInfo},
-};
+use crate::app::GothicOrganizer;
+use crate::core::profile;
 
 pub fn load_files(app: &mut GothicOrganizer, root: Option<PathBuf>) {
-    let Some(current_profile) = app
-        .profiles
-        .get_mut(&app.profile_selected.clone().unwrap_or_default())
-    else {
-        return;
-    };
-
-    let root_dir = root.unwrap_or_else(|| current_profile.path.clone());
-    app.state.current_directory = root_dir.clone();
-
-    let current_dir_entries = |app_files: &profile::Lookup<PathBuf, FileInfo>| {
-        app_files
-            .iter()
-            .filter_map(|(path, info)| {
-                path.parent().and_then(|parent| {
-                    if parent == root_dir {
-                        Some((path.clone(), info.clone()))
-                    } else {
-                        None
-                    }
-                })
-            })
-            .collect::<Vec<(PathBuf, FileInfo)>>()
-    };
-
-    if let Some(selected_instance) = &app.instance_selected
-        && let Some(instances) = &current_profile.instances
-        && let Some(current_instance) = instances.get(selected_instance)
+    if let Some(profile_name) = app.profile_selected.as_ref()
+        && let Some(profile) = app.profiles.get_mut(profile_name)
     {
-        log::trace!("Fetching files from current instance");
-        if let Some(instance_files) = &current_instance.files
-            && !instance_files.is_empty()
+        let root_dir = root.unwrap_or_else(|| profile.path.clone());
+        app.state.current_directory = root_dir.clone();
+
+        let get_current_dir_entries = |app_files: &profile::Lookup<PathBuf, profile::FileInfo>| {
+            app_files
+                .iter()
+                .filter(|(path, _)| path.parent() == Some(&root_dir))
+                .map(|(path, info)| (path.clone(), info.clone()))
+                .collect::<Vec<(PathBuf, profile::FileInfo)>>()
+        };
+
+        let mut current_directory_entries: Vec<(PathBuf, crate::core::profile::FileInfo)>;
+
+        if let Some(instance_name) = &app.instance_selected
+            && let Some(instances) = &profile.instances
+            && let Some(instance) = instances.get(instance_name)
+            && let Some(instance_files) = &instance.files
         {
-            for (path, info) in instance_files.iter() {
-                app.files.insert(path.clone(), info.clone());
-            }
+            log::trace!("Fetching files from current instance");
+            app.files.extend(instance_files.clone());
+            current_directory_entries = get_current_dir_entries(&app.files);
+        } else {
+            log::warn!("No instance selected, displaying only base files for current directory");
+            current_directory_entries = get_current_dir_entries(&app.files);
         }
 
-        log::trace!("Clearing current directory entries");
-        app.state.current_directory_entries.clear();
-
-        log::trace!("Displaying fetched files for current directory");
-        current_dir_entries(&app.files)
-            .iter()
-            .for_each(|(path, info)| {
-                app.state
-                    .current_directory_entries
-                    .push((path.clone(), info.clone()));
-            })
-    } else {
-        log::warn!("No instance selected, displaying only base files for current directory");
-        app.state.current_directory_entries = current_dir_entries(&app.files);
+        current_directory_entries.sort_unstable_by_key(|(path, _)| !path.is_dir());
+        app.state.current_directory_entries = current_directory_entries;
     }
-
-    log::trace!("Sorting current directory entries");
-    app.state
-        .current_directory_entries
-        .sort_unstable_by_key(|(path, _)| !path.is_dir());
 }
 
-// FIXME: This is a mess
 pub fn toggle_state_recursive(app: &mut GothicOrganizer, path: Option<&Path>) {
-    if let Some(path) = path
-        && let Some(old_state) = app
+    let paths_to_toggle: Vec<PathBuf> = path.map(|p| vec![p.to_path_buf()]).unwrap_or_else(|| {
+        app.state
+            .current_directory_entries
+            .iter()
+            .map(|(p, _)| p.clone())
+            .collect()
+    });
+
+    paths_to_toggle.iter().for_each(|path_to_toggle| {
+        if let Some(info) = app
             .state
             .current_directory_entries
             .iter_mut()
-            .find_map(|(p, s)| if p == path { Some(s) } else { None })
-    {
-        let new_state = !(old_state.enabled);
-        old_state.enabled = new_state;
-        if path.is_dir() {
-            app.files.insert(path.to_path_buf(), old_state.clone());
-            app.files.iter_mut().for_each(|(p, s)| {
-                if p.starts_with(path) {
-                    s.enabled = !(s.enabled);
-                }
-            })
-        }
-    } else {
-        for (path, state) in app.state.current_directory_entries.iter_mut() {
-            let new_state = !(state.enabled);
-            state.enabled = new_state;
-            if path.is_dir() {
-                app.files.insert(path.clone(), state.clone());
-                app.files.iter_mut().for_each(|(p, s)| {
-                    if p.starts_with(path.clone()) {
-                        s.enabled = !(s.enabled);
+            .find_map(|(p, i)| (p == path_to_toggle).then_some(i))
+        {
+            info.enabled = !info.enabled;
+            if path_to_toggle.is_dir() {
+                app.files.insert(path_to_toggle.clone(), info.clone());
+                app.files.iter_mut().for_each(|(p, i)| {
+                    if p.starts_with(path_to_toggle) {
+                        i.enabled = info.enabled;
                     }
-                })
+                });
             }
         }
-    }
+    });
 }

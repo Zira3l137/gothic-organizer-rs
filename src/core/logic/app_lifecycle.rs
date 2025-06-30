@@ -51,53 +51,25 @@ pub fn exit(app: &mut GothicOrganizer, wnd_id: &iced::window::Id) -> Task<Messag
 
 pub fn try_reload_last_session(app: &mut GothicOrganizer) -> Result<(), GothicOrganizerError> {
     let profiles = preload_profiles();
-    app.profiles = profiles.clone();
     app.state.profile_choices = combo_box::State::new(profiles.keys().cloned().collect());
+    app.profiles = profiles.clone();
 
-    let last_session = load_session!().ok_or(GothicOrganizerError::new("failed to load last session"))?;
-
+    let last_session = load_session!().ok_or_else(|| GothicOrganizerError::new("Failed to load last session"))?;
     app.theme = last_session.theme;
 
-    let selected_profile_name = last_session
-        .selected_profile
-        .ok_or(GothicOrganizerError::new("no selected profile"))?
-        .clone();
-
-    app.profile_selected = Some(selected_profile_name.clone());
-
-    let selected_profile = profiles
-        .get(&selected_profile_name)
-        .ok_or(GothicOrganizerError::new(&format!(
-            "no profile with name {}",
-            &selected_profile_name
-        )))?
-        .clone();
-
-    let selected_profile_instances = selected_profile.instances.ok_or_else(|| {
+    if let Some(profile_name) = last_session.selected_profile
+        && let Some(profile) = app.profiles.get(&profile_name)
+        && let Some(instance_name) = last_session.selected_instance
+        && let Some(instances) = &profile.instances
+        && let Some(instance) = instances.get(&instance_name)
+    {
+        app.state.instance_choices = combo_box::State::new(instances.keys().cloned().collect());
+        app.files = instance.files.clone().unwrap_or_default();
+        app.instance_selected = Some(instance_name);
+        app.profile_selected = Some(profile_name);
+    } else {
         app.files = last_session.cache.unwrap_or_default();
-        GothicOrganizerError::new("no instances for selected profile")
-    })?;
-
-    app.state.instance_choices = combo_box::State::new(selected_profile_instances.keys().cloned().collect());
-
-    let selected_instance_name = last_session
-        .selected_instance
-        .ok_or(GothicOrganizerError::new("no selected instance"))?
-        .clone();
-
-    app.instance_selected = Some(selected_instance_name.clone());
-
-    let selected_instance = selected_profile_instances
-        .get(&selected_instance_name)
-        .ok_or(GothicOrganizerError::new(&format!(
-            "no instance with name {} for profile {}",
-            &selected_instance_name, &selected_profile_name
-        )))?
-        .clone();
-
-    app.files = selected_instance
-        .files
-        .ok_or(GothicOrganizerError::new("no files for selected instance"))?;
+    }
 
     Ok(())
 }
@@ -122,92 +94,57 @@ pub fn init_window(app: &mut GothicOrganizer) -> Task<Message> {
     task.then(|_| Task::done(Message::RefreshFiles))
 }
 
-pub fn save_current_session(app: &mut GothicOrganizer) {
-    app.profiles.values().for_each(|p| match save_profile!(p) {
-        Ok(_) => {}
-        Err(e) => eprintln!("Failed saving profile: {e}"),
+pub fn save_current_session(app: &GothicOrganizer) {
+    app.profiles.values().for_each(|p| {
+        if let Err(e) = save_profile!(p) {
+            eprintln!("Failed saving profile: {e}");
+        }
     });
 
-    let cache = match app
-        .profiles
-        .get(&app.profile_selected.clone().unwrap_or_default())
-    {
-        Some(current_profile) if current_profile.instances.is_some() => None,
-        _ => Some(app.files.clone()),
-    };
+    let cache = app
+        .profile_selected
+        .as_ref()
+        .and_then(|name| app.profiles.get(name))
+        .map_or(Some(app.files.clone()), |profile| {
+            profile.instances.is_none().then(|| app.files.clone())
+        });
 
     if let Err(e) = save_session!(
         app.profile_selected.clone(),
         app.instance_selected.clone(),
         cache,
-        app.theme.clone().map(|t| t.to_string())
+        app.theme.clone()
     ) {
         eprintln!("Failed saving session: {e}");
     }
 }
 
 pub fn load_default_themes() -> profile::Lookup<String, iced::Theme> {
-    profile::Lookup::from(vec![
-        (iced::Theme::Light.to_string(), iced::Theme::Light),
-        (iced::Theme::Dark.to_string(), iced::Theme::Dark),
-        (iced::Theme::Dracula.to_string(), iced::Theme::Dracula),
-        (iced::Theme::Nord.to_string(), iced::Theme::Nord),
-        (
-            iced::Theme::SolarizedLight.to_string(),
-            iced::Theme::SolarizedLight,
-        ),
-        (
-            iced::Theme::SolarizedDark.to_string(),
-            iced::Theme::SolarizedDark,
-        ),
-        (
-            iced::Theme::GruvboxLight.to_string(),
-            iced::Theme::GruvboxLight,
-        ),
-        (
-            iced::Theme::GruvboxDark.to_string(),
-            iced::Theme::GruvboxDark,
-        ),
-        (
-            iced::Theme::CatppuccinLatte.to_string(),
-            iced::Theme::CatppuccinLatte,
-        ),
-        (
-            iced::Theme::CatppuccinFrappe.to_string(),
-            iced::Theme::CatppuccinFrappe,
-        ),
-        (
-            iced::Theme::CatppuccinMacchiato.to_string(),
-            iced::Theme::CatppuccinMacchiato,
-        ),
-        (
-            iced::Theme::CatppuccinMocha.to_string(),
-            iced::Theme::CatppuccinMocha,
-        ),
-        (iced::Theme::TokyoNight.to_string(), iced::Theme::TokyoNight),
-        (
-            iced::Theme::TokyoNightStorm.to_string(),
-            iced::Theme::TokyoNightStorm,
-        ),
-        (
-            iced::Theme::TokyoNightLight.to_string(),
-            iced::Theme::TokyoNightLight,
-        ),
-        (
-            iced::Theme::KanagawaWave.to_string(),
-            iced::Theme::KanagawaWave,
-        ),
-        (
-            iced::Theme::KanagawaDragon.to_string(),
-            iced::Theme::KanagawaDragon,
-        ),
-        (
-            iced::Theme::KanagawaLotus.to_string(),
-            iced::Theme::KanagawaLotus,
-        ),
-        (iced::Theme::Moonfly.to_string(), iced::Theme::Moonfly),
-        (iced::Theme::Nightfly.to_string(), iced::Theme::Nightfly),
-        (iced::Theme::Oxocarbon.to_string(), iced::Theme::Oxocarbon),
-        (iced::Theme::Ferra.to_string(), iced::Theme::Ferra),
-    ])
+    [
+        (iced::Theme::Light, "Light"),
+        (iced::Theme::Dark, "Dark"),
+        (iced::Theme::Dracula, "Dracula"),
+        (iced::Theme::Nord, "Nord"),
+        (iced::Theme::SolarizedLight, "SolarizedLight"),
+        (iced::Theme::SolarizedDark, "SolarizedDark"),
+        (iced::Theme::GruvboxLight, "GruvboxLight"),
+        (iced::Theme::GruvboxDark, "GruvboxDark"),
+        (iced::Theme::CatppuccinLatte, "CatppuccinLatte"),
+        (iced::Theme::CatppuccinFrappe, "CatppuccinFrappe"),
+        (iced::Theme::CatppuccinMacchiato, "CatppuccinMacchiato"),
+        (iced::Theme::CatppuccinMocha, "CatppuccinMocha"),
+        (iced::Theme::TokyoNight, "TokyoNight"),
+        (iced::Theme::TokyoNightStorm, "TokyoNightStorm"),
+        (iced::Theme::TokyoNightLight, "TokyoNightLight"),
+        (iced::Theme::KanagawaWave, "KanagawaWave"),
+        (iced::Theme::KanagawaDragon, "KanagawaDragon"),
+        (iced::Theme::KanagawaLotus, "KanagawaLotus"),
+        (iced::Theme::Moonfly, "Moonfly"),
+        (iced::Theme::Nightfly, "Nightfly"),
+        (iced::Theme::Oxocarbon, "Oxocarbon"),
+        (iced::Theme::Ferra, "Ferra"),
+    ]
+    .into_iter()
+    .map(|(theme, name)| (name.to_string(), theme))
+    .collect()
 }
