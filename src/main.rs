@@ -13,13 +13,13 @@ use crate::app::GothicOrganizer;
 #[derive(Debug, clap::Parser)]
 #[clap(author, version, about, long_about = None)]
 struct CliArgs {
-    #[clap(short, long, default_value = "0")]
-    verbosity: Option<u8>,
+    #[clap(short, long, default_value = None)]
+    verbosity: Option<LevelFilter>,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = CliArgs::parse();
-    setup_logger(args.verbosity.unwrap_or(0))?;
+    setup_logger(args.verbosity.unwrap_or(LevelFilter::Error))?;
 
     daemon(
         GothicOrganizer::WINDOW_TITLE,
@@ -32,20 +32,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn setup_logger(verbosity: u8) -> Result<(), Box<dyn std::error::Error>> {
-    let log_level = match verbosity {
-        0 => LevelFilter::Error,
-        1 => LevelFilter::Warn,
-        2 => LevelFilter::Info,
-        3 => LevelFilter::Debug,
-        _ => LevelFilter::Trace,
-    };
-
+fn setup_logger(verbosity: LevelFilter) -> Result<(), Box<dyn std::error::Error>> {
     env_logger::Builder::new()
-        .filter_module(module_path!(), log_level)
+        .filter_module(module_path!(), verbosity)
+        .format_file(true)
+        .format_line_number(true)
+        .format_target(false)
         .format_timestamp(None)
         .init();
 
-    log::debug!("Logger initialized with level: {log_level}");
+    log::debug!("Logger initialized with level: {verbosity}");
     Ok(())
 }

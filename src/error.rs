@@ -8,6 +8,8 @@ pub enum GothicOrganizerError {
     Json(#[from] serde_json::Error),
     #[error("Error: {0}")]
     Other(String),
+    #[error("Zip Error: {0}")]
+    Zip(#[from] zip::result::ZipError),
 }
 
 impl GothicOrganizerError {

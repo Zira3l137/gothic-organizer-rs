@@ -1,8 +1,11 @@
+use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 
 use iced::widget::combo_box;
 use iced::Task;
+
+use zip::read::ZipArchive;
 
 use crate::app::GothicOrganizer;
 use crate::app::Message;
@@ -473,21 +476,68 @@ pub fn load_default_themes() -> profile::Lookup<String, iced::Theme> {
     ])
 }
 
-// FIXME: Zip archive handling not implemented yet
-pub fn move_mod_to_storage(app: &mut GothicOrganizer, mod_path: &Path) -> Result<PathBuf, std::io::Error> {
-    if !is_valid_mod_source(mod_path) {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            "Invalid mod source",
-        ));
+pub fn copy_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
+    if src.is_dir() {
+        let entries = ignore::WalkBuilder::new(src)
+            .ignore(false)
+            .build()
+            .flatten();
+
+        for entry in entries {
+            if entry.path().is_dir() {
+                continue;
+            }
+
+            let relative_path = entry.path().strip_prefix(src).unwrap();
+            let dst_path = dst.join(relative_path);
+            std::fs::create_dir_all(
+                dst_path
+                    .parent()
+                    .ok_or(std::io::Error::other("Failed to create directory"))?,
+            )?;
+            std::fs::File::create(&dst_path)?.write_all(&std::fs::read(entry.path())?)?;
+        }
+    } else {
+        std::fs::copy(src, dst)?;
     }
+    Ok(())
+}
+
+pub fn extract_zip(zip_path: &Path, dst_path: &Path) -> Result<(), crate::error::GothicOrganizerError> {
+    log::trace!(
+        "Extracting zip file {} to {}",
+        zip_path.display(),
+        dst_path.display()
+    );
+    let mut archive = ZipArchive::new(std::fs::File::open(zip_path)?)?;
+
+    log::trace!("Processing {} files", archive.len());
+    for i in 0..archive.len() {
+        let mut file = archive.by_index(i)?;
+        let output_path = match file.enclosed_name() {
+            Some(path) => dst_path.join(path),
+            None => continue,
+        };
+        if file.is_dir() {
+            std::fs::create_dir_all(&output_path)?;
+        } else {
+            let mut output_file = std::fs::File::create(&output_path)?;
+            std::io::copy(&mut file, &mut output_file)?;
+        }
+    }
+    Ok(())
+}
+
+pub fn move_mod_to_storage(app: &mut GothicOrganizer, mod_path: &Path) -> Result<PathBuf, crate::error::GothicOrganizerError> {
+    let mut is_zip = false;
 
     let storage_dir = app
         .mods_storage_dir
         .clone()
         .unwrap_or(constants::mod_storage_dir());
+    log::trace!("Mod storage dir: {}", storage_dir.display());
 
-    let mod_name = mod_path
+    let mut mod_name = mod_path
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
         .ok_or(std::io::Error::new(
@@ -495,8 +545,30 @@ pub fn move_mod_to_storage(app: &mut GothicOrganizer, mod_path: &Path) -> Result
             "Failed to get mod name",
         ))?;
 
-    // FIXME: This will fail implement directory copying when it contains files
-    std::fs::copy(mod_path, storage_dir.join(&mod_name))?;
+    if mod_path.extension().and_then(|e| e.to_str()) == Some("zip") {
+        is_zip = true;
+        mod_name = mod_name.replace(".zip", "");
+    }
+
+    let dst_dir = storage_dir.join(&mod_name);
+
+    if dst_dir.exists() {
+        return Err(GothicOrganizerError::from(std::io::Error::new(
+            std::io::ErrorKind::AlreadyExists,
+            "Mod already exists",
+        )));
+    } else {
+        log::trace!("Creating mod directory {}", dst_dir.display());
+        std::fs::create_dir_all(dst_dir.clone())?;
+    }
+
+    if !is_zip {
+        log::trace!("Copying mod files");
+        copy_recursive(mod_path, &dst_dir)?;
+    } else {
+        log::trace!("Extracting mod files");
+        extract_zip(mod_path, &dst_dir)?;
+    }
 
     Ok(storage_dir.join(mod_name))
 }
@@ -507,12 +579,15 @@ pub fn add_mod(
     instance_name: Option<String>,
     mod_source_path: Option<PathBuf>,
 ) -> Task<Message> {
-    let Some(mod_source_path) = mod_source_path.or(rfd::FileDialog::new()
-        .set_title("Select mod directory or zip archive")
-        .pick_folder())
-    else {
+    let Some(mod_source_path) = mod_source_path.or_else(|| {
+        rfd::FileDialog::new()
+            .set_title("Select a zip archive with mod files")
+            .add_filter("Zip archive", &["zip"])
+            .pick_file()
+    }) else {
         return Task::none();
     };
+    log::trace!("Attempting to add mod from: {}", mod_source_path.display());
 
     let mod_path = match move_mod_to_storage(app, &mod_source_path) {
         Ok(path) => path,
@@ -522,26 +597,25 @@ pub fn add_mod(
         }
     };
 
-    if let Some(profile_name) = profile_name.or(app.profile_selected.clone())
-        && let Some(instance_name) = instance_name.or(app.instance_selected.clone())
+    if let Some(profile_name) = profile_name.or_else(|| app.profile_selected.clone())
+        && let Some(instance_name) = instance_name.or_else(|| app.instance_selected.clone())
         && let Some(profile) = app.profiles.get_mut(&profile_name)
         && let Some(instances) = profile.instances.as_mut()
         && let Some(instance) = instances.get_mut(&instance_name)
-        && let Some(mods) = instance.mods.as_mut()
     {
         if !is_valid_mod_source(&mod_path) {
-            return Task::none();
-        }
-
-        // FIXME: Zip archive handling not implemented yet
-        if mod_path.extension().and_then(|e| e.to_str()) == Some("zip") {
+            log::error!("Invalid mod source: {}", mod_path.display());
             return Task::none();
         }
 
         let mod_name = mod_path
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
-            .unwrap_or(format!("Unknown#{}", mods.len() + 1));
+            .unwrap_or(format!(
+                "Unknown#{}",
+                chrono::Local::now().timestamp_millis()
+            ));
+        log::trace!("Assigned name: {mod_name}");
 
         let file_info = |path: &Path| {
             profile::FileInfo::default()
@@ -564,8 +638,14 @@ pub fn add_mod(
             .with_name(&mod_name)
             .with_path(&mod_path)
             .with_files(mod_files);
+        log::trace!("Mod info: {new_mod_info:#?}");
 
-        mods.push(new_mod_info);
+        if let Some(mods) = instance.mods.as_mut() {
+            mods.push(new_mod_info);
+        } else {
+            instance.mods = Some(vec![new_mod_info]);
+        }
+
         return Task::none();
     }
 

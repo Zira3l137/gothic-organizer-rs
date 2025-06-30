@@ -30,7 +30,7 @@ pub fn local_profiles_dir() -> PathBuf {
 }
 
 pub fn mod_storage_dir() -> PathBuf {
-    PathBuf::from("./mods")
+    PathBuf::from("mods")
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
