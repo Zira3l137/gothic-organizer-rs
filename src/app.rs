@@ -30,6 +30,7 @@ pub struct InnerState {
     pub instance_input: Option<String>,
     pub profile_directory_input: String,
     pub profile_choices: State<String>,
+    pub themes: Lookup<String, iced::Theme>,
     pub theme_choices: State<String>,
     pub instance_choices: State<String>,
     pub current_directory_entries: Vec<(PathBuf, FileInfo)>,
@@ -55,9 +56,12 @@ impl GothicOrganizer {
             warn!("Failed to load last session: {err}");
         }
 
+        app.state.themes = logic::load_default_themes();
         app.state.theme_choices = State::new(
-            crate::core::constants::Theme::into_iter()
-                .map(|t| t.to_string())
+            app.state
+                .themes
+                .iter()
+                .map(|(_, t)| t.to_string())
                 .collect(),
         );
 
@@ -158,10 +162,12 @@ impl GothicOrganizer {
 
     pub fn theme(&self) -> iced::Theme {
         match &self.theme {
-            Some(theme) => {
-                let theme = crate::core::constants::Theme::from(theme.clone());
-                theme.into()
-            }
+            Some(theme) => self
+                .state
+                .themes
+                .get(theme)
+                .cloned()
+                .unwrap_or(iced::Theme::Dark),
             None => iced::Theme::Dark,
         }
     }

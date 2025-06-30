@@ -338,7 +338,7 @@ pub fn save_current_session(app: &mut GothicOrganizer) {
         app.profile_selected.clone(),
         app.instance_selected.clone(),
         cache,
-        app.theme.clone()
+        app.theme.clone().map(|t| t.to_string())
     ) {
         eprintln!("Failed saving session: {e}");
     }
@@ -405,6 +405,72 @@ pub fn preload_profiles() -> profile::Lookup<String, profile::Profile> {
 
 pub fn is_valid_mod_source(mod_path: &Path) -> bool {
     (mod_path.is_dir() || mod_path.extension().and_then(|e| e.to_str()) == Some("zip")) && mod_path.exists()
+}
+
+pub fn load_default_themes() -> profile::Lookup<String, iced::Theme> {
+    profile::Lookup::from(vec![
+        (iced::Theme::Light.to_string(), iced::Theme::Light),
+        (iced::Theme::Dark.to_string(), iced::Theme::Dark),
+        (iced::Theme::Dracula.to_string(), iced::Theme::Dracula),
+        (iced::Theme::Nord.to_string(), iced::Theme::Nord),
+        (
+            iced::Theme::SolarizedLight.to_string(),
+            iced::Theme::SolarizedLight,
+        ),
+        (
+            iced::Theme::SolarizedDark.to_string(),
+            iced::Theme::SolarizedDark,
+        ),
+        (
+            iced::Theme::GruvboxLight.to_string(),
+            iced::Theme::GruvboxLight,
+        ),
+        (
+            iced::Theme::GruvboxDark.to_string(),
+            iced::Theme::GruvboxDark,
+        ),
+        (
+            iced::Theme::CatppuccinLatte.to_string(),
+            iced::Theme::CatppuccinLatte,
+        ),
+        (
+            iced::Theme::CatppuccinFrappe.to_string(),
+            iced::Theme::CatppuccinFrappe,
+        ),
+        (
+            iced::Theme::CatppuccinMacchiato.to_string(),
+            iced::Theme::CatppuccinMacchiato,
+        ),
+        (
+            iced::Theme::CatppuccinMocha.to_string(),
+            iced::Theme::CatppuccinMocha,
+        ),
+        (iced::Theme::TokyoNight.to_string(), iced::Theme::TokyoNight),
+        (
+            iced::Theme::TokyoNightStorm.to_string(),
+            iced::Theme::TokyoNightStorm,
+        ),
+        (
+            iced::Theme::TokyoNightLight.to_string(),
+            iced::Theme::TokyoNightLight,
+        ),
+        (
+            iced::Theme::KanagawaWave.to_string(),
+            iced::Theme::KanagawaWave,
+        ),
+        (
+            iced::Theme::KanagawaDragon.to_string(),
+            iced::Theme::KanagawaDragon,
+        ),
+        (
+            iced::Theme::KanagawaLotus.to_string(),
+            iced::Theme::KanagawaLotus,
+        ),
+        (iced::Theme::Moonfly.to_string(), iced::Theme::Moonfly),
+        (iced::Theme::Nightfly.to_string(), iced::Theme::Nightfly),
+        (iced::Theme::Oxocarbon.to_string(), iced::Theme::Oxocarbon),
+        (iced::Theme::Ferra.to_string(), iced::Theme::Ferra),
+    ])
 }
 
 // FIXME: Zip archive handling not implemented yet
