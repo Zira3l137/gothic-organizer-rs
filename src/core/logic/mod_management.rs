@@ -115,8 +115,8 @@ pub fn remove_mod(app: &mut app::GothicOrganizer, mod_name: String) -> Task<app:
         }
 
         return Task::chain(
-            Task::done(app::Message::RefreshFiles),
             Task::done(app::Message::LoadMods),
+            Task::done(app::Message::RefreshFiles),
         );
     }
 

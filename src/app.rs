@@ -55,7 +55,6 @@ impl GothicOrganizer {
         }
 
         app.state.themes = app_lifecycle::load_default_themes();
-        log::debug!("Loaded themes: {:#?}", app.state.themes);
         app.state.theme_choices = State::new(
             app.state
                 .themes
