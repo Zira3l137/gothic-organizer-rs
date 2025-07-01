@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use crate::app;
+use crate::core::lookup::Lookup;
 use crate::core::profile;
 
 pub fn load_files(app: &mut app::GothicOrganizer, root: Option<PathBuf>) {
@@ -10,7 +11,7 @@ pub fn load_files(app: &mut app::GothicOrganizer, root: Option<PathBuf>) {
         let root_dir = root.unwrap_or_else(|| profile.path.clone());
         app.state.current_directory = root_dir.clone();
 
-        let get_current_dir_entries = |app_files: &profile::Lookup<PathBuf, profile::FileInfo>| {
+        let get_current_dir_entries = |app_files: &Lookup<PathBuf, profile::FileInfo>| {
             app_files
                 .iter()
                 .filter(|(path, _)| path.parent() == Some(&root_dir))

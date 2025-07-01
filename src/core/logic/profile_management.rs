@@ -4,7 +4,9 @@ use iced::widget::combo_box;
 use iced::Task;
 
 use crate::app;
+use crate::core::lookup::Lookup;
 use crate::core::profile;
+use crate::error;
 use crate::load_profile;
 
 pub fn switch_profile(app: &mut app::GothicOrganizer, profile_name: &str) -> Task<app::Message> {
@@ -86,6 +88,7 @@ pub fn remove_instance_from_profile(app: &mut app::GothicOrganizer, profile_name
 pub fn select_instance(app: &mut app::GothicOrganizer, instance_name: &str) -> Task<app::Message> {
     write_changes_to_instance(app);
     app.instance_selected = Some(instance_name.to_owned());
+    log::trace!("Loading files for instance {instance_name}");
     Task::done(app::Message::RefreshFiles)
 }
 
@@ -99,6 +102,7 @@ pub fn set_game_dir(app: &mut app::GothicOrganizer, profile_name: Option<String>
         && path.is_dir()
         && let Some(profile) = app.profiles.get_mut(&profile_name)
     {
+        log::trace!("Setting {} directory to {}", profile_name, path.display());
         profile.path = path.clone();
         app.state.current_directory = path.clone();
 
@@ -123,7 +127,35 @@ pub fn set_game_dir(app: &mut app::GothicOrganizer, profile_name: Option<String>
     Task::none()
 }
 
-pub fn preload_profiles() -> profile::Lookup<String, profile::Profile> {
+pub fn set_mods_dir(app: &mut app::GothicOrganizer, profile_name: Option<String>, path: Option<PathBuf>) -> Task<app::Message> {
+    if let Some(profile_name) = profile_name.or_else(|| app.profile_selected.clone())
+        && let Some(path) = path.or_else(|| {
+            rfd::FileDialog::new()
+                .set_title(format!("Select {} directory", &profile_name))
+                .pick_folder()
+        })
+        && path.is_dir()
+        && app.profiles.get(&profile_name).is_some()
+    {
+        log::trace!(
+            "Setting {profile_name} mods directory to {}",
+            path.display()
+        );
+        app.mod_storage_dir = Some(path.clone());
+
+        if let Err(err) = std::fs::create_dir_all(&path) {
+            return Task::done(app::Message::ReturnError(error::SharedError::new(
+                err.into(),
+            )));
+        } else {
+            return Task::done(app::Message::RefreshFiles);
+        }
+    }
+
+    Task::none()
+}
+
+pub fn preload_profiles() -> Lookup<String, profile::Profile> {
     crate::core::constants::Profile::into_iter()
         .map(|profile_name| {
             let name_str = (*profile_name).to_string();

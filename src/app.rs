@@ -8,26 +8,29 @@ use crate::core::logic::app_lifecycle;
 use crate::core::logic::mod_management;
 use crate::core::logic::profile_management;
 use crate::core::logic::ui_logic;
+use crate::core::lookup::Lookup;
 use crate::core::profile;
+use crate::error;
 
 #[derive(Debug, Default)]
 pub struct GothicOrganizer {
     pub profile_selected: Option<String>,
     pub instance_selected: Option<String>,
-    pub profiles: profile::Lookup<String, profile::Profile>,
-    pub files: profile::Lookup<PathBuf, profile::FileInfo>,
+    pub profiles: Lookup<String, profile::Profile>,
+    pub files: Lookup<PathBuf, profile::FileInfo>,
     pub theme: Option<String>,
     pub state: InnerState,
-    pub mods_storage_dir: Option<PathBuf>,
-    pub windows: profile::Lookup<Option<iced::window::Id>, WindowState>,
+    pub mod_storage_dir: Option<PathBuf>,
+    pub windows: Lookup<Option<iced::window::Id>, WindowState>,
 }
 
 #[derive(Debug, Default)]
 pub struct InnerState {
     pub instance_input: Option<String>,
     pub profile_directory_input: String,
+    pub mods_directory_input: String,
     pub profile_choices: State<String>,
-    pub themes: profile::Lookup<String, iced::Theme>,
+    pub themes: Lookup<String, iced::Theme>,
     pub theme_choices: State<String>,
     pub instance_choices: State<String>,
     pub current_directory_entries: Vec<(PathBuf, profile::FileInfo)>,
@@ -101,7 +104,7 @@ impl GothicOrganizer {
                 ui_logic::toggle_state_recursive(self, None);
             }
 
-            Message::BrowseGameDir(profile_name, path) => {
+            Message::SetGameDir(profile_name, path) => {
                 return profile_management::set_game_dir(self, profile_name.clone(), path.clone());
             }
 
@@ -131,12 +134,24 @@ impl GothicOrganizer {
                 return mod_management::add_mod(self, path.clone());
             }
 
+            Message::ModsDirInput(input) => {
+                self.state.mods_directory_input = input.clone();
+            }
+
+            Message::SetModsDir(profile_name, path) => {
+                return profile_management::set_mods_dir(self, profile_name.clone(), path.clone());
+            }
+
             Message::LoadMods => {
                 return mod_management::load_mods(self);
             }
 
             Message::InvokeOptionsMenu => {
                 return app_lifecycle::invoke_options_window(self);
+            }
+
+            Message::ReturnError(err) => {
+                return app_lifecycle::exit_with_error(self, err.clone());
             }
 
             Message::Exit(wnd_id) => {
@@ -183,19 +198,22 @@ impl GothicOrganizer {
 #[derive(Debug, Clone)]
 pub enum Message {
     Exit(iced::window::Id),
-    BrowseGameDir(Option<String>, Option<PathBuf>),
+    SetGameDir(Option<String>, Option<PathBuf>),
+    SetModsDir(Option<String>, Option<PathBuf>),
     ProfileSelected(String),
     InstanceSelected(String),
     InstanceAdd(String),
     InstanceRemove(String),
     InstanceInput(String),
     ProfileDirInput(String),
+    ModsDirInput(String),
     FileToggle(PathBuf),
     TraverseIntoDir(PathBuf),
     ThemeSwitch(String),
     ModToggle(String),
     ModUninstall(String),
     ModAdd(Option<PathBuf>),
+    ReturnError(error::SharedError),
     LoadMods,
     InitWindow,
     InvokeOptionsMenu,

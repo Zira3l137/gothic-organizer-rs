@@ -11,8 +11,11 @@ use iced::widget::Svg;
 use iced::Border;
 use iced::Shadow;
 
+use crate::config;
 use crate::core::constants;
+use crate::core::lookup::Lookup;
 use crate::core::profile;
+use crate::error;
 
 fn default_path<P: AsRef<Path>>(custom_path: Option<P>) -> PathBuf {
     match custom_path {
@@ -21,17 +24,47 @@ fn default_path<P: AsRef<Path>>(custom_path: Option<P>) -> PathBuf {
     }
 }
 
+pub fn save_config<P: AsRef<Path>>(
+    theme: Option<String>,
+    mod_storage_dir: Option<PathBuf>,
+    custom_path: Option<P>,
+) -> Result<(), error::GothicOrganizerError> {
+    let config = config::AppConfig {
+        theme: theme.unwrap_or("Dark".to_string()),
+        mod_storage_dir: mod_storage_dir.unwrap_or(constants::default_mod_storage_dir()?),
+    };
+
+    let default_path = default_path(custom_path);
+    let config_string = serde_json::to_string_pretty(&config).map_err(error::GothicOrganizerError::Json)?;
+    write(default_path.join("config.json"), config_string).map_err(error::GothicOrganizerError::IO)?;
+
+    Ok(())
+}
+
+pub fn load_config<P: AsRef<Path>>(custom_path: Option<P>) -> Option<config::AppConfig> {
+    let default_path = default_path(custom_path);
+    if !default_path.exists() {
+        return None;
+    }
+
+    let config_json = read_to_string(default_path.join("config.json")).ok()?;
+
+    let Ok(config): Result<config::AppConfig, _> = serde_json::from_str(&config_json) else {
+        return None;
+    };
+
+    Some(config)
+}
+
 pub fn save_session<P: AsRef<Path>>(
     selected_profile: Option<String>,
     selected_instance: Option<String>,
-    cache: Option<crate::core::profile::Lookup<PathBuf, profile::FileInfo>>,
-    theme: Option<String>,
+    cache: Option<Lookup<PathBuf, profile::FileInfo>>,
     custom_path: Option<P>,
 ) -> Result<(), std::io::Error> {
-    let session = profile::Session {
+    let session = config::Session {
         selected_profile,
         selected_instance,
-        theme,
         cache,
     };
 
@@ -42,7 +75,7 @@ pub fn save_session<P: AsRef<Path>>(
     Ok(())
 }
 
-pub fn load_session<P: AsRef<Path>>(custom_path: Option<P>) -> Option<profile::Session> {
+pub fn load_session<P: AsRef<Path>>(custom_path: Option<P>) -> Option<config::Session> {
     let default_path = default_path(custom_path);
     if !default_path.exists() {
         return None;
@@ -50,7 +83,7 @@ pub fn load_session<P: AsRef<Path>>(custom_path: Option<P>) -> Option<profile::S
 
     let session_json = read_to_string(default_path.join("session.json")).ok()?;
 
-    let Ok(session): Result<profile::Session, _> = serde_json::from_str(&session_json) else {
+    let Ok(session): Result<config::Session, _> = serde_json::from_str(&session_json) else {
         return None;
     };
 
@@ -79,7 +112,7 @@ pub fn load_profile<P: AsRef<Path>>(name: &str, custom_path: Option<P>) -> Optio
     let profile = entries.find_map(|e| {
         let entry = e.ok()?;
 
-        if !entry.path().is_dir() && entry.file_name().to_string_lossy().to_lowercase() != name.to_lowercase() {
+        if !entry.path().is_dir() || entry.file_name().to_string_lossy().to_lowercase() != name.to_lowercase() {
             return None;
         }
 
@@ -88,7 +121,7 @@ pub fn load_profile<P: AsRef<Path>>(name: &str, custom_path: Option<P>) -> Optio
         let profile_str = profile_dir.find_map(|e| {
             let entry = e.ok()?;
 
-            if entry.path().is_dir() && entry.file_name().to_string_lossy().to_lowercase() != "profile.json" {
+            if entry.path().is_dir() || entry.file_name().to_string_lossy().to_lowercase() != "profile.json" {
                 return None;
             }
 

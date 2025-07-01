@@ -87,7 +87,7 @@ pub fn editor_view(app: &crate::app::GothicOrganizer) -> Element<Message> {
         }
     }));
 
-    let button_browse = |profile: &crate::core::profile::Profile| button("Browse").on_press(Message::BrowseGameDir(Some(profile.name.clone()), None));
+    let button_browse = button("Browse").on_press(Message::SetGameDir(None, None));
     let group_instance = container(row!(choice_instance, button_add, button_remove));
 
     let profile_controls = styled_container!(
@@ -95,7 +95,7 @@ pub fn editor_view(app: &crate::app::GothicOrganizer) -> Element<Message> {
             choice_profile,
             match current_profile {
                 Some(profile) if profile.path.display().to_string() == "" => {
-                    let button_browse: Element<_> = button_browse(profile).into();
+                    let button_browse: Element<_> = button_browse.into();
                     button_browse
                 }
                 Some(profile) if profile.path.display().to_string() != "" => {

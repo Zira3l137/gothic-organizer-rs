@@ -1,4 +1,5 @@
 mod app;
+mod config;
 mod core;
 mod error;
 mod gui;

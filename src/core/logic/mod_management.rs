@@ -5,6 +5,7 @@ use iced::Task;
 
 use crate::app;
 use crate::core::constants;
+use crate::core::lookup::Lookup;
 use crate::core::profile;
 use crate::error;
 
@@ -57,7 +58,7 @@ pub fn add_mod(app: &mut app::GothicOrganizer, mod_source_path: Option<PathBuf>)
                 e.ok()
                     .map(|e| (e.path().to_path_buf(), file_info(e.path())))
             })
-            .collect::<profile::Lookup<PathBuf, profile::FileInfo>>();
+            .collect::<Lookup<PathBuf, profile::FileInfo>>();
 
         let new_mod_info = profile::ModInfo::default()
             .with_enabled(true)
@@ -78,10 +79,14 @@ pub fn add_mod(app: &mut app::GothicOrganizer, mod_source_path: Option<PathBuf>)
 }
 
 pub fn remove_mod(app: &mut app::GothicOrganizer, mod_name: String) -> Task<app::Message> {
-    let storage_dir = match app.mods_storage_dir.as_ref() {
-        Some(dir) => dir.clone(),
+    let Some(profile_name) = app.profile_selected.as_ref() else {
+        return Task::none();
+    };
+
+    let storage_dir = match app.mod_storage_dir.as_ref() {
+        Some(dir) => dir.join(profile_name),
         None => match constants::default_mod_storage_dir() {
-            Ok(dir) => dir,
+            Ok(dir) => dir.join(profile_name),
             Err(e) => {
                 log::warn!("Failed to get default mod storage dir: {e}");
                 return Task::none();
@@ -89,8 +94,7 @@ pub fn remove_mod(app: &mut app::GothicOrganizer, mod_name: String) -> Task<app:
         },
     };
 
-    if let Some(profile_name) = app.profile_selected.as_ref()
-        && let Some(instance_name) = app.instance_selected.as_ref()
+    if let Some(instance_name) = app.instance_selected.as_ref()
         && let Some(profile) = app.profiles.get_mut(profile_name)
         && let Some(instances) = profile.instances.as_mut()
         && let Some(instance) = instances.get_mut(instance_name)
@@ -140,7 +144,7 @@ pub fn load_mods(app: &mut app::GothicOrganizer) -> Task<app::Message> {
                         log::trace!("Overwriting file {}", existing_file.source_path.display());
                         instance
                             .overwrtites
-                            .get_or_insert_with(profile::Lookup::new)
+                            .get_or_insert_with(Lookup::new)
                             .insert(path.clone(), existing_file);
                     }
                 }
@@ -158,12 +162,20 @@ pub fn is_valid_mod_source(mod_path: &Path) -> bool {
 }
 
 pub fn move_mod_to_storage(app: &app::GothicOrganizer, mod_path: &Path) -> Result<PathBuf, error::GothicOrganizerError> {
-    let storage_dir = app.mods_storage_dir.clone().unwrap_or_else(|| {
+    let storage_dir = app.mod_storage_dir.clone().unwrap_or_else(|| {
         constants::default_mod_storage_dir().unwrap_or_else(|e| {
             log::warn!("Failed to get default mod storage dir: {e}");
             PathBuf::from("mods")
         })
     });
+
+    let profile_name = app
+        .profile_selected
+        .as_ref()
+        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "No profile selected"))?;
+
+    let storage_dir = storage_dir.join(profile_name);
+
     log::trace!("Mod storage dir: {}", storage_dir.display());
 
     let mod_name = mod_path
