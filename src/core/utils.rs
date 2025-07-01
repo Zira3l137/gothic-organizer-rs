@@ -1,4 +1,5 @@
-use std::{io::Write, path::Path};
+use std::io::Write;
+use std::path::Path;
 
 use zip::ZipArchive;
 
@@ -53,3 +54,4 @@ pub fn extract_zip(zip_path: &Path, dst_path: &Path) -> Result<(), crate::error:
     }
     Ok(())
 }
+

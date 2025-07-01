@@ -8,8 +8,6 @@ use clap::Parser;
 use iced::daemon;
 use log::LevelFilter;
 
-use crate::app::GothicOrganizer;
-
 #[derive(Debug, clap::Parser)]
 #[clap(author, version, about, long_about = None)]
 struct CliArgs {
@@ -22,13 +20,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     setup_logger(args.verbosity.unwrap_or(LevelFilter::Error))?;
 
     daemon(
-        GothicOrganizer::WINDOW_TITLE,
-        GothicOrganizer::update,
-        GothicOrganizer::view,
+        app::GothicOrganizer::WINDOW_TITLE,
+        app::GothicOrganizer::update,
+        app::GothicOrganizer::view,
     )
-    .theme(|state, _| GothicOrganizer::theme(state))
-    .subscription(GothicOrganizer::subscription)
-    .run_with(GothicOrganizer::new)?;
+    .theme(|state, _| app::GothicOrganizer::theme(state))
+    .subscription(app::GothicOrganizer::subscription)
+    .run_with(app::GothicOrganizer::new)?;
     Ok(())
 }
 

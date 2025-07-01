@@ -1,24 +1,20 @@
 use std::path::PathBuf;
 
-use iced::{widget::combo_box, Task};
+use iced::widget::combo_box;
+use iced::Task;
 
-use crate::{
-    app::{GothicOrganizer, Message},
-    core::profile::{self, Profile},
-    load_profile,
-};
+use crate::app;
+use crate::core::profile;
+use crate::load_profile;
 
-pub fn switch_profile(app: &mut GothicOrganizer, profile_name: &str) -> Task<Message> {
-    log::trace!("Writing current changes");
+pub fn switch_profile(app: &mut app::GothicOrganizer, profile_name: &str) -> Task<app::Message> {
     write_changes_to_instance(app);
 
-    log::trace!("Switching to profile {profile_name}");
     if let Some(next_profile) = app.profiles.get(profile_name) {
         log::trace!("Loading profile {profile_name}");
         app.profile_selected = Some(profile_name.to_owned());
         app.instance_selected = None;
 
-        log::trace!("Updating instance choices");
         let instances = next_profile
             .instances
             .as_ref()
@@ -27,31 +23,28 @@ pub fn switch_profile(app: &mut GothicOrganizer, profile_name: &str) -> Task<Mes
         app.state.instance_choices = combo_box::State::new(instances);
 
         if !next_profile.path.as_os_str().is_empty() {
-            log::trace!("Loading profile files");
-            return Task::done(Message::RefreshFiles);
+            return Task::done(app::Message::RefreshFiles);
         }
     }
 
     Task::none()
 }
 
-pub fn write_changes_to_instance(app: &mut GothicOrganizer) {
+pub fn write_changes_to_instance(app: &mut app::GothicOrganizer) {
     if let Some(profile_name) = app.profile_selected.clone()
         && let Some(profile) = app.profiles.get_mut(&profile_name)
         && let Some(instance_name) = app.instance_selected.clone()
         && let Some(instances) = profile.instances.as_mut()
         && let Some(instance) = instances.get_mut(&instance_name)
     {
-        log::trace!("Fetching current directory changes");
         app.files
             .extend(app.state.current_directory_entries.iter().cloned());
 
-        log::trace!("Writing current changes into instance {}", instance.name);
         instance.files = Some(app.files.clone());
     }
 }
 
-pub fn add_instance_for_profile(app: &mut GothicOrganizer, profile_name: &str) -> Task<Message> {
+pub fn add_instance_for_profile(app: &mut app::GothicOrganizer, profile_name: &str) -> Task<app::Message> {
     if let Some(profile) = app.profiles.get_mut(profile_name) {
         let instance_name = app
             .state
@@ -69,13 +62,13 @@ pub fn add_instance_for_profile(app: &mut GothicOrganizer, profile_name: &str) -
         instances.insert(instance_name, new_instance);
         app.state.instance_choices = combo_box::State::new(instances.keys().cloned().collect());
 
-        return Task::done(Message::RefreshFiles);
+        return Task::done(app::Message::RefreshFiles);
     }
 
     Task::none()
 }
 
-pub fn remove_instance_from_profile(app: &mut GothicOrganizer, profile_name: &str) {
+pub fn remove_instance_from_profile(app: &mut app::GothicOrganizer, profile_name: &str) {
     if let Some(profile) = app.profiles.get_mut(profile_name)
         && let Some(selected_instance_name) = app.instance_selected.clone()
         && let Some(instances) = profile.instances.as_mut()
@@ -90,13 +83,13 @@ pub fn remove_instance_from_profile(app: &mut GothicOrganizer, profile_name: &st
     }
 }
 
-pub fn select_instance(app: &mut GothicOrganizer, instance_name: &str) -> Task<Message> {
+pub fn select_instance(app: &mut app::GothicOrganizer, instance_name: &str) -> Task<app::Message> {
     write_changes_to_instance(app);
     app.instance_selected = Some(instance_name.to_owned());
-    Task::done(Message::RefreshFiles)
+    Task::done(app::Message::RefreshFiles)
 }
 
-pub fn set_game_dir(app: &mut GothicOrganizer, profile_name: Option<String>, path: Option<PathBuf>) -> Task<Message> {
+pub fn set_game_dir(app: &mut app::GothicOrganizer, profile_name: Option<String>, path: Option<PathBuf>) -> Task<app::Message> {
     if let Some(profile_name) = profile_name.or_else(|| app.profile_selected.clone())
         && let Some(path) = path.or_else(|| {
             rfd::FileDialog::new()
@@ -124,17 +117,17 @@ pub fn set_game_dir(app: &mut GothicOrganizer, profile_name: Option<String>, pat
                 }),
         );
 
-        return Task::done(Message::RefreshFiles);
+        return Task::done(app::Message::RefreshFiles);
     }
 
     Task::none()
 }
 
-pub fn preload_profiles() -> profile::Lookup<String, Profile> {
+pub fn preload_profiles() -> profile::Lookup<String, profile::Profile> {
     crate::core::constants::Profile::into_iter()
         .map(|profile_name| {
             let name_str = (*profile_name).to_string();
-            let profile = load_profile!(&name_str).unwrap_or_else(|| Profile::default().with_name(&name_str));
+            let profile = load_profile!(&name_str).unwrap_or_else(|| profile::Profile::default().with_name(&name_str));
             (name_str, profile)
         })
         .collect()

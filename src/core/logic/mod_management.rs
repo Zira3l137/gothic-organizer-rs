@@ -1,19 +1,16 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
+use std::path::PathBuf;
 
 use iced::Task;
 
-use crate::{
-    app::{GothicOrganizer, Message},
-    core::{
-        constants,
-        profile::{self, FileInfo, ModInfo},
-    },
-    error::GothicOrganizerError,
-};
+use crate::app;
+use crate::core::constants;
+use crate::core::profile;
+use crate::error;
 
 use super::super::utils::{copy_recursive, extract_zip};
 
-pub fn add_mod(app: &mut GothicOrganizer, mod_source_path: Option<PathBuf>) -> Task<Message> {
+pub fn add_mod(app: &mut app::GothicOrganizer, mod_source_path: Option<PathBuf>) -> Task<app::Message> {
     let Some(mod_source_path) = mod_source_path.or_else(|| {
         rfd::FileDialog::new()
             .set_title("Select a zip archive with mod files")
@@ -28,7 +25,7 @@ pub fn add_mod(app: &mut GothicOrganizer, mod_source_path: Option<PathBuf>) -> T
     let mod_path = match move_mod_to_storage(app, &mod_source_path) {
         Ok(path) => path,
         Err(e) => {
-            log::error!("Failed to move mod to storage: {e}");
+            log::warn!("Failed to move mod to storage: {e}");
             return Task::none();
         }
     };
@@ -47,7 +44,7 @@ pub fn add_mod(app: &mut GothicOrganizer, mod_source_path: Option<PathBuf>) -> T
         log::trace!("Assigned name: {mod_name}");
 
         let file_info = |path: &Path| {
-            FileInfo::default()
+            profile::FileInfo::default()
                 .with_enabled(true)
                 .with_source_path(path)
                 .with_parent_name(mod_name.clone())
@@ -60,9 +57,9 @@ pub fn add_mod(app: &mut GothicOrganizer, mod_source_path: Option<PathBuf>) -> T
                 e.ok()
                     .map(|e| (e.path().to_path_buf(), file_info(e.path())))
             })
-            .collect::<profile::Lookup<PathBuf, FileInfo>>();
+            .collect::<profile::Lookup<PathBuf, profile::FileInfo>>();
 
-        let new_mod_info = ModInfo::default()
+        let new_mod_info = profile::ModInfo::default()
             .with_enabled(true)
             .with_name(&mod_name)
             .with_path(&mod_path)
@@ -74,19 +71,19 @@ pub fn add_mod(app: &mut GothicOrganizer, mod_source_path: Option<PathBuf>) -> T
             .get_or_insert_with(Vec::new)
             .push(new_mod_info);
 
-        return Task::done(Message::LoadMods);
+        return Task::done(app::Message::LoadMods);
     }
 
     Task::none()
 }
 
-pub fn remove_mod(app: &mut GothicOrganizer, mod_name: String) -> Task<Message> {
+pub fn remove_mod(app: &mut app::GothicOrganizer, mod_name: String) -> Task<app::Message> {
     let storage_dir = match app.mods_storage_dir.as_ref() {
         Some(dir) => dir.clone(),
         None => match constants::default_mod_storage_dir() {
             Ok(dir) => dir,
             Err(e) => {
-                log::error!("Failed to get default mod storage dir: {e}");
+                log::warn!("Failed to get default mod storage dir: {e}");
                 return Task::none();
             }
         },
@@ -109,20 +106,20 @@ pub fn remove_mod(app: &mut GothicOrganizer, mod_name: String) -> Task<Message> 
         if mod_dir.exists() {
             log::trace!("Removing mod directory {}", mod_dir.display());
             if let Err(e) = std::fs::remove_dir_all(&mod_dir) {
-                log::error!("Failed to remove mod directory: {e}");
+                log::warn!("Failed to remove mod directory: {e}");
             }
         }
 
         return Task::chain(
-            Task::done(Message::RefreshFiles),
-            Task::done(Message::LoadMods),
+            Task::done(app::Message::RefreshFiles),
+            Task::done(app::Message::LoadMods),
         );
     }
 
     Task::none()
 }
 
-pub fn load_mods(app: &mut GothicOrganizer) -> Task<Message> {
+pub fn load_mods(app: &mut app::GothicOrganizer) -> Task<app::Message> {
     if let Some(profile_name) = app.profile_selected.as_ref()
         && let Some(instance_name) = app.instance_selected.as_ref()
         && let Some(profile) = app.profiles.get_mut(profile_name)
@@ -153,17 +150,17 @@ pub fn load_mods(app: &mut GothicOrganizer) -> Task<Message> {
         log::trace!("No mods to load");
     }
 
-    Task::done(Message::RefreshFiles)
+    Task::done(app::Message::RefreshFiles)
 }
 
 pub fn is_valid_mod_source(mod_path: &Path) -> bool {
     mod_path.exists() && (mod_path.is_dir() || mod_path.extension().and_then(|e| e.to_str()) == Some("zip"))
 }
 
-pub fn move_mod_to_storage(app: &GothicOrganizer, mod_path: &Path) -> Result<PathBuf, GothicOrganizerError> {
+pub fn move_mod_to_storage(app: &app::GothicOrganizer, mod_path: &Path) -> Result<PathBuf, error::GothicOrganizerError> {
     let storage_dir = app.mods_storage_dir.clone().unwrap_or_else(|| {
         constants::default_mod_storage_dir().unwrap_or_else(|e| {
-            log::error!("Failed to get default mod storage dir: {e}");
+            log::warn!("Failed to get default mod storage dir: {e}");
             PathBuf::from("mods")
         })
     });
@@ -178,7 +175,7 @@ pub fn move_mod_to_storage(app: &GothicOrganizer, mod_path: &Path) -> Result<Pat
     let dst_dir = storage_dir.join(mod_name);
 
     if dst_dir.exists() {
-        return Err(GothicOrganizerError::from(std::io::Error::new(
+        return Err(error::GothicOrganizerError::from(std::io::Error::new(
             std::io::ErrorKind::AlreadyExists,
             "Mod already exists",
         )));

@@ -11,26 +11,24 @@ use iced::widget::Svg;
 use iced::Border;
 use iced::Shadow;
 
-use crate::core::constants::APP_NAME;
-use crate::core::profile::FileInfo;
-use crate::core::profile::Profile;
-use crate::core::profile::Session;
+use crate::core::constants;
+use crate::core::profile;
 
 fn default_path<P: AsRef<Path>>(custom_path: Option<P>) -> PathBuf {
     match custom_path {
         Some(p) => p.as_ref().to_path_buf(),
-        None => PathBuf::from(crate::core::constants::local_app_data()).join(APP_NAME),
+        None => PathBuf::from(crate::core::constants::local_app_data()).join(constants::APP_NAME),
     }
 }
 
 pub fn save_session<P: AsRef<Path>>(
     selected_profile: Option<String>,
     selected_instance: Option<String>,
-    cache: Option<crate::core::profile::Lookup<PathBuf, FileInfo>>,
+    cache: Option<crate::core::profile::Lookup<PathBuf, profile::FileInfo>>,
     theme: Option<String>,
     custom_path: Option<P>,
 ) -> Result<(), std::io::Error> {
-    let session = Session {
+    let session = profile::Session {
         selected_profile,
         selected_instance,
         theme,
@@ -44,7 +42,7 @@ pub fn save_session<P: AsRef<Path>>(
     Ok(())
 }
 
-pub fn load_session<P: AsRef<Path>>(custom_path: Option<P>) -> Option<Session> {
+pub fn load_session<P: AsRef<Path>>(custom_path: Option<P>) -> Option<profile::Session> {
     let default_path = default_path(custom_path);
     if !default_path.exists() {
         return None;
@@ -52,14 +50,14 @@ pub fn load_session<P: AsRef<Path>>(custom_path: Option<P>) -> Option<Session> {
 
     let session_json = read_to_string(default_path.join("session.json")).ok()?;
 
-    let Ok(session): Result<Session, _> = serde_json::from_str(&session_json) else {
+    let Ok(session): Result<profile::Session, _> = serde_json::from_str(&session_json) else {
         return None;
     };
 
     Some(session)
 }
 
-pub fn save_profile<P: AsRef<Path>>(profile: &Profile, custom_path: Option<P>) -> Result<(), std::io::Error> {
+pub fn save_profile<P: AsRef<Path>>(profile: &profile::Profile, custom_path: Option<P>) -> Result<(), std::io::Error> {
     let default_profile_path = default_path(custom_path);
     let profile_json = serde_json::to_string_pretty(&profile).map_err(std::io::Error::other)?;
 
@@ -74,18 +72,14 @@ pub fn save_profile<P: AsRef<Path>>(profile: &Profile, custom_path: Option<P>) -
     Ok(())
 }
 
-pub fn load_profile<P: AsRef<Path>>(name: &str, custom_path: Option<P>) -> Option<Profile> {
+pub fn load_profile<P: AsRef<Path>>(name: &str, custom_path: Option<P>) -> Option<profile::Profile> {
     let default_profile_path = default_path(custom_path);
     let mut entries = read_dir(default_profile_path).ok()?;
 
     let profile = entries.find_map(|e| {
         let entry = e.ok()?;
 
-        if !entry.path().is_dir() {
-            return None;
-        }
-
-        if entry.file_name().to_string_lossy().to_lowercase() != name.to_lowercase() {
+        if !entry.path().is_dir() && entry.file_name().to_string_lossy().to_lowercase() != name.to_lowercase() {
             return None;
         }
 
@@ -94,11 +88,7 @@ pub fn load_profile<P: AsRef<Path>>(name: &str, custom_path: Option<P>) -> Optio
         let profile_str = profile_dir.find_map(|e| {
             let entry = e.ok()?;
 
-            if entry.path().is_dir() {
-                return None;
-            }
-
-            if entry.file_name().to_string_lossy().to_lowercase() != "profile.json" {
+            if entry.path().is_dir() && entry.file_name().to_string_lossy().to_lowercase() != "profile.json" {
                 return None;
             }
 
@@ -107,7 +97,7 @@ pub fn load_profile<P: AsRef<Path>>(name: &str, custom_path: Option<P>) -> Optio
             Some(profile_str)
         })?;
 
-        let Ok(profile): Result<Profile, _> = serde_json::from_str(&profile_str) else {
+        let Ok(profile): Result<profile::Profile, _> = serde_json::from_str(&profile_str) else {
             return None;
         };
 

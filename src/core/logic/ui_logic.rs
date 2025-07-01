@@ -1,9 +1,9 @@
 use std::path::{Path, PathBuf};
 
-use crate::app::GothicOrganizer;
+use crate::app;
 use crate::core::profile;
 
-pub fn load_files(app: &mut GothicOrganizer, root: Option<PathBuf>) {
+pub fn load_files(app: &mut app::GothicOrganizer, root: Option<PathBuf>) {
     if let Some(profile_name) = app.profile_selected.as_ref()
         && let Some(profile) = app.profiles.get_mut(profile_name)
     {
@@ -38,7 +38,7 @@ pub fn load_files(app: &mut GothicOrganizer, root: Option<PathBuf>) {
     }
 }
 
-pub fn toggle_state_recursive(app: &mut GothicOrganizer, path: Option<&Path>) {
+pub fn toggle_state_recursive(app: &mut app::GothicOrganizer, path: Option<&Path>) {
     let paths_to_toggle: Vec<PathBuf> = path.map(|p| vec![p.to_path_buf()]).unwrap_or_else(|| {
         app.state
             .current_directory_entries

@@ -4,27 +4,22 @@ use iced::widget::combo_box::State;
 use iced::Element;
 use iced::Task;
 
-use log::info;
-use log::warn;
-
-use crate::core::logic::{
-    app_lifecycle, mod_management, profile_management,
-    ui_logic::{self, load_files},
-};
-use crate::core::profile::FileInfo;
-use crate::core::profile::Lookup;
-use crate::core::profile::Profile;
+use crate::core::logic::app_lifecycle;
+use crate::core::logic::mod_management;
+use crate::core::logic::profile_management;
+use crate::core::logic::ui_logic;
+use crate::core::profile;
 
 #[derive(Debug, Default)]
 pub struct GothicOrganizer {
     pub profile_selected: Option<String>,
     pub instance_selected: Option<String>,
-    pub profiles: Lookup<String, Profile>,
-    pub files: Lookup<PathBuf, FileInfo>,
+    pub profiles: profile::Lookup<String, profile::Profile>,
+    pub files: profile::Lookup<PathBuf, profile::FileInfo>,
     pub theme: Option<String>,
     pub state: InnerState,
     pub mods_storage_dir: Option<PathBuf>,
-    pub windows: Lookup<Option<iced::window::Id>, WindowState>,
+    pub windows: profile::Lookup<Option<iced::window::Id>, WindowState>,
 }
 
 #[derive(Debug, Default)]
@@ -32,10 +27,10 @@ pub struct InnerState {
     pub instance_input: Option<String>,
     pub profile_directory_input: String,
     pub profile_choices: State<String>,
-    pub themes: Lookup<String, iced::Theme>,
+    pub themes: profile::Lookup<String, iced::Theme>,
     pub theme_choices: State<String>,
     pub instance_choices: State<String>,
-    pub current_directory_entries: Vec<(PathBuf, FileInfo)>,
+    pub current_directory_entries: Vec<(PathBuf, profile::FileInfo)>,
     pub current_directory: PathBuf,
 }
 
@@ -50,12 +45,10 @@ impl GothicOrganizer {
     pub const WINDOW_SIZE: (f32, f32) = (768.0, 768.0);
 
     pub fn new() -> (Self, Task<Message>) {
-        info!("Initializing app");
         let mut app = Self::default();
 
-        info!("Loading last session");
         if let Err(err) = app_lifecycle::try_reload_last_session(&mut app) {
-            warn!("Failed to load last session: {err}");
+            log::warn!("Failed to load last session: {err}");
         }
 
         app.state.themes = app_lifecycle::load_default_themes();
@@ -71,8 +64,6 @@ impl GothicOrganizer {
     }
 
     pub fn update(&mut self, message: Message) -> Task<Message> {
-        info!("Message: {message:?}");
-
         match &message {
             Message::InitWindow => {
                 return app_lifecycle::init_window(self);
@@ -121,11 +112,11 @@ impl GothicOrganizer {
             Message::TraverseIntoDir(path) => {
                 profile_management::write_changes_to_instance(self);
                 self.state.current_directory = path.clone();
-                load_files(self, Some(path.clone()))
+                ui_logic::load_files(self, Some(path.clone()))
             }
 
             Message::RefreshFiles => {
-                load_files(self, None);
+                ui_logic::load_files(self, None);
             }
 
             Message::ModToggle(_) => {

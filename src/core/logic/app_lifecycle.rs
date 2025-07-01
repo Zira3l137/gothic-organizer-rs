@@ -1,16 +1,15 @@
-use iced::{widget::combo_box, Task};
+use iced::widget::combo_box;
+use iced::Task;
 
-use crate::{
-    app::{GothicOrganizer, Message, WindowState},
-    core::{
-        logic::profile_management::{preload_profiles, write_changes_to_instance},
-        profile::{self},
-    },
-    error::GothicOrganizerError,
-    load_session, save_profile, save_session,
-};
+use crate::app;
+use crate::core::logic::profile_management;
+use crate::core::profile;
+use crate::error;
+use crate::load_session;
+use crate::save_profile;
+use crate::save_session;
 
-pub fn invoke_options_window(app: &mut GothicOrganizer) -> Task<Message> {
+pub fn invoke_options_window(app: &mut app::GothicOrganizer) -> Task<app::Message> {
     let (id, task) = iced::window::open(iced::window::Settings {
         position: iced::window::Position::Centered,
         level: iced::window::Level::AlwaysOnTop,
@@ -25,7 +24,7 @@ pub fn invoke_options_window(app: &mut GothicOrganizer) -> Task<Message> {
 
     app.windows.insert(
         Some(id),
-        WindowState {
+        app::WindowState {
             name: "options".to_owned(),
             closed: false,
         },
@@ -34,8 +33,8 @@ pub fn invoke_options_window(app: &mut GothicOrganizer) -> Task<Message> {
     task.then(|_| Task::none())
 }
 
-pub fn exit(app: &mut GothicOrganizer, wnd_id: &iced::window::Id) -> Task<Message> {
-    write_changes_to_instance(app);
+pub fn exit(app: &mut app::GothicOrganizer, wnd_id: &iced::window::Id) -> Task<app::Message> {
+    profile_management::write_changes_to_instance(app);
     save_current_session(app);
 
     if let Some(wnd_state) = app.windows.get_mut(&Some(*wnd_id)) {
@@ -49,12 +48,12 @@ pub fn exit(app: &mut GothicOrganizer, wnd_id: &iced::window::Id) -> Task<Messag
     }
 }
 
-pub fn try_reload_last_session(app: &mut GothicOrganizer) -> Result<(), GothicOrganizerError> {
-    let profiles = preload_profiles();
+pub fn try_reload_last_session(app: &mut app::GothicOrganizer) -> Result<(), error::GothicOrganizerError> {
+    let profiles = profile_management::preload_profiles();
     app.state.profile_choices = combo_box::State::new(profiles.keys().cloned().collect());
     app.profiles = profiles.clone();
 
-    let last_session = load_session!().ok_or_else(|| GothicOrganizerError::new("Failed to load last session"))?;
+    let last_session = load_session!().ok_or_else(|| error::GothicOrganizerError::new("Failed to load last session"))?;
     app.theme = last_session.theme;
 
     if let Some(profile_name) = last_session.selected_profile
@@ -74,9 +73,9 @@ pub fn try_reload_last_session(app: &mut GothicOrganizer) -> Result<(), GothicOr
     Ok(())
 }
 
-pub fn init_window(app: &mut GothicOrganizer) -> Task<Message> {
+pub fn init_window(app: &mut app::GothicOrganizer) -> Task<app::Message> {
     let (id, task) = iced::window::open(iced::window::Settings {
-        size: iced::Size::from(GothicOrganizer::WINDOW_SIZE),
+        size: iced::Size::from(app::GothicOrganizer::WINDOW_SIZE),
         position: iced::window::Position::Centered,
         icon: iced::window::icon::from_file("./resources/icon.ico").ok(),
         exit_on_close_request: false,
@@ -85,19 +84,19 @@ pub fn init_window(app: &mut GothicOrganizer) -> Task<Message> {
 
     app.windows.insert(
         Some(id),
-        WindowState {
+        app::WindowState {
             name: "editor".to_owned(),
             closed: false,
         },
     );
 
-    task.then(|_| Task::done(Message::RefreshFiles))
+    task.then(|_| Task::done(app::Message::RefreshFiles))
 }
 
-pub fn save_current_session(app: &GothicOrganizer) {
+pub fn save_current_session(app: &app::GothicOrganizer) {
     app.profiles.values().for_each(|p| {
         if let Err(e) = save_profile!(p) {
-            eprintln!("Failed saving profile: {e}");
+            log::error!("Failed saving profile: {e}");
         }
     });
 
@@ -115,7 +114,7 @@ pub fn save_current_session(app: &GothicOrganizer) {
         cache,
         app.theme.clone()
     ) {
-        eprintln!("Failed saving session: {e}");
+        log::error!("Failed saving session: {e}");
     }
 }
 
