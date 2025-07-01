@@ -55,6 +55,7 @@ impl GothicOrganizer {
         }
 
         app.state.themes = app_lifecycle::load_default_themes();
+        log::debug!("Loaded themes: {:#?}", app.state.themes);
         app.state.theme_choices = State::new(
             app.state
                 .themes
@@ -73,6 +74,7 @@ impl GothicOrganizer {
             }
 
             Message::ThemeSwitch(theme) => {
+                log::debug!("Switching theme to {theme}");
                 self.theme = Some(theme.clone());
             }
 
@@ -172,12 +174,10 @@ impl GothicOrganizer {
 
     pub fn theme(&self) -> iced::Theme {
         match &self.theme {
-            Some(theme) => self
-                .state
-                .themes
-                .get(theme)
-                .cloned()
-                .unwrap_or(iced::Theme::Dark),
+            Some(theme) => self.state.themes.get(theme).cloned().unwrap_or_else(|| {
+                log::warn!("Theme {theme} not found, defaulting to dark");
+                iced::Theme::Dark
+            }),
             None => iced::Theme::Dark,
         }
     }
