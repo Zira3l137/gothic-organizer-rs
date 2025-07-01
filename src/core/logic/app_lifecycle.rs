@@ -140,30 +140,30 @@ pub fn save_current_session(app: &app::GothicOrganizer) {
 
 pub fn load_default_themes() -> Lookup<String, iced::Theme> {
     [
-        (iced::Theme::Light, "Light"),
-        (iced::Theme::Dark, "Dark"),
-        (iced::Theme::Dracula, "Dracula"),
-        (iced::Theme::Nord, "Nord"),
-        (iced::Theme::SolarizedLight, "SolarizedLight"),
-        (iced::Theme::SolarizedDark, "SolarizedDark"),
-        (iced::Theme::GruvboxLight, "GruvboxLight"),
-        (iced::Theme::GruvboxDark, "GruvboxDark"),
-        (iced::Theme::CatppuccinLatte, "CatppuccinLatte"),
-        (iced::Theme::CatppuccinFrappe, "CatppuccinFrappe"),
-        (iced::Theme::CatppuccinMacchiato, "CatppuccinMacchiato"),
-        (iced::Theme::CatppuccinMocha, "CatppuccinMocha"),
-        (iced::Theme::TokyoNight, "TokyoNight"),
-        (iced::Theme::TokyoNightStorm, "TokyoNightStorm"),
-        (iced::Theme::TokyoNightLight, "TokyoNightLight"),
-        (iced::Theme::KanagawaWave, "KanagawaWave"),
-        (iced::Theme::KanagawaDragon, "KanagawaDragon"),
-        (iced::Theme::KanagawaLotus, "KanagawaLotus"),
-        (iced::Theme::Moonfly, "Moonfly"),
-        (iced::Theme::Nightfly, "Nightfly"),
-        (iced::Theme::Oxocarbon, "Oxocarbon"),
-        (iced::Theme::Ferra, "Ferra"),
+        ("Light", iced::Theme::Light),
+        ("Dark", iced::Theme::Dark),
+        ("Dracula", iced::Theme::Dracula),
+        ("Nord", iced::Theme::Nord),
+        ("SolarizedLight", iced::Theme::SolarizedLight),
+        ("SolarizedDark", iced::Theme::SolarizedDark),
+        ("GruvboxLight", iced::Theme::GruvboxLight),
+        ("GruvboxDark", iced::Theme::GruvboxDark),
+        ("CatppuccinLatte", iced::Theme::CatppuccinLatte),
+        ("CatppuccinFrappe", iced::Theme::CatppuccinFrappe),
+        ("CatppuccinMacchiato", iced::Theme::CatppuccinMacchiato),
+        ("CatppuccinMocha", iced::Theme::CatppuccinMocha),
+        ("TokyoNight", iced::Theme::TokyoNight),
+        ("TokyoNightStorm", iced::Theme::TokyoNightStorm),
+        ("TokyoNightLight", iced::Theme::TokyoNightLight),
+        ("KanagawaWave", iced::Theme::KanagawaWave),
+        ("KanagawaDragon", iced::Theme::KanagawaDragon),
+        ("KanagawaLotus", iced::Theme::KanagawaLotus),
+        ("Moonfly", iced::Theme::Moonfly),
+        ("Nightfly", iced::Theme::Nightfly),
+        ("Oxocarbon", iced::Theme::Oxocarbon),
+        ("Ferra", iced::Theme::Ferra),
     ]
     .into_iter()
-    .map(|(theme, name)| (name.to_string(), theme))
+    .map(|(name, theme)| (name.to_owned(), theme))
     .collect()
 }
