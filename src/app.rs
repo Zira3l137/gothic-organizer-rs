@@ -114,7 +114,7 @@ impl GothicOrganizer {
             }
 
             Message::TraverseIntoDir(path) => {
-                profile_management::write_changes_to_instance(self);
+                profile_management::update_instance_from_cache(self);
                 self.state.current_directory = path.clone();
                 ui_logic::load_files(self, Some(path.clone()))
             }
@@ -123,8 +123,13 @@ impl GothicOrganizer {
                 ui_logic::load_files(self, None);
             }
 
-            Message::ModToggle(_) => {
-                return Task::none();
+            Message::LoadMods => {
+                return mod_management::load_mods(self);
+            }
+
+            Message::ModToggle(name, new_state) => {
+                mod_management::toggle_mod(self, name.clone(), *new_state);
+                return Task::done(Message::RefreshFiles);
             }
 
             Message::ModUninstall(name) => {
@@ -141,10 +146,6 @@ impl GothicOrganizer {
 
             Message::SetModsDir(profile_name, path) => {
                 return profile_management::set_mods_dir(self, profile_name.clone(), path.clone());
-            }
-
-            Message::LoadMods => {
-                return mod_management::load_mods(self);
             }
 
             Message::InvokeOptionsMenu => {
@@ -209,13 +210,13 @@ pub enum Message {
     FileToggle(PathBuf),
     TraverseIntoDir(PathBuf),
     ThemeSwitch(String),
-    ModToggle(String),
+    ModToggle(String, bool),
     ModUninstall(String),
     ModAdd(Option<PathBuf>),
     ReturnError(error::SharedError),
-    LoadMods,
     InitWindow,
     InvokeOptionsMenu,
     FileToggleAll,
     RefreshFiles,
+    LoadMods,
 }

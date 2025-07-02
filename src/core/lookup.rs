@@ -22,7 +22,7 @@ where
     }
 
     /// Returns the number of elements in the internal map.
-    pub fn length(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.access.len()
     }
 
@@ -92,12 +92,12 @@ where
 
     /// Removes a key from the internal map, returning the value at the key if the key
     /// was previously in the map. Keeps the allocated memory for reuse.
-    pub fn remove<Q>(&mut self, key: &Q)
+    pub fn remove<Q>(&mut self, key: &Q) -> Option<V>
     where
         K: std::borrow::Borrow<Q>,
         Q: std::hash::Hash + Eq + Sized,
     {
-        self.access.remove(key);
+        self.access.remove(key)
     }
 
     /// Returns `true` if the map contains a value for the specified key.

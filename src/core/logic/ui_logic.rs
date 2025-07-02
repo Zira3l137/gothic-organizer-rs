@@ -27,6 +27,7 @@ pub fn load_files(app: &mut app::GothicOrganizer, root: Option<PathBuf>) {
             && let Some(instance_files) = &instance.files
         {
             log::trace!("Fetching files from current instance");
+            app.files.clear();
             app.files.extend(instance_files.clone());
             current_directory_entries = get_current_dir_entries(&app.files);
         } else {

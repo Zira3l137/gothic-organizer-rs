@@ -42,7 +42,7 @@ This module manages the application's startup, shutdown, and session persistence
 -   **`exit(app: &mut GothicOrganizer, ...)`**
     -   **Purpose:** To gracefully shut down the application.
     -   **Interactions:**
-        -   Triggers `profile_management::write_changes_to_instance(app)` to ensure any pending UI changes are saved to the data model.
+        -   Triggers `profile_management::update_instance_from_cache(app)` to ensure any pending UI changes are saved to the data model.
         -   Triggers `save_current_session(app)` to persist everything to disk.
 
 ### `profile_management.rs`
@@ -52,12 +52,12 @@ This module handles all logic related to creating, modifying, and switching betw
 -   **`switch_profile(...)` & `select_instance(...)`**
     -   **Purpose:** To change the active profile or instance.
     -   **Interactions:**
-        -   **Crucial Nuance:** Before switching, it calls `write_changes_to_instance(app)` to save the state of the *outgoing* instance.
+        -   **Crucial Nuance:** Before switching, it calls `update_instance_from_cache(app)` to save the state of the *outgoing* instance.
         -   **Modifies `app.profile_selected` and `app.instance_selected`**.
         -   **Modifies `app.state.instance_choices`** to reflect the instances available in the new profile.
-        -   Dispatches `Message::RefreshFiles` to trigger `ui_logic::load_files`, which will load the file view for the new context.
+        -   Dispatches `Message::LoadMods` to trigger `mod_management::load_mods`, which will load the file view for the new context.
 
--   **`write_changes_to_instance(app: &mut GothicOrganizer)`**
+-   **`update_instance_from_cache(app: &mut GothicOrganizer)`**
     -   **Purpose:** To persist changes made in the UI (like toggling files) from the temporary UI state back into the main data model. This is a critical "commit" step that happens before any context switch or shutdown.
     -   **Interactions:**
         -   Finds the currently active profile and instance within `app.profiles`.
@@ -81,7 +81,25 @@ This module handles adding, removing, and applying mods to an instance.
     -   **Interactions:**
         -   Reads `app.mod_storage_dir` and `app.profile_selected` to determine the correct storage location for the mod's files.
         -   **Modifies `app.profiles`**: It finds the current instance and adds a new `ModInfo` struct to its `mods` list. The `mod_info.files` field is populated by walking the extracted mod archive.
-        -   Dispatches `Message::LoadMods`.
+        -   Calls `apply_mod_files` to apply the new mod's files to the instance's file cache.
+        -   Dispatches `Message::RefreshFiles`.
+
+-   **`toggle_mod(...)`**
+    -   **Purpose:** To enable or disable a mod.
+    -   **Interactions:**
+        -   Finds the current instance in `app.profiles`.
+        -   Calls `apply_mod_files` or `unapply_mod_files` to modify the instance's file cache.
+        -   Updates the `enabled` flag on the `ModInfo` struct.
+        -   Dispatches `Message::RefreshFiles`.
+
+-   **`remove_mod(...)`**
+    -   **Purpose:** To remove a mod from an instance and delete its files.
+    -   **Interactions:**
+        -   Calls `toggle_mod` to disable the mod.
+        -   Removes the mod's files from the storage directory.
+        -   Removes the `ModInfo` struct from the instance's `mods` list.
+        -   Removes the mod's overwrites from the instance's `overwrites` map.
+        -   Dispatches `Message::RefreshFiles`.
 
 -   **`load_mods(app: &mut GothicOrganizer)`**
     -   **Purpose:** To apply the files from all active mods to the instance's file cache. This is where file overwrites are handled.
@@ -91,11 +109,6 @@ This module handles adding, removing, and applying mods to an instance.
         -   **Nuance:** This function does *not* directly touch `app.files`. It prepares the `instance.files` cache. The UI is updated subsequently when `ui_logic::load_files` is called (usually via a `RefreshFiles` message), which then loads this prepared `instance.files` into the active `app.files`.
         -   Dispatches `Message::RefreshFiles`.
 
--   **`remove_mod(...)`**
-    -   **Purpose:** To remove a mod from an instance and delete its files.
-    -   **Interactions:**
-        - **Work In Progress...
-
 ### `ui_logic.rs`
 
 This module acts as the view-model layer, preparing data from the core model for display in the GUI.
@@ -104,7 +117,7 @@ This module acts as the view-model layer, preparing data from the core model for
     -   **Purpose:** To populate the file list (`current_directory_entries`) that the user sees.
     -   **Interactions:**
         -   **Modifies `app.state.current_directory`**.
-        -   **Modifies `app.files`**: This is the crucial step where the active file cache is updated. It loads the `instance.files` from the current instance in `app.profiles` into the main `app.files` state, effectively switching the context.
+        -   **Modifies `app.files`**: This is the crucial step where the active file cache is updated. It clears the `app.files` cache and loads the `instance.files` from the current instance in `app.profiles` into the main `app.files` state, effectively switching the context.
         -   **Modifies `app.state.current_directory_entries`**: It filters the now-updated `app.files` to get only the items in the `current_directory`, sorts them, and stores the result for the UI to render.
 
 -   **`toggle_state_recursive(app: &mut GothicOrganizer, ...)`**

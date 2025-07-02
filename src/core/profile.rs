@@ -67,7 +67,7 @@ impl Profile {
 pub struct Instance {
     pub name: String,
     pub files: Option<Lookup<PathBuf, FileInfo>>,
-    pub overwrtites: Option<Lookup<PathBuf, FileInfo>>,
+    pub overwrites: Option<Lookup<String, Lookup<PathBuf, FileInfo>>>,
     pub mods: Option<Vec<ModInfo>>,
 }
 
@@ -76,7 +76,7 @@ impl Instance {
         Self {
             name: name.to_owned(),
             files,
-            overwrtites: None,
+            overwrites: None,
             mods,
         }
     }
@@ -96,8 +96,8 @@ impl Instance {
         self
     }
 
-    pub fn with_overwrtites(mut self, overwrtites: Option<Lookup<PathBuf, FileInfo>>) -> Self {
-        self.overwrtites = overwrtites;
+    pub fn with_overwrites(mut self, overwrites: Option<Lookup<String, Lookup<PathBuf, FileInfo>>>) -> Self {
+        self.overwrites = overwrites;
         self
     }
 }

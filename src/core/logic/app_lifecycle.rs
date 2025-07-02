@@ -35,7 +35,7 @@ pub fn invoke_options_window(app: &mut app::GothicOrganizer) -> Task<app::Messag
 }
 
 pub fn exit(app: &mut app::GothicOrganizer, wnd_id: &iced::window::Id) -> Task<app::Message> {
-    profile_management::write_changes_to_instance(app);
+    profile_management::update_instance_from_cache(app);
     save_current_session(app);
 
     if let Some(wnd_state) = app.windows.get_mut(&Some(*wnd_id)) {
@@ -52,7 +52,7 @@ pub fn exit(app: &mut app::GothicOrganizer, wnd_id: &iced::window::Id) -> Task<a
 pub fn exit_with_error(app: &mut app::GothicOrganizer, err: error::SharedError) -> Task<app::Message> {
     log::error!("Error: {err}");
     log::info!("Saving current session and changes");
-    profile_management::write_changes_to_instance(app);
+    profile_management::update_instance_from_cache(app);
     save_current_session(app);
 
     log::info!("Exiting");

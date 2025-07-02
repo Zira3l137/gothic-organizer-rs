@@ -191,3 +191,16 @@ macro_rules! save_profile {
         $crate::core::helpers::save_profile($profile, $custom_path)
     };
 }
+
+#[macro_export]
+macro_rules! impl_shared_error_from {
+    ($($err_ty:ty),* $(,)?) => {
+        $(
+            impl From<$err_ty> for $crate::error::SharedError {
+                fn from(err: $err_ty) -> Self {
+                    $crate::error::SharedError::new(err)
+                }
+            }
+        )*
+    };
+}

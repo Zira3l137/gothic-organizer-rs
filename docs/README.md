@@ -72,3 +72,12 @@ The `editor_view` then iterates over `current_directory_entries` and creates a U
 Mods are displayed in a separate list in the `editor_view`. The `mod_management.rs` module handles the logic for adding, removing, and loading mods. When a mod is added, its files are extracted to a dedicated storage directory, and a `ModInfo` struct is created to track the mod's information.
 
 The `FileInfo` for each file contains a `parent_name` field, which indicates which mod the file belongs to. This information is displayed in a tooltip when the user hovers over a file in the `editor_view`. This allows users to easily see which files are part of the base game and which are from mods.
+
+
+### File Overwrites
+
+When a mod is loaded, its files may overwrite existing files from the base game or other mods. The application handles this by storing the overwritten files in the `overwrites` field of the `Instance` struct. This allows the application to restore the original files when a mod is disabled or removed.
+
+The `apply_mod_files` function in `mod_management.rs` is responsible for handling file overwrites. When a mod is loaded, it iterates over the mod's files and checks if a file with the same path already exists in the instance's file cache. If it does, the existing `FileInfo` is moved to the `overwrites` map, and the new `FileInfo` from the mod is inserted into the cache.
+
+When a mod is disabled or removed, the `unapply_mod_files` function is called. This function iterates over the mod's files and removes them from the instance's file cache. It then checks the `overwrites` map for any files that were overwritten by the mod and restores them to the cache.

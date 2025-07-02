@@ -10,7 +10,7 @@ use crate::error;
 use crate::load_profile;
 
 pub fn switch_profile(app: &mut app::GothicOrganizer, profile_name: &str) -> Task<app::Message> {
-    write_changes_to_instance(app);
+    update_instance_from_cache(app);
 
     if let Some(next_profile) = app.profiles.get(profile_name) {
         log::trace!("Loading profile {profile_name}");
@@ -32,7 +32,7 @@ pub fn switch_profile(app: &mut app::GothicOrganizer, profile_name: &str) -> Tas
     Task::none()
 }
 
-pub fn write_changes_to_instance(app: &mut app::GothicOrganizer) {
+pub fn update_instance_from_cache(app: &mut app::GothicOrganizer) {
     if let Some(profile_name) = app.profile_selected.clone()
         && let Some(profile) = app.profiles.get_mut(&profile_name)
         && let Some(instance_name) = app.instance_selected.clone()
@@ -54,7 +54,9 @@ pub fn add_instance_for_profile(app: &mut app::GothicOrganizer, profile_name: &s
             .clone()
             .unwrap_or_else(|| format!("{profile_name}_{}", chrono::Local::now().timestamp()));
 
-        let new_instance = profile::Instance::default().with_name(&instance_name);
+        let new_instance = profile::Instance::default()
+            .with_name(&instance_name)
+            .with_files(Some(app.files.clone()));
 
         let instances = profile.instances.get_or_insert_with(Default::default);
         if instances.contains_key(&instance_name) {
@@ -86,10 +88,10 @@ pub fn remove_instance_from_profile(app: &mut app::GothicOrganizer, profile_name
 }
 
 pub fn select_instance(app: &mut app::GothicOrganizer, instance_name: &str) -> Task<app::Message> {
-    write_changes_to_instance(app);
+    update_instance_from_cache(app);
     app.instance_selected = Some(instance_name.to_owned());
     log::trace!("Loading files for instance {instance_name}");
-    Task::done(app::Message::RefreshFiles)
+    Task::done(app::Message::LoadMods)
 }
 
 pub fn set_game_dir(app: &mut app::GothicOrganizer, profile_name: Option<String>, path: Option<PathBuf>) -> Task<app::Message> {
@@ -144,9 +146,7 @@ pub fn set_mods_dir(app: &mut app::GothicOrganizer, profile_name: Option<String>
         app.mod_storage_dir = Some(path.clone());
 
         if let Err(err) = std::fs::create_dir_all(&path) {
-            return Task::done(app::Message::ReturnError(error::SharedError::new(
-                err.into(),
-            )));
+            return Task::done(app::Message::ReturnError(error::SharedError::new(err)));
         } else {
             return Task::done(app::Message::RefreshFiles);
         }

@@ -234,7 +234,7 @@ pub fn editor_view(app: &crate::app::GothicOrganizer) -> Element<Message> {
     {
         column_mods = mods.iter().fold(Column::new(), |column, mod_info| {
             let mod_name: Element<_> = text(mod_info.name.clone()).into();
-            let checkbox = checkbox("", mod_info.enabled).on_toggle(|_| Message::ModToggle(mod_info.name.clone()));
+            let checkbox = checkbox("", mod_info.enabled).on_toggle(|new_state| Message::ModToggle(mod_info.name.clone(), new_state));
             let button_uninstall = ClickableText::new("Uninstall").on_press(|| Message::ModUninstall(mod_info.name.clone()));
 
             let group_mod = styled_container!(
