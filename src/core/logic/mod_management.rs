@@ -156,12 +156,30 @@ pub fn load_mods(app: &mut app::GothicOrganizer) -> Task<app::Message> {
     if let Some(profile_name) = app.profile_selected.as_ref()
         && let Some(instance_name) = app.instance_selected.as_ref()
         && let Some(profile) = app.profiles.get_mut(profile_name)
-        && let Some(instances) = profile.instances.as_mut()
-        && let Some(instance) = instances.get_mut(instance_name)
     {
-        let mods = instance.mods.clone().unwrap_or_default();
-        for mod_info in mods.iter().filter(|m| m.enabled) {
-            apply_mod_files(instance, mod_info, &profile.path);
+        let base_files = ignore::WalkBuilder::new(&profile.path)
+            .ignore(false)
+            .build()
+            .filter_map(Result::ok)
+            .map(|entry| {
+                (
+                    entry.path().to_path_buf(),
+                    FileInfo::default()
+                        .with_source_path(entry.path())
+                        .with_enabled(true),
+                )
+            })
+            .collect::<Lookup<PathBuf, FileInfo>>();
+
+        if let Some(instances) = profile.instances.as_mut()
+            && let Some(instance) = instances.get_mut(instance_name)
+        {
+            instance.files = Some(base_files);
+            instance.overwrites = None;
+            let mods = instance.mods.clone().unwrap_or_default();
+            for mod_info in mods.iter().filter(|m| m.enabled) {
+                apply_mod_files(instance, mod_info, &profile.path);
+            }
         }
     } else {
         log::trace!("No mods to load");
@@ -187,7 +205,12 @@ pub fn move_mod_to_storage(app: &app::GothicOrganizer, mod_path: &Path) -> Resul
         .as_ref()
         .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "No profile selected"))?;
 
-    let storage_dir = storage_dir.join(profile_name);
+    let instance_name = app
+        .instance_selected
+        .as_ref()
+        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "No instance selected"))?;
+
+    let storage_dir = storage_dir.join(profile_name).join(instance_name);
     log::trace!("Mod storage dir: {}", storage_dir.display());
 
     let mod_name = mod_path

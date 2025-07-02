@@ -50,9 +50,7 @@ impl GothicOrganizer {
     pub fn new() -> (Self, Task<Message>) {
         let mut app = Self::default();
 
-        if let Err(err) = app_lifecycle::try_reload_last_session(&mut app) {
-            log::warn!("Failed to load last session: {err}");
-        }
+        app_lifecycle::try_reload_last_session(&mut app);
 
         app.state.themes = app_lifecycle::load_default_themes();
         app.state.theme_choices = State::new(

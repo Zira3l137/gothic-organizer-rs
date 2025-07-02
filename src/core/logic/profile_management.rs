@@ -54,9 +54,23 @@ pub fn add_instance_for_profile(app: &mut app::GothicOrganizer, profile_name: &s
             .clone()
             .unwrap_or_else(|| format!("{profile_name}_{}", chrono::Local::now().timestamp()));
 
+        let base_files = ignore::WalkBuilder::new(&profile.path)
+            .ignore(false)
+            .build()
+            .filter_map(Result::ok)
+            .map(|entry| {
+                (
+                    entry.path().to_path_buf(),
+                    profile::FileInfo::default()
+                        .with_source_path(entry.path())
+                        .with_enabled(true),
+                )
+            })
+            .collect::<Lookup<PathBuf, profile::FileInfo>>();
+
         let new_instance = profile::Instance::default()
             .with_name(&instance_name)
-            .with_files(Some(app.files.clone()));
+            .with_files(Some(base_files));
 
         let instances = profile.instances.get_or_insert_with(Default::default);
         if instances.contains_key(&instance_name) {

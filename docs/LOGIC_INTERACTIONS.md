@@ -57,6 +57,14 @@ This module handles all logic related to creating, modifying, and switching betw
         -   **Modifies `app.state.instance_choices`** to reflect the instances available in the new profile.
         -   Dispatches `Message::LoadMods` to trigger `mod_management::load_mods`, which will load the file view for the new context.
 
+-   **`add_instance_for_profile(...)`**
+    -   **Purpose:** To create a new, clean instance for a profile.
+    -   **Interactions:**
+        -   **Initializes a new `Instance` with a fresh copy of the base game files**, ensuring no state is carried over from a previously active instance.
+        -   Adds the new instance to the current profile.
+        -   Updates `app.state.instance_choices`.
+        -   Dispatches `Message::RefreshFiles`.
+
 -   **`update_instance_from_cache(app: &mut GothicOrganizer)`**
     -   **Purpose:** To persist changes made in the UI (like toggling files) from the temporary UI state back into the main data model. This is a critical "commit" step that happens before any context switch or shutdown.
     -   **Interactions:**
@@ -79,7 +87,7 @@ This module handles adding, removing, and applying mods to an instance.
 -   **`add_mod(...)`**
     -   **Purpose:** To add a new mod to the selected instance.
     -   **Interactions:**
-        -   Reads `app.mod_storage_dir` and `app.profile_selected` to determine the correct storage location for the mod's files.
+        -   Moves the mod files to a designated storage location: `$mod_storage_dir\\$profile_name\\$instance_name`.
         -   **Modifies `app.profiles`**: It finds the current instance and adds a new `ModInfo` struct to its `mods` list. The `mod_info.files` field is populated by walking the extracted mod archive.
         -   Calls `apply_mod_files` to apply the new mod's files to the instance's file cache.
         -   Dispatches `Message::RefreshFiles`.
@@ -104,9 +112,10 @@ This module handles adding, removing, and applying mods to an instance.
 -   **`load_mods(app: &mut GothicOrganizer)`**
     -   **Purpose:** To apply the files from all active mods to the instance's file cache. This is where file overwrites are handled.
     -   **Interactions:**
-        -   Finds the current instance in `app.profiles`.
-        -   **Modifies `instance.files` and `instance.overwrites`**: It iterates through each `ModInfo` in `instance.mods`. For every file in a mod, it attempts to insert it into `instance.files`. If a file already exists at that path, the original `FileInfo` is moved to the `instance.overwrites` lookup, and the new mod file takes its place.
-        -   **Nuance:** This function does *not* directly touch `app.files`. It prepares the `instance.files` cache. The UI is updated subsequently when `ui_logic::load_files` is called (usually via a `RefreshFiles` message), which then loads this prepared `instance.files` into the active `app.files`.
+        -   **Idempotent Operation:** This function is now idempotent. It rebuilds the instance's file cache from a clean slate each time it's called.
+        -   **Clears and Repopulates `instance.files`**: It starts with a fresh copy of the base game files for the current profile.
+        -   **Clears `instance.overwrites`**.
+        -   Iterates through each **enabled** `ModInfo` in `instance.mods` and applies its files using `apply_mod_files`. This correctly rebuilds the `instance.files` and `instance.overwrites` data.
         -   Dispatches `Message::RefreshFiles`.
 
 ### `ui_logic.rs`

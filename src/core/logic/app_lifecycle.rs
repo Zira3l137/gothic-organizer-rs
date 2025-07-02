@@ -59,35 +59,34 @@ pub fn exit_with_error(app: &mut app::GothicOrganizer, err: error::SharedError) 
     iced::exit()
 }
 
-pub fn try_reload_last_session(app: &mut app::GothicOrganizer) -> Result<(), error::GothicOrganizerError> {
+pub fn try_reload_last_session(app: &mut app::GothicOrganizer) {
     let profiles = profile_management::preload_profiles();
     app.state.profile_choices = combo_box::State::new(profiles.keys().cloned().collect());
     app.profiles = profiles.clone();
 
-    let last_session = load_session!().ok_or_else(|| error::GothicOrganizerError::new("Failed to load last session"))?;
-
-    if let Some(profile_name) = last_session.selected_profile
-        && let Some(profile) = profiles.get(&profile_name)
-    {
-        if let Some(instances) = &profile.instances {
-            app.state.instance_choices = combo_box::State::new(instances.keys().cloned().collect());
-            if let Some(instance_name) = last_session.selected_instance
-                && let Some(instance) = instances.get(&instance_name)
-            {
-                app.instance_selected = Some(instance_name);
-                app.files = instance.files.clone().unwrap_or_default();
+    if let Some(last_session) = load_session!() {
+        if let Some(profile_name) = last_session.selected_profile
+            && let Some(profile) = profiles.get(&profile_name)
+        {
+            if let Some(instances) = &profile.instances {
+                app.state.instance_choices = combo_box::State::new(instances.keys().cloned().collect());
+                if let Some(instance_name) = last_session.selected_instance
+                    && let Some(instance) = instances.get(&instance_name)
+                {
+                    app.instance_selected = Some(instance_name);
+                    app.files = instance.files.clone().unwrap_or_default();
+                }
+            } else {
+                app.files = last_session.cache.unwrap_or_default();
             }
-        } else {
-            app.files = last_session.cache.unwrap_or_default();
+            app.profile_selected = Some(profile_name);
         }
-        app.profile_selected = Some(profile_name);
     }
 
-    let config = load_config!().ok_or_else(|| error::GothicOrganizerError::new("Failed to load config"))?;
-    app.theme = Some(config.theme);
-    app.mod_storage_dir = Some(config.mod_storage_dir);
-
-    Ok(())
+    if let Some(config) = load_config!() {
+        app.theme = Some(config.theme);
+        app.mod_storage_dir = Some(config.mod_storage_dir);
+    }
 }
 
 pub fn init_window(app: &mut app::GothicOrganizer) -> Task<app::Message> {
