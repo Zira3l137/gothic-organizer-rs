@@ -1,5 +1,7 @@
 use thiserror::Error;
 
+use crate::impl_shared_error_from;
+
 #[derive(Error, Debug)]
 pub enum GothicOrganizerError {
     #[error("IO Error: {0}")]
@@ -22,7 +24,10 @@ impl GothicOrganizerError {
 pub struct SharedError(std::sync::Arc<dyn std::error::Error + Send + Sync>);
 
 impl SharedError {
-    pub fn new(error: GothicOrganizerError) -> Self {
+    pub fn new<E>(error: E) -> Self
+    where
+        E: std::error::Error + Send + Sync + 'static,
+    {
         Self(std::sync::Arc::new(error))
     }
 }
@@ -34,3 +39,10 @@ impl std::fmt::Display for SharedError {
 }
 
 impl std::error::Error for SharedError {}
+
+impl_shared_error_from!(
+    GothicOrganizerError,
+    std::io::Error,
+    serde_json::Error,
+    zip::result::ZipError,
+);

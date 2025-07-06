@@ -53,7 +53,10 @@ pub fn add_mod(app: &mut app::GothicOrganizer, mod_source_path: Option<PathBuf>)
         let mod_files = ignore::WalkBuilder::new(mod_path.clone())
             .ignore(false)
             .build()
-            .filter_map(|e| e.ok().map(|e| (e.path().to_path_buf(), file_info(e.path()))))
+            .filter_map(|e| {
+                e.ok()
+                    .map(|e| (e.path().to_path_buf(), file_info(e.path())))
+            })
             .collect::<Lookup<PathBuf, FileInfo>>();
 
         let new_mod_info = ModInfo::default()
@@ -62,9 +65,15 @@ pub fn add_mod(app: &mut app::GothicOrganizer, mod_source_path: Option<PathBuf>)
             .with_path(&mod_path)
             .with_files(mod_files);
 
-        log::info!("Adding \"{mod_name}\" with {} files", new_mod_info.files.len());
+        log::info!(
+            "Adding \"{mod_name}\" with {} files",
+            new_mod_info.files.len()
+        );
         apply_mod_files(instance, &new_mod_info, &profile.path);
-        instance.mods.get_or_insert_with(Vec::new).push(new_mod_info);
+        instance
+            .mods
+            .get_or_insert_with(Vec::new)
+            .push(new_mod_info);
 
         return Task::done(app::Message::RefreshFiles);
     }
@@ -86,7 +95,10 @@ pub fn remove_mod(app: &mut app::GothicOrganizer, mod_name: String) -> Task<app:
             return Task::done(app::Message::ReturnError(error::SharedError::new(e)));
         };
         mods.retain(|info| info.name != mod_name);
-        instance.overwrites.as_mut().and_then(|overwrites| overwrites.remove(&mod_name));
+        instance
+            .overwrites
+            .as_mut()
+            .and_then(|overwrites| overwrites.remove(&mod_name));
 
         return Task::done(app::Message::RefreshFiles);
     }
@@ -130,7 +142,7 @@ fn apply_mod_files(instance: &mut Instance, mod_info: &ModInfo, profile_path: &P
                     .get_or_insert_with(Lookup::new)
                     .access
                     .entry(mod_info.name.clone())
-                    .or_insert_with(Lookup::new)
+                    .or_default()
                     .insert(dst_path, existing_file);
             }
         }
@@ -138,12 +150,17 @@ fn apply_mod_files(instance: &mut Instance, mod_info: &ModInfo, profile_path: &P
 }
 
 fn unapply_mod_files(instance: &mut Instance, mod_info: &ModInfo, profile_path: &Path) {
-    let Some(instance_files) = instance.files.as_mut() else { return };
+    let Some(instance_files) = instance.files.as_mut() else {
+        return;
+    };
     mod_info.files.iter().for_each(|(path, _)| {
         if let Ok(relative_path) = path.strip_prefix(&mod_info.path) {
             let dst_path = profile_path.join(relative_path);
             instance_files.remove(&dst_path);
-            if let Some(mod_overwrites) = instance.overwrites.as_mut().and_then(|o| o.get_mut(&mod_info.name))
+            if let Some(mod_overwrites) = instance
+                .overwrites
+                .as_mut()
+                .and_then(|o| o.get_mut(&mod_info.name))
                 && let Some(original_file) = mod_overwrites.remove(&dst_path)
             {
                 instance_files.insert(dst_path, original_file);
@@ -240,3 +257,4 @@ pub fn move_mod_to_storage(app: &app::GothicOrganizer, mod_path: &Path) -> Resul
 
     Ok(dst_dir)
 }
+
