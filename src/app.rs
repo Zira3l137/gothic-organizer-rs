@@ -80,7 +80,7 @@ impl GothicOrganizer {
             }
 
             Message::InstanceSelected(instance) => {
-                return profile_management::select_instance(self, instance);
+                return profile_management::switch_instance(self, instance);
             }
 
             Message::InstanceInput(input) => {

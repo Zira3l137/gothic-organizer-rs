@@ -137,6 +137,7 @@ fn apply_mod_files(instance: &mut Instance, mod_info: &ModInfo, profile_path: &P
         if let Ok(relative_path) = path.strip_prefix(&mod_info.path) {
             let dst_path = profile_path.join(relative_path);
             if let Some(existing_file) = instance_files.insert(dst_path.clone(), info.clone().with_target_path(&dst_path)) {
+                log::info!("Overwriting \"{}\"", dst_path.display());
                 instance
                     .overwrites
                     .get_or_insert_with(Lookup::new)
@@ -153,6 +154,7 @@ fn unapply_mod_files(instance: &mut Instance, mod_info: &ModInfo, profile_path: 
     let Some(instance_files) = instance.files.as_mut() else {
         return;
     };
+
     mod_info.files.iter().for_each(|(path, _)| {
         if let Ok(relative_path) = path.strip_prefix(&mod_info.path) {
             let dst_path = profile_path.join(relative_path);
@@ -173,27 +175,12 @@ pub fn load_mods(app: &mut app::GothicOrganizer) -> Task<app::Message> {
     if let Some(profile_name) = app.profile_selected.as_ref()
         && let Some(instance_name) = app.instance_selected.as_ref()
         && let Some(profile) = app.profiles.get_mut(profile_name)
+        && let Some(instances) = profile.instances.as_mut()
+        && let Some(instance) = instances.get_mut(instance_name)
     {
-        let base_files = ignore::WalkBuilder::new(&profile.path)
-            .ignore(false)
-            .build()
-            .filter_map(Result::ok)
-            .map(|entry| {
-                (
-                    entry.path().to_path_buf(),
-                    FileInfo::default()
-                        .with_source_path(entry.path())
-                        .with_enabled(true),
-                )
-            })
-            .collect::<Lookup<PathBuf, FileInfo>>();
-
-        if let Some(instances) = profile.instances.as_mut()
-            && let Some(instance) = instances.get_mut(instance_name)
-        {
-            instance.files = Some(base_files);
-            instance.overwrites = None;
-            let mods = instance.mods.clone().unwrap_or_default();
+        instance.overwrites = None;
+        let current_instance_mods = instance.mods.clone();
+        if let Some(mods) = current_instance_mods {
             for mod_info in mods.iter().filter(|m| m.enabled) {
                 apply_mod_files(instance, mod_info, &profile.path);
             }
@@ -257,4 +244,3 @@ pub fn move_mod_to_storage(app: &app::GothicOrganizer, mod_path: &Path) -> Resul
 
     Ok(dst_dir)
 }
-

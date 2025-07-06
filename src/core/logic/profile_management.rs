@@ -101,11 +101,12 @@ pub fn remove_instance_from_profile(app: &mut app::GothicOrganizer, profile_name
     }
 }
 
-pub fn select_instance(app: &mut app::GothicOrganizer, instance_name: &str) -> Task<app::Message> {
+pub fn switch_instance(app: &mut app::GothicOrganizer, instance_name: &str) -> Task<app::Message> {
     update_instance_from_cache(app);
     app.instance_selected = Some(instance_name.to_owned());
+
     log::trace!("Loading files for instance {instance_name}");
-    Task::done(app::Message::LoadMods)
+    Task::done(app::Message::RefreshFiles)
 }
 
 pub fn set_game_dir(app: &mut app::GothicOrganizer, profile_name: Option<String>, path: Option<PathBuf>) -> Task<app::Message> {
