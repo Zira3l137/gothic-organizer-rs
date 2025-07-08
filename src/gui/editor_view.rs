@@ -1,4 +1,3 @@
-use iced::alignment::Horizontal;
 use iced::alignment::Vertical;
 use iced::widget::button;
 use iced::widget::checkbox;
@@ -6,7 +5,6 @@ use iced::widget::column;
 use iced::widget::combo_box;
 use iced::widget::container;
 use iced::widget::horizontal_space;
-use iced::widget::image;
 use iced::widget::row;
 use iced::widget::scrollable;
 use iced::widget::svg;
@@ -43,18 +41,41 @@ pub fn editor_view(app: &crate::app::GothicOrganizer) -> Element<Message> {
         .as_ref()
         .and_then(|s| current_profile.and_then(|p| p.instances.as_ref().and_then(|i| i.get(s))));
 
+    let theme = app.theme();
+    let palette = theme.palette();
+    let palette_ext = theme.extended_palette();
+    let mut container_bg_color = palette_ext.primary.weak.color;
+    container_bg_color.a = 0.3;
+
     //////////////////////////////////////////////////////////////
     /////////////////////////[Top Header]/////////////////////////
-    let logo = image("./resources/icon.ico");
+    let logo = svg_with_color!(
+        "./resources/logo.svg",
+        color_idle = palette_ext.primary.strong.color,
+        color_hovered = palette_ext.primary.strong.color
+    )
+    .height(60)
+    .width(60);
 
     let mut title = text!("{}", app_title_full());
-    title = title.align_y(Vertical::Center);
-    title = title.align_x(Horizontal::Left);
     title = title.size(30);
 
     let button_options_icon: svg::Svg<_> = svg("./resources/options.svg").height(20).width(20);
     let button_options = button(button_options_icon).on_press(Message::InvokeOptionsMenu);
-    let header: Row<_> = row!(logo, title, horizontal_space(), button_options).spacing(10);
+    let header: Row<_> = row!(title, horizontal_space(), button_options)
+        .spacing(10)
+        .padding(10)
+        .align_y(Vertical::Center);
+
+    let top_side = styled_container!(
+        row![logo, header].spacing(10),
+        border_width = 2.0,
+        border_radius = 4.0,
+        background = container_bg_color
+    )
+    .padding(10)
+    .align_y(Vertical::Center)
+    .center_x(Length::Fill);
     //////////////////////////////////////////////////////////////
     /////////////////////////[Top Profile Controls]///////////////
     let choice_profile = combo_box(
@@ -111,7 +132,8 @@ pub fn editor_view(app: &crate::app::GothicOrganizer) -> Element<Message> {
         )
         .spacing(10),
         border_width = 2.0,
-        border_radius = 4.0
+        border_radius = 4.0,
+        background = container_bg_color
     )
     .padding(10)
     .center_x(Length::Fill);
@@ -205,7 +227,8 @@ pub fn editor_view(app: &crate::app::GothicOrganizer) -> Element<Message> {
     let files_menu = styled_container!(
         column!(controls_files, scrollable(column_files)).spacing(10),
         border_width = 2.0,
-        border_radius = 4.0
+        border_radius = 4.0,
+        background = container_bg_color
     )
     .padding(10)
     .align_top(Length::Fill);
@@ -228,7 +251,7 @@ pub fn editor_view(app: &crate::app::GothicOrganizer) -> Element<Message> {
         border_radius = 4.0
     )
     .padding(10)
-    .center_x(Length::Fill);
+    .align_left(Length::Fill);
 
     let mut column_mods: Column<_> = Column::new();
 
@@ -255,7 +278,8 @@ pub fn editor_view(app: &crate::app::GothicOrganizer) -> Element<Message> {
     let mods_menu = styled_container!(
         column!(group_mod_controls, scrollable(column_mods)),
         border_width = 2.0,
-        border_radius = 4.0
+        border_radius = 4.0,
+        background = container_bg_color
     )
     .padding(10)
     .align_y(Vertical::Top)
@@ -266,7 +290,7 @@ pub fn editor_view(app: &crate::app::GothicOrganizer) -> Element<Message> {
 
     let group_editor = container(row!(mods_menu, files_menu).spacing(10)).align_top(Length::Fill);
 
-    column![header, profile_controls, group_editor]
+    column![top_side, profile_controls, group_editor]
         .spacing(10)
         .padding(10)
         .into()
