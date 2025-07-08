@@ -2,10 +2,30 @@ use std::path;
 
 use crate::app;
 use crate::core;
+use crate::core::services::Service;
 
 pub struct UiService<'a> {
     session: &'a mut core::services::session_service::SessionService,
     state: &'a mut app::InnerState,
+}
+
+impl super::Service for UiService<'_> {
+    fn context(&mut self) -> Result<super::context::Context, crate::error::GothicOrganizerError> {
+        let profile = self
+            .session
+            .active_profile
+            .as_mut()
+            .and_then(|p| self.session.profiles.get_mut(&p.clone()))
+            .ok_or_else(|| crate::error::GothicOrganizerError::Other("No active profile".into()))?;
+
+        let instance_name = self
+            .session
+            .active_instance
+            .as_ref()
+            .ok_or_else(|| crate::error::GothicOrganizerError::Other("No active instance".into()))?;
+
+        Ok(super::context::Context::new(profile, instance_name))
+    }
 }
 
 impl<'a> UiService<'a> {
@@ -13,55 +33,38 @@ impl<'a> UiService<'a> {
         Self { session, state }
     }
 
-    pub fn load_files(&mut self, root: Option<path::PathBuf>) {
-        if let Some(profile_name) = self.session.active_profile.as_ref()
-            && let Some(profile) = self.session.profiles.get_mut(profile_name)
-        {
-            let root_dir = root.unwrap_or_else(|| profile.path.clone());
-            self.state.current_directory = root_dir.clone();
+    pub fn reload_displayed_directory(&mut self, root: Option<path::PathBuf>) {
+        let Ok(context) = self.context() else {
+            return;
+        };
 
-            let get_current_dir_entries = |app_files: &core::lookup::Lookup<path::PathBuf, core::profile::FileInfo>| {
-                app_files
-                    .iter()
-                    .filter(|(path, _)| path.parent() == Some(&root_dir))
-                    .map(|(path, info)| (path.clone(), info.clone()))
-                    .collect::<Vec<(path::PathBuf, core::profile::FileInfo)>>()
-            };
+        let profile_path = context.active_profile.path.clone();
+        let instance_files = context.instance_files().cloned();
 
-            let mut current_directory_entries: Vec<(path::PathBuf, core::profile::FileInfo)>;
+        let root_dir = root.unwrap_or_else(|| profile_path.clone());
 
-            if let Some(instance_name) = &self.session.active_instance
-                && let Some(instances) = &profile.instances
-                && let Some(instance) = instances.get(instance_name)
-                && let Some(instance_files) = &instance.files
-            {
-                log::trace!("Fetching files from current instance");
-                self.session.files.clear();
-                self.session.files.extend(instance_files.clone());
-                current_directory_entries = get_current_dir_entries(&self.session.files);
-            } else {
-                log::warn!("No instance selected, displaying only base files for current directory");
-                self.session.files.clear();
-                self.session.files.extend(
-                    ignore::WalkBuilder::new(&profile.path)
-                        .ignore(false)
-                        .build()
-                        .filter_map(Result::ok)
-                        .map(|entry| {
-                            (
-                                entry.path().to_path_buf(),
-                                core::profile::FileInfo::default()
-                                    .with_source_path(entry.path())
-                                    .with_enabled(true),
-                            )
-                        }),
-                );
-                current_directory_entries = get_current_dir_entries(&self.session.files);
-            }
+        let get_current_dir_entries = |app_files: &core::lookup::Lookup<path::PathBuf, core::profile::FileInfo>| {
+            app_files
+                .iter()
+                .filter(|(path, _)| path.parent() == Some(&root_dir))
+                .map(|(path, info)| (path.clone(), info.clone()))
+                .collect::<Vec<(path::PathBuf, core::profile::FileInfo)>>()
+        };
 
-            current_directory_entries.sort_unstable_by_key(|(path, _)| !path.is_dir());
-            self.state.current_directory_entries = current_directory_entries;
+        let mut current_directory_entries: Vec<(path::PathBuf, core::profile::FileInfo)>;
+
+        if let Some(instance_files) = instance_files {
+            self.session.files.clear();
+            self.session.files.extend(instance_files);
+        } else {
+            log::warn!("No instance selected, displaying only base files for current directory");
         }
+
+        current_directory_entries = get_current_dir_entries(&self.session.files);
+        current_directory_entries.sort_unstable_by_key(|(path, _)| !path.is_dir());
+
+        self.state.current_directory = root_dir.clone();
+        self.state.current_directory_entries = current_directory_entries;
     }
 
     pub fn toggle_state_recursive(&mut self, path: Option<&path::Path>) {

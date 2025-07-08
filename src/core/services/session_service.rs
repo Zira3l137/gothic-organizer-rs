@@ -12,8 +12,11 @@ use crate::save_config;
 use crate::save_profile;
 use crate::save_session;
 
+#[derive(Debug, Default)]
 pub struct SessionService {
     pub profiles: core::lookup::Lookup<String, core::profile::Profile>,
+    pub profile_names: Option<Vec<String>>,
+    pub instance_names: Option<Vec<String>>,
     pub active_profile: Option<String>,
     pub active_instance: Option<String>,
     pub mod_storage_dir: Option<path::PathBuf>,
@@ -26,6 +29,8 @@ impl SessionService {
     pub fn new() -> Self {
         let mut service = Self {
             profiles: core::lookup::Lookup::new(),
+            profile_names: None,
+            instance_names: None,
             active_profile: None,
             active_instance: None,
             mod_storage_dir: None,
@@ -40,12 +45,14 @@ impl SessionService {
     pub fn try_reload_last_session(&mut self) {
         let profiles = Self::preload_profiles();
         self.profiles = profiles.clone();
+        self.profile_names = Some(profiles.keys().cloned().collect());
 
         if let Some(last_session) = load_session!() {
             if let Some(profile_name) = last_session.selected_profile
                 && let Some(profile) = profiles.get(&profile_name)
             {
                 if let Some(instances) = &profile.instances {
+                    self.instance_names = Some(instances.keys().cloned().collect());
                     if let Some(instance_name) = last_session.selected_instance
                         && let Some(instance) = instances.get(&instance_name)
                     {

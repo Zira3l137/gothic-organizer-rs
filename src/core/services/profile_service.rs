@@ -4,11 +4,33 @@ use iced::Task;
 
 use crate::app;
 use crate::core;
+use crate::core::lookup;
+use crate::core::profile;
+use crate::core::services::Service;
 use crate::error;
 
 pub struct ProfileService<'a> {
     session: &'a mut core::services::session_service::SessionService,
     app_state: &'a mut app::InnerState,
+}
+
+impl super::Service for ProfileService<'_> {
+    fn context(&mut self) -> Result<super::context::Context, crate::error::GothicOrganizerError> {
+        let profile = self
+            .session
+            .active_profile
+            .as_mut()
+            .and_then(|p| self.session.profiles.get_mut(&p.clone()))
+            .ok_or_else(|| crate::error::GothicOrganizerError::Other("No active profile".into()))?;
+
+        let instance_name = self
+            .session
+            .active_instance
+            .as_ref()
+            .ok_or_else(|| crate::error::GothicOrganizerError::Other("No active instance".into()))?;
+
+        Ok(super::context::Context::new(profile, instance_name))
+    }
 }
 
 impl<'a> ProfileService<'a> {
@@ -17,10 +39,11 @@ impl<'a> ProfileService<'a> {
     }
 
     pub fn switch_profile(&mut self, profile_name: &str) -> Task<app::Message> {
-        self.update_instance_from_cache();
+        if let Err(err) = self.update_instance_from_cache() {
+            log::error!("Failed to update instance from cache: {err}");
+        }
 
         if let Some(next_profile) = self.session.profiles.get(profile_name) {
-            log::trace!("Loading profile {profile_name}");
             self.session.active_profile = Some(profile_name.to_owned());
             self.session.active_instance = None;
 
@@ -29,6 +52,7 @@ impl<'a> ProfileService<'a> {
                 .as_ref()
                 .map(|i| i.keys().cloned().collect())
                 .unwrap_or_default();
+
             self.app_state.instance_choices = iced::widget::combo_box::State::new(instances);
 
             if !next_profile.path.as_os_str().is_empty() {
@@ -39,18 +63,16 @@ impl<'a> ProfileService<'a> {
         Task::none()
     }
 
-    pub fn update_instance_from_cache(&mut self) {
-        if let Some(profile_name) = self.session.active_profile.clone()
-            && let Some(profile) = self.session.profiles.get_mut(&profile_name)
-            && let Some(instance_name) = self.session.active_instance.clone()
-            && let Some(instances) = profile.instances.as_mut()
-            && let Some(instance) = instances.get_mut(&instance_name)
-        {
-            self.session
-                .files
-                .extend(self.app_state.current_directory_entries.iter().cloned());
-            instance.files = Some(self.session.files.clone());
-        }
+    pub fn update_instance_from_cache(&mut self) -> Result<(), error::GothicOrganizerError> {
+        self.session
+            .files
+            .extend(self.app_state.current_directory_entries.iter().cloned());
+
+        let cached_files = self.session.files.clone();
+        let mut context = self.context()?;
+
+        context.instance_mut(None).files = Some(cached_files);
+        Ok(())
     }
 
     pub fn add_instance_for_profile(&mut self, profile_name: &str) -> Task<app::Message> {
@@ -60,7 +82,23 @@ impl<'a> ProfileService<'a> {
                 return Task::none();
             }
 
-            let new_instance = core::profile::Instance::default().with_name(&instance_name);
+            let base_files = ignore::WalkBuilder::new(&profile.path)
+                .ignore(false)
+                .build()
+                .filter_map(Result::ok)
+                .map(|entry| {
+                    (
+                        entry.path().to_path_buf(),
+                        profile::FileInfo::default()
+                            .with_source_path(entry.path())
+                            .with_enabled(true),
+                    )
+                })
+                .collect::<lookup::Lookup<path::PathBuf, profile::FileInfo>>();
+
+            let new_instance = core::profile::Instance::default()
+                .with_name(&instance_name)
+                .with_files(Some(base_files));
 
             let instances = profile.instances.get_or_insert_with(Default::default);
             if instances.contains_key(&instance_name) {
@@ -71,8 +109,7 @@ impl<'a> ProfileService<'a> {
             self.app_state.instance_choices = iced::widget::combo_box::State::new(instances.keys().cloned().collect());
             self.app_state.instance_input = String::new();
 
-            // Automatically select the new instance
-            return self.select_instance(&instance_name);
+            return self.switch_instance(&instance_name);
         }
 
         Task::none()
@@ -93,10 +130,12 @@ impl<'a> ProfileService<'a> {
         }
     }
 
-    pub fn select_instance(&mut self, instance_name: &str) -> Task<app::Message> {
+    pub fn switch_instance(&mut self, instance_name: &str) -> Task<app::Message> {
+        if let Err(err) = self.update_instance_from_cache() {
+            log::error!("Failed to update instance from cache: {err}");
+        }
         self.session.active_instance = Some(instance_name.to_owned());
-        log::trace!("Loading files for instance {instance_name}");
-        Task::done(app::Message::ModsLoadingRequested)
+        Task::done(app::Message::CurrentDirectoryUpdated)
     }
 
     pub fn set_game_dir(&mut self, profile_name: Option<String>, path: Option<path::PathBuf>) -> Task<app::Message> {
@@ -144,10 +183,6 @@ impl<'a> ProfileService<'a> {
             && path.is_dir()
             && self.session.profiles.get(&profile_name).is_some()
         {
-            log::trace!(
-                "Setting {profile_name} mods directory to {}",
-                path.display()
-            );
             self.session.mod_storage_dir = Some(path.clone());
 
             if let Err(err) = std::fs::create_dir_all(&path) {

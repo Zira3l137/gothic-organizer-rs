@@ -1,40 +1,32 @@
 use std::path::PathBuf;
 
-use iced::widget::combo_box::State;
-use iced::Element;
-use iced::Task;
+use iced::widget::combo_box;
 
-use crate::core::logic::app_lifecycle;
-use crate::core::logic::mod_management;
-use crate::core::logic::profile_management;
-use crate::core::logic::ui_logic;
-use crate::core::lookup::Lookup;
+use crate::core::lookup;
 use crate::core::profile;
+use crate::core::services::mod_service;
+use crate::core::services::profile_service;
+use crate::core::services::session_service;
+use crate::core::services::ui_service;
 use crate::error;
 
 #[derive(Debug, Default)]
 pub struct GothicOrganizer {
-    pub profile_selected: Option<String>,
-    pub instance_selected: Option<String>,
-    pub profiles: Lookup<String, profile::Profile>,
-    pub files: Lookup<PathBuf, profile::FileInfo>,
-    pub theme: Option<String>,
+    pub session: session_service::SessionService,
     pub state: InnerState,
-    pub mod_storage_dir: Option<PathBuf>,
-    pub windows: Lookup<Option<iced::window::Id>, WindowState>,
 }
 
 #[derive(Debug, Default)]
 pub struct InnerState {
-    pub instance_input: Option<String>,
+    pub current_directory: PathBuf,
+    pub instance_input: String,
     pub profile_directory_input: String,
     pub mods_directory_input: String,
-    pub profile_choices: State<String>,
-    pub themes: Lookup<String, iced::Theme>,
-    pub theme_choices: State<String>,
-    pub instance_choices: State<String>,
+    pub profile_choices: combo_box::State<String>,
+    pub theme_choices: combo_box::State<String>,
+    pub instance_choices: combo_box::State<String>,
+    pub themes: lookup::Lookup<String, iced::Theme>,
     pub current_directory_entries: Vec<(PathBuf, profile::FileInfo)>,
-    pub current_directory: PathBuf,
 }
 
 #[derive(Debug, Default)]
@@ -47,13 +39,16 @@ impl GothicOrganizer {
     pub const WINDOW_TITLE: &str = "Gothic Organizer";
     pub const WINDOW_SIZE: (f32, f32) = (768.0, 768.0);
 
-    pub fn new() -> (Self, Task<Message>) {
-        let mut app = Self::default();
+    pub fn new() -> (Self, iced::Task<Message>) {
+        let mut app = Self {
+            session: session_service::SessionService::new(),
+            ..Default::default()
+        };
 
-        app_lifecycle::try_reload_last_session(&mut app);
-
-        app.state.themes = app_lifecycle::load_default_themes();
-        app.state.theme_choices = State::new(
+        app.state.profile_choices = combo_box::State::new(app.session.profile_names.clone().unwrap_or_default());
+        app.state.instance_choices = combo_box::State::new(app.session.instance_names.clone().unwrap_or_default());
+        app.state.themes = session_service::SessionService::load_default_themes();
+        app.state.theme_choices = combo_box::State::new(
             app.state
                 .themes
                 .iter()
@@ -61,50 +56,56 @@ impl GothicOrganizer {
                 .collect(),
         );
 
-        (app, Task::done(Message::InitWindow))
+        (app, iced::Task::done(Message::InitWindow))
     }
 
-    pub fn update(&mut self, message: Message) -> Task<Message> {
+    pub fn update(&mut self, message: Message) -> iced::Task<Message> {
         match &message {
             Message::InitWindow => {
-                return app_lifecycle::init_window(self);
+                return self.session.init_window();
             }
 
             Message::ThemeSwitch(theme) => {
-                log::debug!("Switching theme to {theme}");
-                self.theme = Some(theme.clone());
+                self.session.theme_selected = Some(theme.clone());
             }
 
             Message::ProfileSelected(profile_name) => {
-                return profile_management::switch_profile(self, profile_name);
+                let mut service = profile_service::ProfileService::new(&mut self.session, &mut self.state);
+                return service.switch_profile(profile_name);
             }
 
             Message::InstanceSelected(instance) => {
-                return profile_management::switch_instance(self, instance);
+                let mut service = profile_service::ProfileService::new(&mut self.session, &mut self.state);
+                return service.switch_instance(instance);
             }
 
             Message::InstanceInput(input) => {
-                self.state.instance_input = Some(input.clone());
+                self.state.instance_input = input.clone();
             }
 
             Message::InstanceAdd(profile_name) => {
-                return profile_management::add_instance_for_profile(self, profile_name);
+                let mut service = profile_service::ProfileService::new(&mut self.session, &mut self.state);
+                return service.add_instance_for_profile(profile_name);
             }
 
             Message::InstanceRemove(profile_name) => {
-                profile_management::remove_instance_from_profile(self, profile_name);
+                let mut service = profile_service::ProfileService::new(&mut self.session, &mut self.state);
+                service.remove_instance_from_profile(profile_name);
             }
 
             Message::FileToggle(path) => {
-                ui_logic::toggle_state_recursive(self, Some(path));
+                let mut service = ui_service::UiService::new(&mut self.session, &mut self.state);
+                service.toggle_state_recursive(Some(path));
             }
 
             Message::FileToggleAll => {
-                ui_logic::toggle_state_recursive(self, None);
+                let mut service = ui_service::UiService::new(&mut self.session, &mut self.state);
+                service.toggle_state_recursive(None);
             }
 
             Message::SetGameDir(profile_name, path) => {
-                return profile_management::set_game_dir(self, profile_name.clone(), path.clone());
+                let mut service = profile_service::ProfileService::new(&mut self.session, &mut self.state);
+                return service.set_game_dir(profile_name.clone(), path.clone());
             }
 
             Message::ProfileDirInput(input) => {
@@ -112,30 +113,37 @@ impl GothicOrganizer {
             }
 
             Message::TraverseIntoDir(path) => {
-                profile_management::update_instance_from_cache(self);
+                self.fetch_ui_changes();
                 self.state.current_directory = path.clone();
-                ui_logic::load_files(self, Some(path.clone()))
+                let mut ui_service = ui_service::UiService::new(&mut self.session, &mut self.state);
+                ui_service.reload_displayed_directory(Some(path.clone()))
             }
 
-            Message::RefreshFiles => {
-                ui_logic::load_files(self, None);
+            Message::CurrentDirectoryUpdated => {
+                let mut service = ui_service::UiService::new(&mut self.session, &mut self.state);
+                service.reload_displayed_directory(None);
             }
 
-            Message::LoadMods => {
-                return mod_management::load_mods(self);
+            Message::LoadModsRequested => {
+                let mut service = mod_service::ModService::new(&mut self.session);
+                return service.reload_mods();
             }
 
             Message::ModToggle(name, new_state) => {
-                mod_management::toggle_mod(self, name.clone(), *new_state);
-                return Task::done(Message::RefreshFiles);
+                self.fetch_ui_changes();
+                let mut service = mod_service::ModService::new(&mut self.session);
+                service.toggle_mod(name.clone(), *new_state);
+                return iced::Task::done(Message::CurrentDirectoryUpdated);
             }
 
             Message::ModUninstall(name) => {
-                return mod_management::remove_mod(self, name.clone());
+                let mut service = mod_service::ModService::new(&mut self.session);
+                return service.remove_mod(name.clone());
             }
 
             Message::ModAdd(path) => {
-                return mod_management::add_mod(self, path.clone());
+                let mut service = mod_service::ModService::new(&mut self.session);
+                return service.add_mod(path.clone());
             }
 
             Message::ModsDirInput(input) => {
@@ -143,23 +151,25 @@ impl GothicOrganizer {
             }
 
             Message::SetModsDir(profile_name, path) => {
-                return profile_management::set_mods_dir(self, profile_name.clone(), path.clone());
+                let mut service = profile_service::ProfileService::new(&mut self.session, &mut self.state);
+                return service.set_mods_dir(profile_name.clone(), path.clone());
             }
 
             Message::InvokeOptionsMenu => {
-                return app_lifecycle::invoke_options_window(self);
+                return self.session.invoke_options_window();
             }
 
-            Message::ReturnError(err) => {
-                return app_lifecycle::exit_with_error(self, err.clone());
+            Message::ErrorReturned(err) => {
+                return self.session.exit_with_error(err.clone());
             }
 
             Message::Exit(wnd_id) => {
-                return app_lifecycle::exit(self, wnd_id);
+                self.fetch_ui_changes();
+                return self.session.exit(wnd_id);
             }
         }
 
-        Task::none()
+        iced::Task::none()
     }
 
     pub fn subscription(&self) -> iced::Subscription<Message> {
@@ -171,7 +181,7 @@ impl GothicOrganizer {
     }
 
     pub fn theme(&self) -> iced::Theme {
-        match &self.theme {
+        match &self.session.theme_selected {
             Some(theme) => self.state.themes.get(theme).cloned().unwrap_or_else(|| {
                 log::warn!("Theme {theme} not found, defaulting to dark");
                 iced::Theme::Dark
@@ -180,8 +190,13 @@ impl GothicOrganizer {
         }
     }
 
-    pub fn view(&self, id: iced::window::Id) -> Element<Message> {
-        if let Some((_, wnd_state)) = self.windows.iter().find(|(wnd_id, _)| **wnd_id == Some(id)) {
+    pub fn view(&self, id: iced::window::Id) -> iced::Element<Message> {
+        if let Some((_, wnd_state)) = self
+            .session
+            .windows
+            .iter()
+            .find(|(wnd_id, _)| **wnd_id == Some(id))
+        {
             if wnd_state.name == "options" {
                 crate::gui::options_view::options_view(self)
             } else {
@@ -189,6 +204,14 @@ impl GothicOrganizer {
             }
         } else {
             iced::widget::container(iced::widget::text("no window")).into()
+        }
+    }
+
+    fn fetch_ui_changes(&mut self) {
+        let mut profile_service = profile_service::ProfileService::new(&mut self.session, &mut self.state);
+
+        if let Err(err) = profile_service.update_instance_from_cache() {
+            log::error!("Error updating instance cache: {err}");
         }
     }
 }
@@ -211,10 +234,10 @@ pub enum Message {
     ModToggle(String, bool),
     ModUninstall(String),
     ModAdd(Option<PathBuf>),
-    ReturnError(error::SharedError),
+    ErrorReturned(error::SharedError),
     InitWindow,
     InvokeOptionsMenu,
     FileToggleAll,
-    RefreshFiles,
-    LoadMods,
+    CurrentDirectoryUpdated,
+    LoadModsRequested,
 }

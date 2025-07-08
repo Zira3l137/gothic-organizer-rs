@@ -26,17 +26,20 @@ use crate::svg_with_color;
 pub fn editor_view(app: &crate::app::GothicOrganizer) -> Element<Message> {
     /////////////////////////[States]/////////////////////////////
     let current_profile = app
-        .profile_selected
+        .session
+        .active_profile
         .as_ref()
-        .and_then(|s| app.profiles.get(s));
+        .and_then(|s| app.session.profiles.get(s));
 
     let instance_selected = app
-        .instance_selected
+        .session
+        .active_instance
         .as_ref()
         .and_then(|s| current_profile.and_then(|p| p.instances.as_ref().and_then(|i| i.get(s))));
 
     let current_instance = app
-        .instance_selected
+        .session
+        .active_instance
         .as_ref()
         .and_then(|s| current_profile.and_then(|p| p.instances.as_ref().and_then(|i| i.get(s))));
 
@@ -57,20 +60,20 @@ pub fn editor_view(app: &crate::app::GothicOrganizer) -> Element<Message> {
     let choice_profile = combo_box(
         &app.state.profile_choices,
         "Profile",
-        app.profile_selected.as_ref(),
+        app.session.active_profile.as_ref(),
         Message::ProfileSelected,
     );
 
     let choice_instance = combo_box(
         &app.state.instance_choices,
         "Instance",
-        app.instance_selected.as_ref(),
+        app.session.active_instance.as_ref(),
         Message::InstanceSelected,
     )
     .on_input(Message::InstanceInput);
 
-    let button_add: button::Button<Message> = button("Add").on_press_maybe(app.profile_selected.as_ref().and_then(|s| {
-        let profile = app.profiles.get(s)?;
+    let button_add: button::Button<Message> = button("Add").on_press_maybe(app.session.active_profile.as_ref().and_then(|s| {
+        let profile = app.session.profiles.get(s)?;
         if profile.path.display().to_string() != "" {
             Some(Message::InstanceAdd(s.clone()))
         } else {
@@ -78,8 +81,8 @@ pub fn editor_view(app: &crate::app::GothicOrganizer) -> Element<Message> {
         }
     }));
 
-    let button_remove = button("Remove").on_press_maybe(app.profile_selected.as_ref().and_then(|s| {
-        let profile = app.profiles.get(s)?;
+    let button_remove = button("Remove").on_press_maybe(app.session.active_profile.as_ref().and_then(|s| {
+        let profile = app.session.profiles.get(s)?;
         if profile.path.display().to_string() != "" {
             Some(Message::InstanceRemove(s.clone()))
         } else {

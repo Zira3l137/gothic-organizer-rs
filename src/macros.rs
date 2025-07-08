@@ -44,6 +44,7 @@ macro_rules! styled_container {
     (@some_opt $val:expr; $ty:ty) => {
         Some($val)
     };
+
     (@some_opt ; $ty:ty) => {
         None::<$ty>
     };

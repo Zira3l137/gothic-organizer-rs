@@ -28,7 +28,7 @@ The `core` directory contains the heart of the application's logic and is struct
 
 - `constants.rs`: Defines application-wide constants, such as the application name, version, and paths to data directories.
 - `helpers.rs`: Provides helper functions for loading and saving configuration, session data, and profiles. It also includes helpers for creating styled UI components.
-- `logic`: Contains the business logic of the application, separated into modules for different concerns.
+- `services`: Contains the business logic of the application, separated into service modules for different concerns.
 - `lookup.rs`: Implements a custom `Lookup` data structure, which is a wrapper around `hashbrown::HashMap` with a more convenient API for the application's needs.
 - `profile.rs`: Defines the data structures for profiles, instances, mods, and file information.
 - `utils.rs`: Contains utility functions for file system operations, such as copying files recursively and extracting zip archives.
@@ -43,12 +43,13 @@ The `gui` directory contains the UI components of the application:
 
 ## Logic and Data Handling
 
-The application's logic is primarily handled within the `core::logic` module, which is divided into the following sub-modules:
+The application's logic is handled by a set of services within the `core::services` module. This service-oriented architecture separates concerns and manages the application's state.
 
-- `app_lifecycle.rs`: Manages the application's lifecycle, including initialization, session loading/saving, and exiting.
-- `mod_management.rs`: Handles the logic for adding, removing, and loading mods.
-- `profile_management.rs`: Manages game profiles and instances, including creating, deleting, and switching between them.
-- `ui_logic.rs`: Contains logic related to the user interface, such as loading and displaying files and directories.
+-   **`SessionService`**: The central state manager. It holds all profiles, the active profile/instance selection, and the main file cache. It's responsible for loading and saving the user's session.
+-   **`ProfileService`**: Manages profiles and instances. It handles logic for creating, switching, and modifying them.
+-   **`ModService`**: Manages mods for the selected instance, including adding, removing, enabling/disabling, and handling file overwrites.
+-   **`UiService`**: Prepares data for the UI. It populates the file list view based on the current context (profile/instance).
+-   **`Context`**: A temporary object that provides controlled, mutable access to the currently active profile and instance within the `SessionService`'s state. Services use it to ensure they are operating on the correct data.
 
 ### Data Model
 
@@ -61,23 +62,10 @@ The main data structures are defined in `core/profile.rs`:
 - `ModInfo`: Contains information about a mod, including its name, path, and a list of its files.
 - `FileInfo`: Represents a single file, containing its source and target paths, and whether it is enabled or not.
 
-### Displaying Directory Entries and Mods
-
-The application displays directory entries and mods in the `editor_view`. The logic for this is handled in `core::logic::ui_logic.rs` and `gui::editor_view.rs`.
-
-When a user selects a profile and an instance, the `load_files` function in `ui_logic.rs` is called. This function populates the `current_directory_entries` field in the application's state with the files and directories of the currently selected instance.
-
-The `editor_view` then iterates over `current_directory_entries` and creates a UI element for each entry. Directories are displayed with a folder icon and are clickable, allowing the user to navigate the file system. Files are displayed with a file icon.
-
-Mods are displayed in a separate list in the `editor_view`. The `mod_management.rs` module handles the logic for adding, removing, and loading mods. When a mod is added, its files are extracted to a dedicated storage directory, and a `ModInfo` struct is created to track the mod's information.
-
-The `FileInfo` for each file contains a `parent_name` field, which indicates which mod the file belongs to. This information is displayed in a tooltip when the user hovers over a file in the `editor_view`. This allows users to easily see which files are part of the base game and which are from mods.
-
+The application uses a custom `Lookup<K, V>` data structure, which is a wrapper around `hashbrown::HashMap` using the `ahash` algorithm for performance.
 
 ### File Overwrites
 
-When a mod is loaded, its files may overwrite existing files from the base game or other mods. The application handles this by storing the overwritten files in the `overwrites` field of the `Instance` struct. This allows the application to restore the original files when a mod is disabled or removed.
+When a mod is loaded, its files may overwrite existing files from the base game or other mods. The application handles this by storing the overwritten files in the `overwrites` field of the `Instance` struct. This field is a `Lookup<String, Lookup<PathBuf, FileInfo>>`, which maps a mod's name to a lookup of the files it has overwritten. This allows the application to restore the original files when a mod is disabled or removed.
 
-The `apply_mod_files` function in `mod_management.rs` is responsible for handling file overwrites. When a mod is loaded, it iterates over the mod's files and checks if a file with the same path already exists in the instance's file cache. If it does, the existing `FileInfo` is moved to the `overwrites` map, and the new `FileInfo` from the mod is inserted into the cache.
-
-When a mod is disabled or removed, the `unapply_mod_files` function is called. This function iterates over the mod's files and removes them from the instance's file cache. It then checks the `overwrites` map for any files that were overwritten by the mod and restores them to the cache.
+The `apply_mod_files` and `unapply_mod_files` functions in `ModService` are responsible for managing this process.

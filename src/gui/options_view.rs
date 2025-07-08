@@ -16,7 +16,7 @@ pub fn options_view(app: &crate::app::GothicOrganizer) -> Element<Message> {
     let choice_theme = combo_box(
         &app.state.theme_choices,
         "Application theme",
-        app.theme.as_ref(),
+        app.session.theme_selected.as_ref(),
         Message::ThemeSwitch,
     );
 
@@ -24,7 +24,7 @@ pub fn options_view(app: &crate::app::GothicOrganizer) -> Element<Message> {
 
     let label_profile_dir = text("Game directory:");
     let input_profile_dir: Element<Message> = text_input("Game directory", app.state.profile_directory_input.as_ref())
-        .on_input_maybe(if app.profile_selected.is_some() {
+        .on_input_maybe(if app.session.active_profile.is_some() {
             Some(Message::ProfileDirInput)
         } else {
             None
@@ -35,7 +35,7 @@ pub fn options_view(app: &crate::app::GothicOrganizer) -> Element<Message> {
         ))
         .into();
 
-    let button_browse_profile_dir = button("...").on_press_maybe(if app.profile_selected.is_some() {
+    let button_browse_profile_dir = button("...").on_press_maybe(if app.session.active_profile.is_some() {
         Some(Message::SetGameDir(None, None))
     } else {
         None
@@ -51,7 +51,7 @@ pub fn options_view(app: &crate::app::GothicOrganizer) -> Element<Message> {
 
     let label_mods_dir = text("Mods directory:");
     let input_mods_dir: Element<Message> = text_input("Mods directory", app.state.mods_directory_input.as_ref())
-        .on_input_maybe(if app.profile_selected.is_some() {
+        .on_input_maybe(if app.session.active_profile.is_some() {
             Some(Message::ModsDirInput)
         } else {
             None
@@ -62,7 +62,7 @@ pub fn options_view(app: &crate::app::GothicOrganizer) -> Element<Message> {
         ))
         .into();
 
-    let button_browse_mods_dir = button("...").on_press_maybe(if app.profile_selected.is_some() {
+    let button_browse_mods_dir = button("...").on_press_maybe(if app.session.active_profile.is_some() {
         Some(Message::SetModsDir(None, None))
     } else {
         None
