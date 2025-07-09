@@ -29,14 +29,13 @@ pub fn options_view(app: &crate::app::GothicOrganizer) -> Element<Message> {
         } else {
             None
         })
-        .on_submit(Message::SetGameDir(
-            None,
-            Some(app.state.profile_directory_input.clone().into()),
-        ))
+        .on_submit(Message::SetGameDir(Some(
+            app.state.profile_directory_input.clone().into(),
+        )))
         .into();
 
     let button_browse_profile_dir = button("...").on_press_maybe(if app.session.active_profile.is_some() {
-        Some(Message::SetGameDir(None, None))
+        Some(Message::SetGameDir(None))
     } else {
         None
     });
@@ -56,14 +55,13 @@ pub fn options_view(app: &crate::app::GothicOrganizer) -> Element<Message> {
         } else {
             None
         })
-        .on_submit(Message::SetModsDir(
-            None,
-            Some(app.state.mods_directory_input.clone().into()),
-        ))
+        .on_submit(Message::SetModsDir(Some(
+            app.state.mods_directory_input.clone().into(),
+        )))
         .into();
 
     let button_browse_mods_dir = button("...").on_press_maybe(if app.session.active_profile.is_some() {
-        Some(Message::SetModsDir(None, None))
+        Some(Message::SetModsDir(None))
     } else {
         None
     });

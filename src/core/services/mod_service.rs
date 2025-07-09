@@ -11,24 +11,7 @@ pub struct ModService<'a> {
     session: &'a mut core::services::session_service::SessionService,
 }
 
-impl super::Service for ModService<'_> {
-    fn context(&mut self) -> Result<super::context::Context, crate::error::GothicOrganizerError> {
-        let profile = self
-            .session
-            .active_profile
-            .as_mut()
-            .and_then(|p| self.session.profiles.get_mut(&p.clone()))
-            .ok_or_else(|| crate::error::GothicOrganizerError::Other("No active profile".into()))?;
-
-        let instance_name = self
-            .session
-            .active_instance
-            .as_ref()
-            .ok_or_else(|| crate::error::GothicOrganizerError::Other("No active instance".into()))?;
-
-        Ok(super::context::Context::new(profile, instance_name))
-    }
-}
+crate::impl_service!(ModService);
 
 impl<'a> ModService<'a> {
     pub fn new(session: &'a mut core::services::session_service::SessionService) -> Self {
@@ -87,12 +70,17 @@ impl<'a> ModService<'a> {
                 .with_path(&mod_path)
                 .with_files(mod_files);
 
-            Self::apply_mod_files(context.instance_mut(None), &new_mod_info, &profile_path);
-            context
-                .instance_mut(None)
-                .mods
-                .get_or_insert_default()
-                .push(new_mod_info.clone());
+            if let Some(instance) = context.instance_mut(None) {
+                Self::apply_mod_files(instance, &new_mod_info, &profile_path);
+                instance
+                    .mods
+                    .get_or_insert_default()
+                    .push(new_mod_info.clone());
+            } else {
+                return Task::done(app::Message::ErrorReturned(error::SharedError::new(
+                    error::GothicOrganizerError::Other("No active instance".to_owned()),
+                )));
+            }
 
             return Task::done(app::Message::CurrentDirectoryUpdated);
         }
@@ -117,11 +105,9 @@ impl<'a> ModService<'a> {
 
             mods.retain(|info| info.name != mod_name);
 
-            context
-                .instance_mut(None)
-                .overwrites
-                .as_mut()
-                .and_then(|overwrites| overwrites.remove(&mod_name));
+            if let Some(overwrites) = context.instance_overwrites_mut() {
+                overwrites.remove(&mod_name);
+            }
 
             return Task::done(app::Message::CurrentDirectoryUpdated);
         }
@@ -133,8 +119,12 @@ impl<'a> ModService<'a> {
             return;
         };
         let profile_path = context.active_profile.path.clone();
-
         let mods = context.instance_mods().cloned();
+        let Some(instance) = context.instance_mut(None) else {
+            log::error!("No active instance");
+            return;
+        };
+
         if let Some(mut mods) = mods
             && let Some(mod_info) = mods.iter_mut().find(|info| info.name == mod_name)
         {
@@ -144,14 +134,14 @@ impl<'a> ModService<'a> {
 
             if enabled {
                 log::info!("Enabling \"{mod_name}\"");
-                Self::apply_mod_files(context.instance_mut(None), mod_info, &profile_path);
+                Self::apply_mod_files(instance, mod_info, &profile_path);
             } else {
                 log::info!("Disabling \"{mod_name}\"");
-                Self::unapply_mod_files(context.instance_mut(None), mod_info, &profile_path);
+                Self::unapply_mod_files(instance, mod_info, &profile_path);
             }
 
             mod_info.enabled = enabled;
-            context.instance_mut(None).mods = Some(mods);
+            context.set_instance_mods(mods);
         }
     }
 
@@ -202,9 +192,11 @@ impl<'a> ModService<'a> {
         let current_instance_mods = context.instance_mods().cloned();
 
         if let Some(mods) = current_instance_mods {
-            context.instance_mut(None).overwrites = None;
+            context.clear_instance_overwrites();
             for mod_info in mods.iter().filter(|m| m.enabled) {
-                Self::apply_mod_files(context.instance_mut(None), mod_info, &profile_path);
+                if let Some(instance) = context.instance_mut(None) {
+                    Self::apply_mod_files(instance, mod_info, &profile_path);
+                }
             }
         }
 

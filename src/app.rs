@@ -88,9 +88,9 @@ impl GothicOrganizer {
                 return service.add_instance_for_profile(profile_name);
             }
 
-            Message::InstanceRemove(profile_name) => {
+            Message::InstanceRemove() => {
                 let mut service = profile_service::ProfileService::new(&mut self.session, &mut self.state);
-                service.remove_instance_from_profile(profile_name);
+                service.remove_instance_from_profile();
             }
 
             Message::FileToggle(path) => {
@@ -103,9 +103,9 @@ impl GothicOrganizer {
                 service.toggle_state_recursive(None);
             }
 
-            Message::SetGameDir(profile_name, path) => {
+            Message::SetGameDir(path) => {
                 let mut service = profile_service::ProfileService::new(&mut self.session, &mut self.state);
-                return service.set_game_dir(profile_name.clone(), path.clone());
+                return service.set_game_dir(path.clone());
             }
 
             Message::ProfileDirInput(input) => {
@@ -150,9 +150,9 @@ impl GothicOrganizer {
                 self.state.mods_directory_input = input.clone();
             }
 
-            Message::SetModsDir(profile_name, path) => {
+            Message::SetModsDir(path) => {
                 let mut service = profile_service::ProfileService::new(&mut self.session, &mut self.state);
-                return service.set_mods_dir(profile_name.clone(), path.clone());
+                return service.set_mods_dir(path.clone());
             }
 
             Message::InvokeOptionsMenu => {
@@ -219,12 +219,11 @@ impl GothicOrganizer {
 #[derive(Debug, Clone)]
 pub enum Message {
     Exit(iced::window::Id),
-    SetGameDir(Option<String>, Option<PathBuf>),
-    SetModsDir(Option<String>, Option<PathBuf>),
+    SetModsDir(Option<PathBuf>),
+    SetGameDir(Option<PathBuf>),
     ProfileSelected(String),
     InstanceSelected(String),
     InstanceAdd(String),
-    InstanceRemove(String),
     InstanceInput(String),
     ProfileDirInput(String),
     ModsDirInput(String),
@@ -235,6 +234,7 @@ pub enum Message {
     ModUninstall(String),
     ModAdd(Option<PathBuf>),
     ErrorReturned(error::SharedError),
+    InstanceRemove(),
     InitWindow,
     InvokeOptionsMenu,
     FileToggleAll,

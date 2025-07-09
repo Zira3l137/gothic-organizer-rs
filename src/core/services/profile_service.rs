@@ -14,24 +14,7 @@ pub struct ProfileService<'a> {
     app_state: &'a mut app::InnerState,
 }
 
-impl super::Service for ProfileService<'_> {
-    fn context(&mut self) -> Result<super::context::Context, crate::error::GothicOrganizerError> {
-        let profile = self
-            .session
-            .active_profile
-            .as_mut()
-            .and_then(|p| self.session.profiles.get_mut(&p.clone()))
-            .ok_or_else(|| crate::error::GothicOrganizerError::Other("No active profile".into()))?;
-
-        let instance_name = self
-            .session
-            .active_instance
-            .as_ref()
-            .ok_or_else(|| crate::error::GothicOrganizerError::Other("No active instance".into()))?;
-
-        Ok(super::context::Context::new(profile, instance_name))
-    }
-}
+crate::impl_service!(ProfileService);
 
 impl<'a> ProfileService<'a> {
     pub fn new(session: &'a mut core::services::session_service::SessionService, app_state: &'a mut app::InnerState) -> Self {
@@ -71,7 +54,7 @@ impl<'a> ProfileService<'a> {
         let cached_files = self.session.files.clone();
         let mut context = self.context()?;
 
-        context.instance_mut(None).files = Some(cached_files);
+        context.set_instance_files(cached_files);
         Ok(())
     }
 
@@ -115,19 +98,29 @@ impl<'a> ProfileService<'a> {
         Task::none()
     }
 
-    pub fn remove_instance_from_profile(&mut self, profile_name: &str) {
-        if let Some(profile) = self.session.profiles.get_mut(profile_name)
-            && let Some(selected_instance_name) = self.session.active_instance.clone()
-            && let Some(instances) = profile.instances.as_mut()
-        {
-            instances.remove(&selected_instance_name);
-            self.app_state.instance_choices = iced::widget::combo_box::State::new(instances.keys().cloned().collect());
-            self.session.active_instance = None;
-            self.app_state.instance_input = String::new();
+    pub fn remove_instance_from_profile(&mut self) {
+        let Ok(mut context) = self.context() else {
+            log::error!("Failed to get context");
+            return;
+        };
+
+        let active_instance_name = context.active_instance_name.clone();
+        let mut instance_names: Vec<String> = Vec::new();
+
+        if let Some(instances) = context.instances_mut() {
+            instances.remove(&active_instance_name);
+            instance_names.extend(instances.keys().cloned());
             if instances.is_empty() {
-                profile.instances = None;
+                context.active_profile.instances = None;
             }
+        } else {
+            log::error!("Failed to get instances");
+            return;
         }
+
+        self.app_state.instance_choices = iced::widget::combo_box::State::new(instance_names);
+        self.app_state.instance_input = String::new();
+        self.session.active_instance = None;
     }
 
     pub fn switch_instance(&mut self, instance_name: &str) -> Task<app::Message> {
@@ -138,60 +131,70 @@ impl<'a> ProfileService<'a> {
         Task::done(app::Message::CurrentDirectoryUpdated)
     }
 
-    pub fn set_game_dir(&mut self, profile_name: Option<String>, path: Option<path::PathBuf>) -> Task<app::Message> {
-        if let Some(profile_name) = profile_name.or_else(|| self.session.active_profile.clone())
-            && let Some(path) = path.or_else(|| {
-                rfd::FileDialog::new()
-                    .set_title(format!("Select {} directory", &profile_name))
-                    .pick_folder()
-            })
-            && path.is_dir()
-            && let Some(profile) = self.session.profiles.get_mut(&profile_name)
-        {
-            log::trace!("Setting {} directory to {}", profile_name, path.display());
-            profile.path = path.clone();
-            self.app_state.current_directory = path.clone();
+    pub fn set_game_dir(&mut self, path: Option<path::PathBuf>) -> Task<app::Message> {
+        let Ok(context) = self.context() else {
+            log::error!("Failed to get context");
+            return Task::none();
+        };
 
-            self.session.files.extend(
-                ignore::WalkBuilder::new(path)
-                    .ignore(false)
-                    .build()
-                    .filter_map(Result::ok)
-                    .map(|entry| {
-                        (
-                            entry.path().to_path_buf(),
-                            core::profile::FileInfo::default()
-                                .with_source_path(entry.path())
-                                .with_enabled(true),
-                        )
-                    }),
-            );
+        let Some(path) = path.or_else(|| {
+            rfd::FileDialog::new()
+                .set_title(format!("Select {} directory", &context.active_profile.name))
+                .pick_folder()
+        }) else {
+            return Task::none();
+        };
 
-            return Task::done(app::Message::CurrentDirectoryUpdated);
+        context.active_profile.path = path.clone();
+        self.app_state.current_directory = path.clone();
+
+        self.session.files.clear();
+        self.session.files.extend(
+            ignore::WalkBuilder::new(path)
+                .ignore(false)
+                .build()
+                .filter_map(Result::ok)
+                .map(|entry| {
+                    (
+                        entry.path().to_path_buf(),
+                        core::profile::FileInfo::default()
+                            .with_source_path(entry.path())
+                            .with_enabled(true),
+                    )
+                }),
+        );
+
+        if let Err(err) = self.update_instance_from_cache() {
+            log::error!("Failed to update instance from cache: {err}");
         }
 
-        Task::none()
+        Task::batch(vec![
+            Task::done(app::Message::LoadModsRequested),
+            Task::done(app::Message::CurrentDirectoryUpdated),
+        ])
     }
 
-    pub fn set_mods_dir(&mut self, profile_name: Option<String>, path: Option<path::PathBuf>) -> Task<app::Message> {
-        if let Some(profile_name) = profile_name.or_else(|| self.session.active_profile.clone())
-            && let Some(path) = path.or_else(|| {
-                rfd::FileDialog::new()
-                    .set_title(format!("Select {} directory", &profile_name))
-                    .pick_folder()
-            })
-            && path.is_dir()
-            && self.session.profiles.get(&profile_name).is_some()
-        {
-            self.session.mod_storage_dir = Some(path.clone());
+    pub fn set_mods_dir(&mut self, path: Option<path::PathBuf>) -> Task<app::Message> {
+        let Ok(context) = self.context() else {
+            log::error!("Failed to get context");
+            return Task::none();
+        };
 
-            if let Err(err) = std::fs::create_dir_all(&path) {
-                return Task::done(app::Message::ErrorReturned(error::SharedError::new(err)));
-            } else {
-                return Task::done(app::Message::CurrentDirectoryUpdated);
-            }
+        let Some(path) = path.or_else(|| {
+            rfd::FileDialog::new()
+                .set_title(format!("Select {} directory", &context.active_profile.name))
+                .pick_folder()
+        }) else {
+            log::error!("Failed to get mod storage path");
+            return Task::none();
+        };
+
+        self.session.mod_storage_dir = Some(path.clone());
+
+        if let Err(err) = std::fs::create_dir_all(&path) {
+            Task::done(app::Message::ErrorReturned(error::SharedError::new(err)))
+        } else {
+            Task::done(app::Message::CurrentDirectoryUpdated)
         }
-
-        Task::none()
     }
 }

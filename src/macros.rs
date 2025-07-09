@@ -205,3 +205,27 @@ macro_rules! impl_shared_error_from {
         )*
     };
 }
+
+/// This macro implements the `Service` trait for a struct.
+#[macro_export]
+macro_rules! impl_service {
+    ($service:ident) => {
+        impl Service for $service<'_> {
+            fn context(&mut self) -> Result<$crate::core::services::context::Context, $crate::error::GothicOrganizerError> {
+                let profile = self
+                    .session
+                    .active_profile
+                    .as_mut()
+                    .and_then(|p| self.session.profiles.get_mut(&p.clone()))
+                    .ok_or_else(|| $crate::error::GothicOrganizerError::Other("No active profile".into()))?;
+
+                let instance_name = self.session.active_instance.clone().unwrap_or_default();
+
+                Ok($crate::core::services::context::Context::new(
+                    profile,
+                    &instance_name,
+                ))
+            }
+        }
+    };
+}

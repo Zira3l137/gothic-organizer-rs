@@ -104,13 +104,13 @@ pub fn editor_view(app: &crate::app::GothicOrganizer) -> Element<Message> {
     let button_remove = button("Remove").on_press_maybe(app.session.active_profile.as_ref().and_then(|s| {
         let profile = app.session.profiles.get(s)?;
         if profile.path.display().to_string() != "" {
-            Some(Message::InstanceRemove(s.clone()))
+            Some(Message::InstanceRemove())
         } else {
             None
         }
     }));
 
-    let button_browse = button("Browse").on_press(Message::SetGameDir(None, None));
+    let button_browse = button("Browse").on_press(Message::SetGameDir(None));
     let group_instance = container(row!(choice_instance, button_add, button_remove));
 
     let profile_controls = styled_container!(

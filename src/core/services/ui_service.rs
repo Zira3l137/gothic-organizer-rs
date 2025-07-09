@@ -9,24 +9,7 @@ pub struct UiService<'a> {
     state: &'a mut app::InnerState,
 }
 
-impl super::Service for UiService<'_> {
-    fn context(&mut self) -> Result<super::context::Context, crate::error::GothicOrganizerError> {
-        let profile = self
-            .session
-            .active_profile
-            .as_mut()
-            .and_then(|p| self.session.profiles.get_mut(&p.clone()))
-            .ok_or_else(|| crate::error::GothicOrganizerError::Other("No active profile".into()))?;
-
-        let instance_name = self
-            .session
-            .active_instance
-            .as_ref()
-            .ok_or_else(|| crate::error::GothicOrganizerError::Other("No active instance".into()))?;
-
-        Ok(super::context::Context::new(profile, instance_name))
-    }
-}
+crate::impl_service!(UiService);
 
 impl<'a> UiService<'a> {
     pub fn new(session: &'a mut core::services::session_service::SessionService, state: &'a mut app::InnerState) -> Self {
@@ -42,15 +25,6 @@ impl<'a> UiService<'a> {
         let instance_files = context.instance_files().cloned();
 
         let root_dir = root.unwrap_or_else(|| profile_path.clone());
-
-        let get_current_dir_entries = |app_files: &core::lookup::Lookup<path::PathBuf, core::profile::FileInfo>| {
-            app_files
-                .iter()
-                .filter(|(path, _)| path.parent() == Some(&root_dir))
-                .map(|(path, info)| (path.clone(), info.clone()))
-                .collect::<Vec<(path::PathBuf, core::profile::FileInfo)>>()
-        };
-
         let mut current_directory_entries: Vec<(path::PathBuf, core::profile::FileInfo)>;
 
         if let Some(instance_files) = instance_files {
@@ -60,7 +34,14 @@ impl<'a> UiService<'a> {
             log::warn!("No instance selected, displaying only base files for current directory");
         }
 
-        current_directory_entries = get_current_dir_entries(&self.session.files);
+        current_directory_entries = self
+            .session
+            .files
+            .iter()
+            .filter(|(path, _)| path.parent() == Some(&root_dir))
+            .map(|(path, info)| (path.clone(), info.clone()))
+            .collect::<Vec<(path::PathBuf, core::profile::FileInfo)>>();
+
         current_directory_entries.sort_unstable_by_key(|(path, _)| !path.is_dir());
 
         self.state.current_directory = root_dir.clone();
