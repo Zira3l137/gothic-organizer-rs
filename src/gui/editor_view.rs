@@ -42,7 +42,6 @@ pub fn editor_view(app: &crate::app::GothicOrganizer) -> Element<Message> {
         .and_then(|s| current_profile.and_then(|p| p.instances.as_ref().and_then(|i| i.get(s))));
 
     let theme = app.theme();
-    let palette = theme.palette();
     let palette_ext = theme.extended_palette();
     let mut container_bg_color = palette_ext.primary.weak.color;
     container_bg_color.a = 0.3;
