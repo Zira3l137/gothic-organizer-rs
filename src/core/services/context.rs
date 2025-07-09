@@ -3,6 +3,7 @@ use std::path;
 use crate::core::lookup;
 use crate::core::profile;
 
+#[allow(unused)]
 type Overwrites = lookup::Lookup<String, lookup::Lookup<path::PathBuf, profile::FileInfo>>;
 type Mods = Vec<profile::ModInfo>;
 type InstanceFiles = lookup::Lookup<path::PathBuf, profile::FileInfo>;
@@ -51,12 +52,14 @@ impl<'ctx> Context<'ctx> {
             .as_mut()
     }
 
+    #[allow(unused)]
     pub fn instance_overwrites(&self) -> Option<&Overwrites> {
         self.instance(Some(&self.active_instance_name))
             .overwrites
             .as_ref()
     }
 
+    #[allow(unused)]
     pub fn instance_overwrites_mut(&mut self) -> Option<&mut Overwrites> {
         self.instance_mut(Some(&self.active_instance_name.clone()))
             .overwrites
@@ -69,6 +72,7 @@ impl<'ctx> Context<'ctx> {
             .as_ref()
     }
 
+    #[allow(unused)]
     pub fn instance_files_mut(&mut self) -> Option<&mut InstanceFiles> {
         self.instance_mut(Some(&self.active_instance_name.clone()))
             .files

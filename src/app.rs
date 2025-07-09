@@ -239,5 +239,6 @@ pub enum Message {
     InvokeOptionsMenu,
     FileToggleAll,
     CurrentDirectoryUpdated,
+    #[allow(unused)]
     LoadModsRequested,
 }

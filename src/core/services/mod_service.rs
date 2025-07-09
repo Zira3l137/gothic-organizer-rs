@@ -63,7 +63,7 @@ impl<'a> ModService<'a> {
             let mod_name = mod_path
                 .file_name()
                 .map(|n| n.to_string_lossy().to_string())
-                .unwrap_or_else(|| format!("Unknown#{}", chrono::Local::now().timestamp_millis()));
+                .unwrap();
 
             let file_info = |path: &path::Path| {
                 core::profile::FileInfo::default()

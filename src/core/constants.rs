@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::path::PathBuf;
 
 pub const APP_NAME: &str = env!("CARGO_PKG_NAME");

@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use thiserror::Error;
 
 use crate::impl_shared_error_from;
