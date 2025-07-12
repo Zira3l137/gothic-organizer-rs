@@ -8,13 +8,13 @@ use crate::core::services::Service;
 use crate::error;
 
 pub struct ModService<'a> {
-    session: &'a mut core::services::session_service::SessionService,
+    session: &'a mut core::services::session::SessionService,
 }
 
 crate::impl_service!(ModService);
 
 impl<'a> ModService<'a> {
-    pub fn new(session: &'a mut core::services::session_service::SessionService) -> Self {
+    pub fn new(session: &'a mut core::services::session::SessionService) -> Self {
         Self { session }
     }
 
@@ -43,10 +43,7 @@ impl<'a> ModService<'a> {
 
             let profile_path = context.active_profile.path.clone();
 
-            let mod_name = mod_path
-                .file_name()
-                .map(|n| n.to_string_lossy().to_string())
-                .unwrap();
+            let mod_name = mod_path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap();
 
             let file_info = |path: &path::Path| {
                 core::profile::FileInfo::default()
@@ -58,10 +55,7 @@ impl<'a> ModService<'a> {
             let mod_files = ignore::WalkBuilder::new(mod_path.clone())
                 .ignore(false)
                 .build()
-                .filter_map(|e| {
-                    e.ok()
-                        .map(|e| (e.path().to_path_buf(), file_info(e.path())))
-                })
+                .filter_map(|e| e.ok().map(|e| (e.path().to_path_buf(), file_info(e.path()))))
                 .collect::<core::lookup::Lookup<path::PathBuf, core::profile::FileInfo>>();
 
             let new_mod_info = core::profile::ModInfo::default()
@@ -72,10 +66,7 @@ impl<'a> ModService<'a> {
 
             if let Some(instance) = context.instance_mut(None) {
                 Self::apply_mod_files(instance, &new_mod_info, &profile_path);
-                instance
-                    .mods
-                    .get_or_insert_default()
-                    .push(new_mod_info.clone());
+                instance.mods.get_or_insert_default().push(new_mod_info.clone());
             } else {
                 return Task::done(app::Message::ErrorReturned(error::SharedError::new(
                     error::GothicOrganizerError::Other("No active instance".to_owned()),
@@ -145,12 +136,18 @@ impl<'a> ModService<'a> {
         }
     }
 
-    fn apply_mod_files(instance: &mut core::profile::Instance, mod_info: &core::profile::ModInfo, profile_path: &path::Path) {
+    fn apply_mod_files(
+        instance: &mut core::profile::Instance,
+        mod_info: &core::profile::ModInfo,
+        profile_path: &path::Path,
+    ) {
         let instance_files = instance.files.get_or_insert_with(core::lookup::Lookup::new);
         mod_info.files.iter().for_each(|(path, info)| {
             if let Ok(relative_path) = path.strip_prefix(&mod_info.path) {
                 let dst_path = profile_path.join(relative_path);
-                if let Some(existing_file) = instance_files.insert(dst_path.clone(), info.clone().with_target_path(&dst_path)) {
+                if let Some(existing_file) = instance_files
+                    .insert(dst_path.clone(), info.clone().with_target_path(&dst_path))
+                {
                     instance
                         .overwrites
                         .get_or_insert_with(core::lookup::Lookup::new)
@@ -163,7 +160,11 @@ impl<'a> ModService<'a> {
         });
     }
 
-    fn unapply_mod_files(instance: &mut core::profile::Instance, mod_info: &core::profile::ModInfo, profile_path: &path::Path) {
+    fn unapply_mod_files(
+        instance: &mut core::profile::Instance,
+        mod_info: &core::profile::ModInfo,
+        profile_path: &path::Path,
+    ) {
         let Some(instance_files) = instance.files.as_mut() else {
             return;
         };
@@ -171,10 +172,8 @@ impl<'a> ModService<'a> {
             if let Ok(relative_path) = path.strip_prefix(&mod_info.path) {
                 let dst_path = profile_path.join(relative_path);
                 instance_files.remove(&dst_path);
-                if let Some(mod_overwrites) = instance
-                    .overwrites
-                    .as_mut()
-                    .and_then(|o| o.get_mut(&mod_info.name))
+                if let Some(mod_overwrites) =
+                    instance.overwrites.as_mut().and_then(|o| o.get_mut(&mod_info.name))
                     && let Some(original_file) = mod_overwrites.remove(&dst_path)
                 {
                     instance_files.insert(dst_path, original_file);
@@ -204,10 +203,14 @@ impl<'a> ModService<'a> {
     }
 
     pub fn is_valid_mod_source(mod_path: &path::Path) -> bool {
-        mod_path.exists() && (mod_path.is_dir() || mod_path.extension().and_then(|e| e.to_str()) == Some("zip"))
+        mod_path.exists()
+            && (mod_path.is_dir() || mod_path.extension().and_then(|e| e.to_str()) == Some("zip"))
     }
 
-    pub fn move_mod_to_storage(&mut self, mod_path: &path::Path) -> Result<path::PathBuf, error::GothicOrganizerError> {
+    pub fn move_mod_to_storage(
+        &mut self,
+        mod_path: &path::Path,
+    ) -> Result<path::PathBuf, error::GothicOrganizerError> {
         let storage_dir = self.session.mod_storage_dir.clone().unwrap_or_else(|| {
             core::constants::default_mod_storage_dir().unwrap_or_else(|e| {
                 log::warn!("Failed to get default mod storage dir: {e}");
@@ -225,7 +228,9 @@ impl<'a> ModService<'a> {
             .file_name()
             .and_then(|n| n.to_str())
             .map(|s| s.strip_suffix(".zip").unwrap_or(s))
-            .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "Failed to get mod name"))?;
+            .ok_or_else(|| {
+                std::io::Error::new(std::io::ErrorKind::InvalidData, "Failed to get mod name")
+            })?;
 
         let dst_dir = storage_dir.join(mod_name);
         if dst_dir.exists() {

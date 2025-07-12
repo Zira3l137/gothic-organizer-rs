@@ -4,16 +4,18 @@ use std::path::PathBuf;
 
 pub const APP_NAME: &str = env!("CARGO_PKG_NAME");
 pub const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
+pub const APP_AUTHORS: &str = env!("CARGO_PKG_AUTHORS");
+pub const APP_REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
 pub const APP_TITLE: &str = "Gothic Organizer";
-pub const APP_AUTHOR: &str = "Zira3l137";
-pub const APP_REPOSITORY: &str = "https://github.com/Zira3l137/gothic-organizer-rs";
 
 pub fn app_title_full() -> String {
     format!("{APP_TITLE} v{APP_VERSION}")
 }
 
 pub fn app_info() -> String {
-    format!("{APP_TITLE}\nVersion: {APP_VERSION}\nAuthor: {APP_AUTHOR}\nRepository: {APP_REPOSITORY}")
+    format!(
+        "{APP_TITLE}\nVersion: {APP_VERSION}\nAuthors: {APP_AUTHORS}\nRepository: {APP_REPOSITORY}"
+    )
 }
 
 pub fn local_app_data() -> String {
@@ -21,6 +23,7 @@ pub fn local_app_data() -> String {
     {
         std::env::var("LOCALAPPDATA").unwrap_or(String::from(""))
     }
+
     #[cfg(target_os = "linux")]
     {
         std::env::var("XDG_DATA_HOME").unwrap_or(String::from("~/.local/share"))
@@ -33,10 +36,9 @@ pub fn local_profiles_dir() -> PathBuf {
 
 pub fn default_mod_storage_dir() -> Result<PathBuf, crate::error::GothicOrganizerError> {
     let exe_path = std::env::current_exe()?;
-    let exe_dir = exe_path.parent().ok_or(std::io::Error::new(
-        std::io::ErrorKind::NotFound,
-        "Failed to get exe directory",
-    ))?;
+    let exe_dir = exe_path
+        .parent()
+        .ok_or(std::io::Error::new(std::io::ErrorKind::NotFound, "Failed to get exe directory"))?;
     Ok(exe_dir.join("mods"))
 }
 

@@ -10,14 +10,17 @@ use crate::core::services::Service;
 use crate::error;
 
 pub struct ProfileService<'a> {
-    session: &'a mut core::services::session_service::SessionService,
+    session: &'a mut core::services::session::SessionService,
     app_state: &'a mut app::InnerState,
 }
 
 crate::impl_service!(ProfileService);
 
 impl<'a> ProfileService<'a> {
-    pub fn new(session: &'a mut core::services::session_service::SessionService, app_state: &'a mut app::InnerState) -> Self {
+    pub fn new(
+        session: &'a mut core::services::session::SessionService,
+        app_state: &'a mut app::InnerState,
+    ) -> Self {
         Self { session, app_state }
     }
 
@@ -47,9 +50,7 @@ impl<'a> ProfileService<'a> {
     }
 
     pub fn update_instance_from_cache(&mut self) -> Result<(), error::GothicOrganizerError> {
-        self.session
-            .files
-            .extend(self.app_state.current_directory_entries.iter().cloned());
+        self.session.files.extend(self.app_state.current_directory_entries.iter().cloned());
 
         let cached_files = self.session.files.clone();
         let mut context = self.context()?;
@@ -89,7 +90,8 @@ impl<'a> ProfileService<'a> {
             }
 
             instances.insert(instance_name.clone(), new_instance);
-            self.app_state.instance_choices = iced::widget::combo_box::State::new(instances.keys().cloned().collect());
+            self.app_state.instance_choices =
+                iced::widget::combo_box::State::new(instances.keys().cloned().collect());
             self.app_state.instance_input = String::new();
 
             return self.switch_instance(&instance_name);
@@ -150,18 +152,16 @@ impl<'a> ProfileService<'a> {
 
         self.session.files.clear();
         self.session.files.extend(
-            ignore::WalkBuilder::new(path)
-                .ignore(false)
-                .build()
-                .filter_map(Result::ok)
-                .map(|entry| {
+            ignore::WalkBuilder::new(path).ignore(false).build().filter_map(Result::ok).map(
+                |entry| {
                     (
                         entry.path().to_path_buf(),
                         core::profile::FileInfo::default()
                             .with_source_path(entry.path())
                             .with_enabled(true),
                     )
-                }),
+                },
+            ),
         );
 
         if let Err(err) = self.update_instance_from_cache() {

@@ -1,22 +1,22 @@
-use iced::advanced::layout;
-use iced::advanced::mouse;
-use iced::advanced::renderer;
-use iced::advanced::text;
-use iced::advanced::widget::Tree;
-use iced::advanced::Layout;
-use iced::advanced::Widget;
-use iced::alignment;
-use iced::event;
-use iced::widget::text::Fragment;
-use iced::widget::text::LineHeight;
-use iced::widget::text::Shaping;
-use iced::widget::text::Wrapping;
 use iced::Element;
 use iced::Length;
 use iced::Pixels;
 use iced::Rectangle;
 use iced::Size;
 use iced::Theme;
+use iced::advanced::Layout;
+use iced::advanced::Widget;
+use iced::advanced::layout;
+use iced::advanced::mouse;
+use iced::advanced::renderer;
+use iced::advanced::text;
+use iced::advanced::widget::Tree;
+use iced::alignment;
+use iced::event;
+use iced::widget::text::Fragment;
+use iced::widget::text::LineHeight;
+use iced::widget::text::Shaping;
+use iced::widget::text::Wrapping;
 
 pub struct ClickableText<'a, Renderer, Message>
 where
@@ -28,6 +28,8 @@ where
     wrapping: Wrapping,
     size: Option<Pixels>,
     fragment: Fragment<'a>,
+    color_idle: Option<iced::Color>,
+    color_hovered: Option<iced::Color>,
     passed_message: Option<Message>,
     line_height: LineHeight,
     font: Option<Renderer::Font>,
@@ -42,6 +44,8 @@ where
     pub fn new(fragment: impl text::IntoFragment<'a>) -> Self {
         ClickableText {
             fragment: fragment.into_fragment(),
+            color_idle: None,
+            color_hovered: None,
             size: None,
             line_height: LineHeight::default(),
             font: None,
@@ -90,22 +94,35 @@ where
         self
     }
 
-    pub fn on_press(mut self, message: impl FnOnce() -> Message) -> Self {
-        self.passed_message = Some(message());
+    pub fn color(mut self, color: impl Into<iced::Color>) -> Self {
+        self.color_idle = Some(color.into());
+        self
+    }
+
+    pub fn color_hovered(mut self, color: impl Into<iced::Color>) -> Self {
+        self.color_hovered = Some(color.into());
+        self
+    }
+
+    pub fn on_press(mut self, message: Message) -> Self {
+        self.passed_message = Some(message);
+        self
+    }
+
+    pub fn on_press_maybe(mut self, message: impl FnOnce() -> Option<Message>) -> Self {
+        self.passed_message = message();
         self
     }
 }
 
-impl<'a, Renderer, Message> Widget<Message, Theme, Renderer> for ClickableText<'a, Renderer, Message>
+impl<'a, Renderer, Message> Widget<Message, Theme, Renderer>
+    for ClickableText<'a, Renderer, Message>
 where
     Renderer: text::Renderer,
     Message: Clone,
 {
     fn size(&self) -> Size<Length> {
-        Size {
-            width: self.width,
-            height: self.height,
-        }
+        Size { width: self.width, height: self.height }
     }
 
     fn state(&self) -> iced_core::widget::tree::State {
@@ -114,10 +131,14 @@ where
         ))
     }
 
-    fn layout(&self, tree: &mut Tree, renderer: &Renderer, limits: &layout::Limits) -> layout::Node {
+    fn layout(
+        &self,
+        tree: &mut Tree,
+        renderer: &Renderer,
+        limits: &layout::Limits,
+    ) -> layout::Node {
         iced_core::widget::text::layout(
-            tree.state
-                .downcast_mut::<iced::widget::text::State<Renderer::Paragraph>>(),
+            tree.state.downcast_mut::<iced::widget::text::State<Renderer::Paragraph>>(),
             renderer,
             limits,
             self.width,
@@ -143,9 +164,8 @@ where
         cursor: mouse::Cursor,
         viewport: &Rectangle,
     ) {
-        let state = tree
-            .state
-            .downcast_ref::<iced_core::widget::text::State<Renderer::Paragraph>>();
+        let state =
+            tree.state.downcast_ref::<iced_core::widget::text::State<Renderer::Paragraph>>();
         let palette = theme.palette();
         let paragraph = state.0.raw();
 
@@ -167,9 +187,9 @@ where
             paragraph,
             iced_core::Point::new(x, y),
             if cursor.is_over(layout.bounds()) {
-                palette.primary
+                self.color_idle.unwrap_or(palette.primary)
             } else {
-                palette.text
+                self.color_hovered.unwrap_or(palette.text)
             },
             *viewport,
         );
@@ -219,7 +239,8 @@ where
     }
 }
 
-impl<'a, Renderer, Message> From<ClickableText<'a, Renderer, Message>> for Element<'a, Message, Theme, Renderer>
+impl<'a, Renderer, Message> From<ClickableText<'a, Renderer, Message>>
+    for Element<'a, Message, Theme, Renderer>
 where
     Renderer: iced::advanced::text::Renderer + 'a,
     Message: Clone + 'a,

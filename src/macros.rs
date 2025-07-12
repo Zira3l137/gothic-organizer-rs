@@ -69,8 +69,8 @@ macro_rules! svg_with_color {
     ) => {
         $crate::core::helpers::svg_with_color(
             $content,
-            styled_container!(@some_opt $($color_idle)?; iced::Color),
-            styled_container!(@some_opt $($color_hovered)?; iced::Color),
+            $crate::svg_with_color!(@some_opt $($color_idle)?; iced::Color),
+            $crate::svg_with_color!(@some_opt $($color_hovered)?; iced::Color),
         )
     };
 
@@ -80,6 +80,22 @@ macro_rules! svg_with_color {
     };
     (@some_opt ; $ty:ty) => {
         None::<$ty>
+    };
+}
+
+/// Creates a new [`ClickableText`] widget with the provided content.
+///
+/// [`ClickableText`]: gui::custom_widgets::clickable_text::ClickableText
+///
+/// This macro uses the same syntax as [`format!`], but creates a new [`ClickableText`] widget instead.
+///
+/// See [the formatting documentation in `std::fmt`](std::fmt)
+/// for details of the macro argument syntax.
+///
+#[macro_export]
+macro_rules! clickable_text {
+    ($($arg:tt)*) => {
+        $crate::gui::custom_widgets::clickable_text(format!($($arg)*))
     };
 }
 
@@ -137,7 +153,12 @@ macro_rules! save_session {
         $crate::helpers::save_session($selected_profile, $selected_instance, $cache, $custom_path)
     };
     ($selected_profile: expr, $selected_instance: expr, $cache: expr) => {
-        $crate::core::helpers::save_session::<String>($selected_profile, $selected_instance, $cache, None)
+        $crate::core::helpers::save_session::<String>(
+            $selected_profile,
+            $selected_instance,
+            $cache,
+            None,
+        )
     };
 }
 

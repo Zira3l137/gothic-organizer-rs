@@ -5,14 +5,17 @@ use crate::core;
 use crate::core::services::Service;
 
 pub struct UiService<'a> {
-    session: &'a mut core::services::session_service::SessionService,
+    session: &'a mut core::services::session::SessionService,
     state: &'a mut app::InnerState,
 }
 
 crate::impl_service!(UiService);
 
 impl<'a> UiService<'a> {
-    pub fn new(session: &'a mut core::services::session_service::SessionService, state: &'a mut app::InnerState) -> Self {
+    pub fn new(
+        session: &'a mut core::services::session::SessionService,
+        state: &'a mut app::InnerState,
+    ) -> Self {
         Self { session, state }
     }
 
@@ -49,13 +52,10 @@ impl<'a> UiService<'a> {
     }
 
     pub fn toggle_state_recursive(&mut self, path: Option<&path::Path>) {
-        let paths_to_toggle: Vec<path::PathBuf> = path.map(|p| vec![p.to_path_buf()]).unwrap_or_else(|| {
-            self.state
-                .current_directory_entries
-                .iter()
-                .map(|(p, _)| p.clone())
-                .collect()
-        });
+        let paths_to_toggle: Vec<path::PathBuf> =
+            path.map(|p| vec![p.to_path_buf()]).unwrap_or_else(|| {
+                self.state.current_directory_entries.iter().map(|(p, _)| p.clone()).collect()
+            });
 
         paths_to_toggle.iter().for_each(|path_to_toggle| {
             if let Some(info) = self
@@ -66,9 +66,7 @@ impl<'a> UiService<'a> {
             {
                 info.enabled = !info.enabled;
                 if path_to_toggle.is_dir() {
-                    self.session
-                        .files
-                        .insert(path_to_toggle.clone(), info.clone());
+                    self.session.files.insert(path_to_toggle.clone(), info.clone());
                     self.session.files.iter_mut().for_each(|(p, i)| {
                         if p.starts_with(path_to_toggle) {
                             i.enabled = info.enabled;
