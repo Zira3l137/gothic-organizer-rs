@@ -12,12 +12,14 @@ pub trait Service {
 
 pub fn execute_cmd(cmd: &str, args: &[&str]) -> Result<String, crate::error::GothicOrganizerError> {
     let output = process::Command::new(cmd).args(args).output()?;
-    if output.status.success() {
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
-    } else {
+    if !output.stderr.is_empty() {
         Err(crate::error::GothicOrganizerError::Other(
             String::from_utf8_lossy(&output.stderr).to_string(),
         ))
+    } else if !output.stdout.is_empty() {
+        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    } else {
+        Ok(String::new())
     }
 }
 

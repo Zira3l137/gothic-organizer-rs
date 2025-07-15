@@ -223,7 +223,7 @@ impl GothicOrganizer {
             services::profile::ProfileService::new(&mut self.session, &mut self.state);
 
         if let Err(err) = profile_service.update_instance_from_cache() {
-            log::error!("Error updating instance cache: {err}");
+            log::warn!("Couldn't update instance cache: {err}");
         }
     }
 }
