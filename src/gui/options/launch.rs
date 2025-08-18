@@ -49,7 +49,7 @@ fn parser_settings(
 }
 
 fn game_settings(
-    _app: &app::GothicOrganizer,
+    app: &app::GothicOrganizer,
     launch_options: Option<config::LaunchOptions>,
 ) -> iced::Element<app::Message> {
     let mut game_settings = config::GameSettings::default();
@@ -57,10 +57,20 @@ fn game_settings(
         game_settings = launch_options.game_settings.clone();
     }
 
+    let zspy_level_label: iced::Element<app::Message> =
+        widget::Text::new(format!("ZSpy messages Level: {}", game_settings.zspy)).into();
+
+    let zspy_slider: iced::Element<app::Message> = widget::Slider::new(
+        std::ops::RangeInclusive::new(0, 10),
+        app.state.zspy_level_input,
+        app::Message::ZSpyLevelChanged,
+    )
+    .into();
+
     let renderer_switcher: iced::Element<app::Message> = widget::ComboBox::new(
-        &_app.state.renderer_choices,
+        &app.state.renderer_choices,
         "Renderer Backend",
-        _app.session.active_renderer_backend.as_ref(),
+        app.session.active_renderer_backend.as_ref(),
         app::Message::OptionsRendererSwitched,
     )
     .into();
@@ -71,7 +81,9 @@ fn game_settings(
             .align_left(iced::Length::Fill),
         widget::Checkbox::new("Enable MARVIN mode", game_settings.marvin_mode)
             .on_toggle(|new_state| { app::Message::ToggleMarvinMode(new_state) }),
-        renderer_switcher
+        renderer_switcher,
+        zspy_level_label,
+        zspy_slider
     ]
     .spacing(10)
     .padding(10);

@@ -44,7 +44,7 @@ pub struct ParserSettings {
     pub commands: Lookup<ParserCommand, bool>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum ZSpyMessagesLevel {
     #[default]
     Off,
@@ -52,6 +52,43 @@ pub enum ZSpyMessagesLevel {
     Medium,
     High,
     All,
+}
+
+impl From<ZSpyMessagesLevel> for u8 {
+    fn from(value: ZSpyMessagesLevel) -> Self {
+        match value {
+            ZSpyMessagesLevel::Off => 0,
+            ZSpyMessagesLevel::Low => 1,
+            ZSpyMessagesLevel::Medium => 5,
+            ZSpyMessagesLevel::High => 8,
+            ZSpyMessagesLevel::All => 10,
+        }
+    }
+}
+
+impl From<u8> for ZSpyMessagesLevel {
+    fn from(value: u8) -> Self {
+        match value {
+            0 => ZSpyMessagesLevel::Off,
+            1..=4 => ZSpyMessagesLevel::Low,
+            5..=7 => ZSpyMessagesLevel::Medium,
+            8..=9 => ZSpyMessagesLevel::High,
+            10 => ZSpyMessagesLevel::All,
+            _ => ZSpyMessagesLevel::All,
+        }
+    }
+}
+
+impl std::fmt::Display for ZSpyMessagesLevel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ZSpyMessagesLevel::Off => write!(f, "Off"),
+            ZSpyMessagesLevel::Low => write!(f, "Low"),
+            ZSpyMessagesLevel::Medium => write!(f, "Medium"),
+            ZSpyMessagesLevel::High => write!(f, "High"),
+            ZSpyMessagesLevel::All => write!(f, "All"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]

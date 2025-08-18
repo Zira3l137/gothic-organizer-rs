@@ -24,6 +24,7 @@ pub struct SessionService {
     pub active_profile: Option<String>,
     pub active_instance: Option<String>,
     pub active_renderer_backend: Option<config::RendererBackend>,
+    pub active_zspy_level: Option<config::ZSpyMessagesLevel>,
     pub mod_storage_dir: Option<path::PathBuf>,
     pub theme_selected: Option<String>,
     pub files: lookup::Lookup<path::PathBuf, profile::FileInfo>,
@@ -40,6 +41,7 @@ impl SessionService {
             active_profile: None,
             active_instance: None,
             active_renderer_backend: None,
+            active_zspy_level: None,
             mod_storage_dir: None,
             theme_selected: None,
             launch_options: None,
@@ -59,6 +61,7 @@ impl SessionService {
             if let Some(launch_options) = last_session.launch_options {
                 self.launch_options = Some(launch_options.clone());
                 self.active_renderer_backend = Some(launch_options.game_settings.renderer);
+                self.active_zspy_level = Some(launch_options.game_settings.zspy);
             }
 
             if let Some(profile_name) = last_session.selected_profile

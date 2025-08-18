@@ -22,6 +22,7 @@ pub struct InnerState {
     pub instance_input: String,
     pub profile_directory_input: String,
     pub mods_directory_input: String,
+    pub zspy_level_input: u8,
     pub current_options_menu: options::menu::OptionsMenu,
     pub profile_choices: combo_box::State<String>,
     pub theme_choices: combo_box::State<String>,
@@ -55,6 +56,8 @@ impl GothicOrganizer {
         app.state.renderer_choices = combo_box::State::new(
             config::RendererBackend::into_iter().cloned().collect::<Vec<_>>(),
         );
+        app.state.zspy_level_input =
+            app.session.active_zspy_level.unwrap_or(config::ZSpyMessagesLevel::Off).into();
 
         (app, iced::Task::done(Message::InitWindow))
     }
@@ -189,6 +192,13 @@ impl GothicOrganizer {
                 self.session.toggle_launch_option(option, *new_state);
             }
 
+            Message::ZSpyLevelChanged(level) => {
+                self.state.zspy_level_input = *level;
+                self.session.active_zspy_level = Some((*level).into());
+                self.session.launch_options.get_or_insert_default().game_settings.zspy =
+                    (*level).into();
+            }
+
             Message::OpenRepository => {
                 if let Err(err) = services::browser_open(constants::APP_REPOSITORY) {
                     log::error!("Error opening repository: {err}");
@@ -270,6 +280,7 @@ pub enum Message {
     ModUninstall(String),
     ModAdd(Option<PathBuf>),
     ErrorReturned(error::SharedError),
+    ZSpyLevelChanged(u8),
     OpenRepository,
     InstanceRemove(),
     InitWindow,
