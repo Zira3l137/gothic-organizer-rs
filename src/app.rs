@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use iced::widget::combo_box;
 
+use crate::config;
 use crate::core::constants;
 use crate::core::lookup;
 use crate::core::profile;
@@ -25,6 +26,7 @@ pub struct InnerState {
     pub profile_choices: combo_box::State<String>,
     pub theme_choices: combo_box::State<String>,
     pub instance_choices: combo_box::State<String>,
+    pub renderer_choices: combo_box::State<config::RendererBackend>,
     pub themes: lookup::Lookup<String, iced::Theme>,
     pub current_directory_entries: Vec<(PathBuf, profile::FileInfo)>,
 }
@@ -50,6 +52,9 @@ impl GothicOrganizer {
         app.state.themes = services::session::SessionService::load_default_themes();
         app.state.theme_choices =
             combo_box::State::new(app.state.themes.iter().map(|(_, t)| t.to_string()).collect());
+        app.state.renderer_choices = combo_box::State::new(
+            config::RendererBackend::into_iter().cloned().collect::<Vec<_>>(),
+        );
 
         (app, iced::Task::done(Message::InitWindow))
     }
@@ -169,6 +174,21 @@ impl GothicOrganizer {
                 self.state.current_options_menu = *menu;
             }
 
+            Message::OptionsRendererSwitched(backend) => {
+                self.session.active_renderer_backend = Some(backend.clone());
+                self.session.launch_options.get_or_insert_default().game_settings.renderer =
+                    backend.clone();
+            }
+
+            Message::ToggleMarvinMode(new_state) => {
+                self.session.launch_options.get_or_insert_default().game_settings.marvin_mode =
+                    *new_state;
+            }
+
+            Message::ToggleParserSetting(option, new_state) => {
+                self.session.toggle_launch_option(option, *new_state);
+            }
+
             Message::OpenRepository => {
                 if let Err(err) = services::browser_open(constants::APP_REPOSITORY) {
                     log::error!("Error opening repository: {err}");
@@ -241,6 +261,9 @@ pub enum Message {
     ModsDirInput(String),
     FileToggle(PathBuf),
     OptionsMenuSwitched(options::menu::OptionsMenu),
+    OptionsRendererSwitched(config::RendererBackend),
+    ToggleParserSetting(config::ParserCommand, bool),
+    ToggleMarvinMode(bool),
     TraverseIntoDir(PathBuf),
     ThemeSwitch(String),
     ModToggle(String, bool),

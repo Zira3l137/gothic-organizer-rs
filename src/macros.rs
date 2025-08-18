@@ -149,13 +149,20 @@ macro_rules! load_config {
 /// Optionally `$custom_path` can be provided.
 #[macro_export]
 macro_rules! save_session {
-    ($selected_profile: expr, $selected_instance: expr, $cache: expr, $custom_path: expr) => {
-        $crate::helpers::save_session($selected_profile, $selected_instance, $cache, $custom_path)
+    ($selected_profile: expr, $selected_instance: expr, $launch_options: expr, $cache: expr, $custom_path: expr) => {
+        $crate::helpers::save_session(
+            $selected_profile,
+            $selected_instance,
+            $launch_options,
+            $cache,
+            $custom_path,
+        )
     };
-    ($selected_profile: expr, $selected_instance: expr, $cache: expr) => {
+    ($selected_profile: expr, $selected_instance: expr, $launch_options: expr, $cache: expr) => {
         $crate::core::helpers::save_session::<String>(
             $selected_profile,
             $selected_instance,
+            $launch_options,
             $cache,
             None,
         )
@@ -247,6 +254,19 @@ macro_rules! impl_service {
                     &instance_name,
                 ))
             }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! lookup {
+    [($($key: expr => $value: expr),*)] => {
+        {
+            let mut lookup = $crate::core::lookup::Lookup::new();
+            $(
+                lookup.insert($key, $value);
+            )*
+            lookup
         }
     };
 }

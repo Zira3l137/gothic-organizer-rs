@@ -1,17 +1,102 @@
-use iced::alignment;
 use iced::widget;
 
 use crate::app;
+use crate::config;
+use crate::core::lookup::Lookup;
 use crate::styled_container;
 
-pub fn launch_menu(_app: &app::GothicOrganizer) -> iced::Element<app::Message> {
+fn parser_settings(
+    _app: &app::GothicOrganizer,
+    launch_options: Option<config::LaunchOptions>,
+) -> iced::Element<app::Message> {
+    let mut parser_settings: Lookup<config::ParserCommand, bool> = Lookup::new();
+    if let Some(launch_options) = launch_options {
+        parser_settings = launch_options.parser_settings.commands.clone();
+    }
+
     styled_container!(
-        widget::column![].align_x(alignment::Horizontal::Center).spacing(10).padding(10),
+        config::ParserCommand::into_iter().fold(
+            widget::column![
+                styled_container!(
+                    widget::text("Parser Settings"),
+                    border_width = 2.0,
+                    border_radius = 4.0
+                )
+                .padding(10)
+                .align_left(iced::Length::Fill)
+            ]
+            .spacing(10)
+            .padding(10),
+            |container, option| {
+                container.push(
+                    widget::Checkbox::new(
+                        format!("Reparse {option}"),
+                        *parser_settings.get(option).unwrap_or(&false),
+                    )
+                    .on_toggle(|new_state| {
+                        app::Message::ToggleParserSetting(option.clone(), new_state)
+                    }),
+                )
+            }
+        ),
+        border_width = 2.0,
+        border_radius = 4.0
+    )
+    .align_top(iced::Length::Fill)
+    .align_left(iced::Length::Fill)
+    .padding(10)
+    .into()
+}
+
+fn game_settings(
+    _app: &app::GothicOrganizer,
+    launch_options: Option<config::LaunchOptions>,
+) -> iced::Element<app::Message> {
+    let mut game_settings = config::GameSettings::default();
+    if let Some(launch_options) = launch_options {
+        game_settings = launch_options.game_settings.clone();
+    }
+
+    let renderer_switcher: iced::Element<app::Message> = widget::ComboBox::new(
+        &_app.state.renderer_choices,
+        "Renderer Backend",
+        _app.session.active_renderer_backend.as_ref(),
+        app::Message::OptionsRendererSwitched,
+    )
+    .into();
+
+    let column = widget::column![
+        styled_container!(widget::text("Game Settings"), border_width = 2.0, border_radius = 4.0)
+            .padding(10)
+            .align_left(iced::Length::Fill),
+        widget::Checkbox::new("Enable MARVIN mode", game_settings.marvin_mode)
+            .on_toggle(|new_state| { app::Message::ToggleMarvinMode(new_state) }),
+        renderer_switcher
+    ]
+    .spacing(10)
+    .padding(10);
+
+    styled_container!(column, border_width = 2.0, border_radius = 4.0)
+        .padding(10)
+        .align_top(iced::Length::Fill)
+        .align_left(iced::Length::Fill)
+        .into()
+}
+
+pub fn launch_menu(app: &app::GothicOrganizer) -> iced::Element<app::Message> {
+    let launch_options = &app.session.launch_options;
+    styled_container!(
+        widget::row![
+            parser_settings(app, launch_options.clone()),
+            game_settings(app, launch_options.clone())
+        ]
+        .spacing(10)
+        .padding(10),
         border_width = 4.0,
         border_radius = 4.0
     )
     .padding(10)
-    .center(iced::Length::Fill)
     .align_top(iced::Length::Fill)
+    .align_left(iced::Length::Fill)
     .into()
 }

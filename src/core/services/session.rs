@@ -3,40 +3,48 @@ use std::path;
 use iced::Task;
 
 use crate::app;
-use crate::core;
+use crate::config;
+use crate::core::constants;
+use crate::core::lookup;
+use crate::core::profile;
 use crate::error;
 use crate::load_config;
 use crate::load_profile;
 use crate::load_session;
+use crate::lookup;
 use crate::save_config;
 use crate::save_profile;
 use crate::save_session;
 
 #[derive(Debug, Default)]
 pub struct SessionService {
-    pub profiles: core::lookup::Lookup<String, core::profile::Profile>,
+    pub profiles: lookup::Lookup<String, profile::Profile>,
     pub profile_names: Option<Vec<String>>,
     pub instance_names: Option<Vec<String>>,
     pub active_profile: Option<String>,
     pub active_instance: Option<String>,
+    pub active_renderer_backend: Option<config::RendererBackend>,
     pub mod_storage_dir: Option<path::PathBuf>,
     pub theme_selected: Option<String>,
-    pub files: core::lookup::Lookup<path::PathBuf, core::profile::FileInfo>,
-    pub windows: core::lookup::Lookup<Option<iced::window::Id>, app::WindowState>,
+    pub files: lookup::Lookup<path::PathBuf, profile::FileInfo>,
+    pub windows: lookup::Lookup<Option<iced::window::Id>, app::WindowState>,
+    pub launch_options: Option<config::LaunchOptions>,
 }
 
 impl SessionService {
     pub fn new() -> Self {
         let mut service = Self {
-            profiles: core::lookup::Lookup::new(),
+            profiles: lookup::Lookup::new(),
             profile_names: None,
             instance_names: None,
             active_profile: None,
             active_instance: None,
+            active_renderer_backend: None,
             mod_storage_dir: None,
             theme_selected: None,
-            files: core::lookup::Lookup::new(),
-            windows: core::lookup::Lookup::new(),
+            launch_options: None,
+            files: lookup::Lookup::new(),
+            windows: lookup::Lookup::new(),
         };
         service.try_reload_last_session();
         service
@@ -48,6 +56,11 @@ impl SessionService {
         self.profile_names = Some(profiles.keys().cloned().collect());
 
         if let Some(last_session) = load_session!() {
+            if let Some(launch_options) = last_session.launch_options {
+                self.launch_options = Some(launch_options.clone());
+                self.active_renderer_backend = Some(launch_options.game_settings.renderer);
+            }
+
             if let Some(profile_name) = last_session.selected_profile
                 && let Some(profile) = profiles.get(&profile_name)
             {
@@ -90,6 +103,7 @@ impl SessionService {
         if let Err(e) = save_session!(
             self.active_profile.clone(),
             self.active_instance.clone(),
+            self.launch_options.clone(),
             cache
         ) {
             log::error!("Failed saving session: {e}");
@@ -132,13 +146,8 @@ impl SessionService {
             ..Default::default()
         });
 
-        self.windows.insert(
-            Some(id),
-            app::WindowState {
-                name: "editor".to_owned(),
-                closed: false,
-            },
-        );
+        self.windows
+            .insert(Some(id), app::WindowState { name: "editor".to_owned(), closed: false });
 
         task.then(|_| Task::done(app::Message::CurrentDirectoryUpdated))
     }
@@ -146,37 +155,43 @@ impl SessionService {
     pub fn invoke_options_window(&mut self) -> Task<app::Message> {
         let (id, task) = iced::window::open(iced::window::Settings {
             position: iced::window::Position::Centered,
-            size: iced::Size {
-                width: 768.0,
-                height: 400.0,
-            },
+            size: iced::Size { width: 768.0, height: 460.0 },
             icon: iced::window::icon::from_file("./resources/icon.ico").ok(),
             exit_on_close_request: false,
             ..Default::default()
         });
 
-        self.windows.insert(
-            Some(id),
-            app::WindowState {
-                name: "options".to_owned(),
-                closed: false,
-            },
-        );
+        self.windows
+            .insert(Some(id), app::WindowState { name: "options".to_owned(), closed: false });
 
         task.then(|_| Task::none())
     }
 
-    pub fn preload_profiles() -> core::lookup::Lookup<String, core::profile::Profile> {
-        core::constants::Profile::into_iter()
+    pub fn preload_profiles() -> lookup::Lookup<String, profile::Profile> {
+        constants::Profile::into_iter()
             .map(|profile_name| {
                 let name_str = (*profile_name).to_string();
-                let profile = load_profile!(&name_str).unwrap_or_else(|| core::profile::Profile::default().with_name(&name_str));
+                let profile = load_profile!(&name_str)
+                    .unwrap_or_else(|| profile::Profile::default().with_name(&name_str));
                 (name_str, profile)
             })
             .collect()
     }
 
-    pub fn load_default_themes() -> core::lookup::Lookup<String, iced::Theme> {
+    pub fn toggle_launch_option(&mut self, option: &config::ParserCommand, new_state: bool) {
+        if let Some(options) = self.launch_options.as_mut() {
+            options.parser_settings.commands.insert(option.clone(), new_state);
+        } else {
+            self.launch_options = Some(config::LaunchOptions {
+                parser_settings: config::ParserSettings {
+                    commands: lookup![(option.clone() => new_state)],
+                },
+                ..Default::default()
+            });
+        }
+    }
+
+    pub fn load_default_themes() -> lookup::Lookup<String, iced::Theme> {
         [
             ("Light", iced::Theme::Light),
             ("Dark", iced::Theme::Dark),

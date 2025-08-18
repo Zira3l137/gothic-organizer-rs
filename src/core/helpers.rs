@@ -5,11 +5,11 @@ use std::fs::write;
 use std::path::Path;
 use std::path::PathBuf;
 
+use iced::Border;
+use iced::Shadow;
 use iced::border::Radius;
 use iced::widget::Container;
 use iced::widget::Svg;
-use iced::Border;
-use iced::Shadow;
 
 use crate::config;
 use crate::core::constants;
@@ -35,8 +35,10 @@ pub fn save_config<P: AsRef<Path>>(
     };
 
     let default_path = default_path(custom_path);
-    let config_string = serde_json::to_string_pretty(&config).map_err(error::GothicOrganizerError::Json)?;
-    write(default_path.join("config.json"), config_string).map_err(error::GothicOrganizerError::IO)?;
+    let config_string =
+        serde_json::to_string_pretty(&config).map_err(error::GothicOrganizerError::Json)?;
+    write(default_path.join("config.json"), config_string)
+        .map_err(error::GothicOrganizerError::IO)?;
 
     Ok(())
 }
@@ -55,18 +57,14 @@ pub fn load_config<P: AsRef<Path>>(custom_path: Option<P>) -> Option<config::App
 
     Some(config)
 }
-
 pub fn save_session<P: AsRef<Path>>(
     selected_profile: Option<String>,
     selected_instance: Option<String>,
+    launch_options: Option<config::LaunchOptions>,
     cache: Option<Lookup<PathBuf, profile::FileInfo>>,
     custom_path: Option<P>,
 ) -> Result<(), std::io::Error> {
-    let session = config::Session {
-        selected_profile,
-        selected_instance,
-        cache,
-    };
+    let session = config::Session { selected_profile, selected_instance, launch_options, cache };
 
     let default_path = default_path(custom_path);
     let session_string = serde_json::to_string_pretty(&session)?;
@@ -90,29 +88,33 @@ pub fn load_session<P: AsRef<Path>>(custom_path: Option<P>) -> Option<config::Se
     Some(session)
 }
 
-pub fn save_profile<P: AsRef<Path>>(profile: &profile::Profile, custom_path: Option<P>) -> Result<(), std::io::Error> {
+pub fn save_profile<P: AsRef<Path>>(
+    profile: &profile::Profile,
+    custom_path: Option<P>,
+) -> Result<(), std::io::Error> {
     let default_profile_path = default_path(custom_path);
     let profile_json = serde_json::to_string_pretty(&profile).map_err(std::io::Error::other)?;
 
-    create_dir_all(default_profile_path.join(&profile.name)).map_err(|e| std::io::Error::new(e.kind(), e))?;
-    write(
-        default_profile_path
-            .join(&profile.name)
-            .join("profile.json"),
-        profile_json,
-    )?;
+    create_dir_all(default_profile_path.join(&profile.name))
+        .map_err(|e| std::io::Error::new(e.kind(), e))?;
+    write(default_profile_path.join(&profile.name).join("profile.json"), profile_json)?;
 
     Ok(())
 }
 
-pub fn load_profile<P: AsRef<Path>>(name: &str, custom_path: Option<P>) -> Option<profile::Profile> {
+pub fn load_profile<P: AsRef<Path>>(
+    name: &str,
+    custom_path: Option<P>,
+) -> Option<profile::Profile> {
     let default_profile_path = default_path(custom_path);
     let mut entries = read_dir(default_profile_path).ok()?;
 
     let profile = entries.find_map(|e| {
         let entry = e.ok()?;
 
-        if !entry.path().is_dir() || entry.file_name().to_string_lossy().to_lowercase() != name.to_lowercase() {
+        if !entry.path().is_dir()
+            || entry.file_name().to_string_lossy().to_lowercase() != name.to_lowercase()
+        {
             return None;
         }
 
@@ -121,7 +123,9 @@ pub fn load_profile<P: AsRef<Path>>(name: &str, custom_path: Option<P>) -> Optio
         let profile_str = profile_dir.find_map(|e| {
             let entry = e.ok()?;
 
-            if entry.path().is_dir() || entry.file_name().to_string_lossy().to_lowercase() != "profile.json" {
+            if entry.path().is_dir()
+                || entry.file_name().to_string_lossy().to_lowercase() != "profile.json"
+            {
                 return None;
             }
 
@@ -212,7 +216,11 @@ where
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn svg_with_color<'a, C>(handle: impl Into<iced_core::svg::Handle>, color_idle: Option<C>, color_hovered: Option<C>) -> Svg<'a>
+pub fn svg_with_color<'a, C>(
+    handle: impl Into<iced_core::svg::Handle>,
+    color_idle: Option<C>,
+    color_hovered: Option<C>,
+) -> Svg<'a>
 where
     C: Into<iced::Color> + Clone + 'a,
 {

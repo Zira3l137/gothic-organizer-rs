@@ -16,9 +16,7 @@ where
     K: std::hash::Hash + Eq + Sized,
 {
     pub fn new() -> Self {
-        Self {
-            access: hashbrown::HashMap::with_hasher(ahash::RandomState::new()),
-        }
+        Self { access: hashbrown::HashMap::with_hasher(ahash::RandomState::new()) }
     }
 
     /// Returns the number of elements in the internal map.
@@ -133,7 +131,8 @@ where
     K: std::hash::Hash + Eq + Sized,
 {
     fn from(value: hashbrown::HashMap<K, V>) -> Self {
-        let access = hashbrown::HashMap::with_capacity_and_hasher(value.len(), ahash::RandomState::new());
+        let access =
+            hashbrown::HashMap::with_capacity_and_hasher(value.len(), ahash::RandomState::new());
         Self { access }
     }
 }
@@ -143,7 +142,8 @@ where
     K: std::hash::Hash + Eq + Sized,
 {
     fn from(value: Vec<(K, V)>) -> Self {
-        let mut map = hashbrown::HashMap::with_capacity_and_hasher(value.len(), ahash::RandomState::new());
+        let mut map =
+            hashbrown::HashMap::with_capacity_and_hasher(value.len(), ahash::RandomState::new());
         for (key, value) in value {
             map.insert(key, value);
         }
@@ -158,7 +158,8 @@ where
     fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
         let iterator = iter.into_iter();
         let possible_size = iterator.size_hint().1.unwrap_or(10);
-        let mut map = hashbrown::HashMap::with_capacity_and_hasher(possible_size, ahash::RandomState::new());
+        let mut map =
+            hashbrown::HashMap::with_capacity_and_hasher(possible_size, ahash::RandomState::new());
         for (key, value) in iterator {
             map.insert(key, value);
         }
@@ -180,7 +181,8 @@ where
 
 impl From<Vec<crate::core::profile::Instance>> for Lookup<String, crate::core::profile::Instance> {
     fn from(value: Vec<crate::core::profile::Instance>) -> Self {
-        let mut map = hashbrown::HashMap::with_capacity_and_hasher(value.len(), ahash::RandomState::new());
+        let mut map =
+            hashbrown::HashMap::with_capacity_and_hasher(value.len(), ahash::RandomState::new());
         for instance in value {
             map.insert(instance.name.clone(), instance);
         }
@@ -197,10 +199,7 @@ where
     where
         S: serde::Serializer,
     {
-        self.access
-            .iter()
-            .collect::<Vec<(&K, &V)>>()
-            .serialize(serializer)
+        self.access.iter().collect::<Vec<(&K, &V)>>().serialize(serializer)
     }
 }
 
