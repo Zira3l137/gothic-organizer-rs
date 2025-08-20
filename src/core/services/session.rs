@@ -24,7 +24,7 @@ pub struct SessionService {
     pub active_profile: Option<String>,
     pub active_instance: Option<String>,
     pub active_renderer_backend: Option<config::RendererBackend>,
-    pub active_zspy_level: Option<config::ZSpyMessagesLevel>,
+    pub active_zspy_config: Option<config::ZSpyConfig>,
     pub mod_storage_dir: Option<path::PathBuf>,
     pub theme_selected: Option<String>,
     pub files: lookup::Lookup<path::PathBuf, profile::FileInfo>,
@@ -41,7 +41,7 @@ impl SessionService {
             active_profile: None,
             active_instance: None,
             active_renderer_backend: None,
-            active_zspy_level: None,
+            active_zspy_config: None,
             mod_storage_dir: None,
             theme_selected: None,
             launch_options: None,
@@ -61,7 +61,7 @@ impl SessionService {
             if let Some(launch_options) = last_session.launch_options {
                 self.launch_options = Some(launch_options.clone());
                 self.active_renderer_backend = Some(launch_options.game_settings.renderer);
-                self.active_zspy_level = Some(launch_options.game_settings.zspy);
+                self.active_zspy_config = Some(launch_options.game_settings.zspy);
             }
 
             if let Some(profile_name) = last_session.selected_profile
@@ -117,18 +117,15 @@ impl SessionService {
         }
     }
 
-    pub fn exit(&mut self, wnd_id: &iced::window::Id) -> Task<app::Message> {
-        self.save_current_session();
-
+    pub fn close_window(&mut self, wnd_id: &iced::window::Id) -> Task<app::Message> {
         if let Some(wnd_state) = self.windows.get_mut(&Some(*wnd_id)) {
             wnd_state.closed = true;
         }
 
-        if self.windows.iter().all(|(_, wnd_state)| wnd_state.closed) {
-            iced::exit()
-        } else {
-            iced::window::get_latest().and_then(iced::window::close)
-        }
+        iced::Task::chain(
+            iced::window::get_latest().and_then(iced::window::close),
+            Task::done(app::Message::ExitApplication),
+        )
     }
 
     pub fn exit_with_error(&mut self, err: error::SharedError) -> Task<app::Message> {

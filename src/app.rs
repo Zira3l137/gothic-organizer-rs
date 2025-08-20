@@ -48,16 +48,21 @@ impl GothicOrganizer {
 
         app.state.profile_choices =
             combo_box::State::new(app.session.profile_names.clone().unwrap_or_default());
+
         app.state.instance_choices =
             combo_box::State::new(app.session.instance_names.clone().unwrap_or_default());
+
         app.state.themes = services::session::SessionService::load_default_themes();
+
         app.state.theme_choices =
             combo_box::State::new(app.state.themes.iter().map(|(_, t)| t.to_string()).collect());
+
         app.state.renderer_choices = combo_box::State::new(
             config::RendererBackend::into_iter().cloned().collect::<Vec<_>>(),
         );
+
         app.state.zspy_level_input =
-            app.session.active_zspy_level.unwrap_or(config::ZSpyMessagesLevel::Off).into();
+            app.session.active_zspy_config.get_or_insert_default().verbosity.into();
 
         (app, iced::Task::done(Message::InitWindow))
     }
@@ -121,7 +126,12 @@ impl GothicOrganizer {
             }
 
             Message::TraverseIntoDir(path) => {
-                self.fetch_ui_changes();
+                let mut profile_service =
+                    services::profile::ProfileService::new(&mut self.session, &mut self.state);
+
+                if let Err(err) = profile_service.update_instance_from_cache() {
+                    log::warn!("Couldn't update instance cache: {err}");
+                }
                 self.state.current_directory = path.clone();
                 let mut ui_service =
                     services::ui::UiService::new(&mut self.session, &mut self.state);
@@ -139,7 +149,12 @@ impl GothicOrganizer {
             }
 
             Message::ModToggle(name, new_state) => {
-                self.fetch_ui_changes();
+                let mut profile_service =
+                    services::profile::ProfileService::new(&mut self.session, &mut self.state);
+
+                if let Err(err) = profile_service.update_instance_from_cache() {
+                    log::warn!("Couldn't update instance cache: {err}");
+                }
                 let mut service = services::mods::ModService::new(&mut self.session);
                 service.toggle_mod(name.clone(), *new_state);
                 return iced::Task::done(Message::CurrentDirectoryUpdated);
@@ -192,10 +207,16 @@ impl GothicOrganizer {
                 self.session.toggle_launch_option(option, *new_state);
             }
 
+            Message::ToggleZSpy(new_state) => {
+                self.session.active_zspy_config.get_or_insert_default().enabled = *new_state;
+                self.session.launch_options.get_or_insert_default().game_settings.zspy.enabled =
+                    *new_state;
+            }
+
             Message::ZSpyLevelChanged(level) => {
                 self.state.zspy_level_input = *level;
-                self.session.active_zspy_level = Some((*level).into());
-                self.session.launch_options.get_or_insert_default().game_settings.zspy =
+                self.session.active_zspy_config.get_or_insert_default().verbosity = (*level).into();
+                self.session.launch_options.get_or_insert_default().game_settings.zspy.verbosity =
                     (*level).into();
             }
 
@@ -205,9 +226,26 @@ impl GothicOrganizer {
                 }
             }
 
-            Message::Exit(wnd_id) => {
-                self.fetch_ui_changes();
-                return self.session.exit(wnd_id);
+            Message::CloseWindowRequest(wnd_id) => {
+                return self.session.close_window(wnd_id);
+            }
+
+            Message::ExitApplication => {
+                if self.session.windows.iter().all(|(_, wnd_state)| wnd_state.closed) {
+                    let mut profile_service =
+                        services::profile::ProfileService::new(&mut self.session, &mut self.state);
+
+                    if let Err(err) = profile_service.update_instance_from_cache() {
+                        log::warn!("Couldn't update instance cache: {err}");
+                    }
+
+                    self.session.save_current_session();
+                    return iced::exit();
+                }
+            }
+
+            Message::None => {
+                return iced::Task::none();
             }
         }
 
@@ -216,7 +254,9 @@ impl GothicOrganizer {
 
     pub fn subscription(&self) -> iced::Subscription<Message> {
         iced::event::listen_with(|event, _, id| match event {
-            iced::Event::Window(iced::window::Event::CloseRequested) => Some(Message::Exit(id)),
+            iced::Event::Window(iced::window::Event::CloseRequested) => {
+                Some(Message::CloseWindowRequest(id))
+            }
             iced::Event::Window(iced::window::Event::FileDropped(path)) => {
                 Some(Message::ModAdd(Some(path)))
             }
@@ -247,20 +287,11 @@ impl GothicOrganizer {
             iced::widget::container(iced::widget::text("no window")).into()
         }
     }
-
-    fn fetch_ui_changes(&mut self) {
-        let mut profile_service =
-            services::profile::ProfileService::new(&mut self.session, &mut self.state);
-
-        if let Err(err) = profile_service.update_instance_from_cache() {
-            log::warn!("Couldn't update instance cache: {err}");
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    Exit(iced::window::Id),
+    CloseWindowRequest(iced::window::Id),
     SetModsDir(Option<PathBuf>),
     SetGameDir(Option<PathBuf>),
     ProfileSelected(String),
@@ -274,6 +305,7 @@ pub enum Message {
     OptionsRendererSwitched(config::RendererBackend),
     ToggleParserSetting(config::ParserCommand, bool),
     ToggleMarvinMode(bool),
+    ToggleZSpy(bool),
     TraverseIntoDir(PathBuf),
     ThemeSwitch(String),
     ModToggle(String, bool),
@@ -281,6 +313,7 @@ pub enum Message {
     ModAdd(Option<PathBuf>),
     ErrorReturned(error::SharedError),
     ZSpyLevelChanged(u8),
+    ExitApplication,
     OpenRepository,
     InstanceRemove(),
     InitWindow,
@@ -288,4 +321,5 @@ pub enum Message {
     FileToggleAll,
     CurrentDirectoryUpdated,
     LoadModsRequested,
+    None,
 }

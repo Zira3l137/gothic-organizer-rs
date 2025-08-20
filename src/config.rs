@@ -35,7 +35,7 @@ pub struct LaunchOptions {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct GameSettings {
     pub renderer: RendererBackend,
-    pub zspy: ZSpyMessagesLevel,
+    pub zspy: ZSpyConfig,
     pub marvin_mode: bool,
 }
 
@@ -44,8 +44,14 @@ pub struct ParserSettings {
     pub commands: Lookup<ParserCommand, bool>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct ZSpyConfig {
+    pub enabled: bool,
+    pub verbosity: ZSpyVerbosity,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-pub enum ZSpyMessagesLevel {
+pub enum ZSpyVerbosity {
     #[default]
     Off,
     Low,
@@ -54,39 +60,39 @@ pub enum ZSpyMessagesLevel {
     All,
 }
 
-impl From<ZSpyMessagesLevel> for u8 {
-    fn from(value: ZSpyMessagesLevel) -> Self {
+impl From<ZSpyVerbosity> for u8 {
+    fn from(value: ZSpyVerbosity) -> Self {
         match value {
-            ZSpyMessagesLevel::Off => 0,
-            ZSpyMessagesLevel::Low => 1,
-            ZSpyMessagesLevel::Medium => 5,
-            ZSpyMessagesLevel::High => 8,
-            ZSpyMessagesLevel::All => 10,
+            ZSpyVerbosity::Off => 0,
+            ZSpyVerbosity::Low => 1,
+            ZSpyVerbosity::Medium => 5,
+            ZSpyVerbosity::High => 8,
+            ZSpyVerbosity::All => 10,
         }
     }
 }
 
-impl From<u8> for ZSpyMessagesLevel {
+impl From<u8> for ZSpyVerbosity {
     fn from(value: u8) -> Self {
         match value {
-            0 => ZSpyMessagesLevel::Off,
-            1..=4 => ZSpyMessagesLevel::Low,
-            5..=7 => ZSpyMessagesLevel::Medium,
-            8..=9 => ZSpyMessagesLevel::High,
-            10 => ZSpyMessagesLevel::All,
-            _ => ZSpyMessagesLevel::All,
+            0 => ZSpyVerbosity::Off,
+            1..=4 => ZSpyVerbosity::Low,
+            5..=7 => ZSpyVerbosity::Medium,
+            8..=9 => ZSpyVerbosity::High,
+            10 => ZSpyVerbosity::All,
+            _ => ZSpyVerbosity::All,
         }
     }
 }
 
-impl std::fmt::Display for ZSpyMessagesLevel {
+impl std::fmt::Display for ZSpyVerbosity {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ZSpyMessagesLevel::Off => write!(f, "Off"),
-            ZSpyMessagesLevel::Low => write!(f, "Low"),
-            ZSpyMessagesLevel::Medium => write!(f, "Medium"),
-            ZSpyMessagesLevel::High => write!(f, "High"),
-            ZSpyMessagesLevel::All => write!(f, "All"),
+            ZSpyVerbosity::Off => write!(f, "Off"),
+            ZSpyVerbosity::Low => write!(f, "Low"),
+            ZSpyVerbosity::Medium => write!(f, "Medium"),
+            ZSpyVerbosity::High => write!(f, "High"),
+            ZSpyVerbosity::All => write!(f, "All"),
         }
     }
 }
@@ -157,6 +163,7 @@ impl ParserCommand {
         COMMANDS.iter()
     }
 
+    #[allow(dead_code)]
     pub fn into_argument(self) -> String {
         match self {
             ParserCommand::Game => "zReparse_Game".to_owned(),

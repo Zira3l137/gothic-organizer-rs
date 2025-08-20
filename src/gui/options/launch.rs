@@ -58,12 +58,20 @@ fn game_settings(
     }
 
     let zspy_level_label: iced::Element<app::Message> =
-        widget::Text::new(format!("ZSpy messages Level: {}", game_settings.zspy)).into();
+        widget::Text::new(format!("ZSpy verbosity Level: {}", game_settings.zspy.verbosity)).into();
 
     let zspy_slider: iced::Element<app::Message> = widget::Slider::new(
         std::ops::RangeInclusive::new(0, 10),
         app.state.zspy_level_input,
-        app::Message::ZSpyLevelChanged,
+        |value| {
+            if let Some(zspy_cfg) = &app.session.active_zspy_config
+                && zspy_cfg.enabled
+            {
+                app::Message::ZSpyLevelChanged(value)
+            } else {
+                app::Message::None
+            }
+        },
     )
     .into();
 
@@ -79,9 +87,11 @@ fn game_settings(
         styled_container!(widget::text("Game Settings"), border_width = 2.0, border_radius = 4.0)
             .padding(10)
             .align_left(iced::Length::Fill),
+        renderer_switcher,
         widget::Checkbox::new("Enable MARVIN mode", game_settings.marvin_mode)
             .on_toggle(|new_state| { app::Message::ToggleMarvinMode(new_state) }),
-        renderer_switcher,
+        widget::Checkbox::new("Enable zSpy", game_settings.zspy.enabled)
+            .on_toggle(|new_state| { app::Message::ToggleZSpy(new_state) }),
         zspy_level_label,
         zspy_slider
     ]
