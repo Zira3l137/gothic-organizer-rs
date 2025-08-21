@@ -19,8 +19,8 @@ pub fn mods_menu<'a>(
 
     let icon_add = svg_with_color!(
         "./resources/add_mod.svg",
-        color_idle = iced::Color::from_rgb(0.0, 230.0, 0.0),
-        color_hovered = iced::Color::from_rgb(0.0, 255.0, 0.0)
+        color_idle = palette_ext.success.base.color,
+        color_hovered = palette_ext.success.strong.color
     )
     .height(20)
     .width(20);
