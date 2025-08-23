@@ -3,12 +3,9 @@
 use std::path::Path;
 use std::path::PathBuf;
 
-use serde::Deserialize;
-use serde::Serialize;
-
 use crate::core::lookup::Lookup;
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Profile {
     pub name: String,
     pub path: PathBuf,
@@ -17,11 +14,7 @@ pub struct Profile {
 
 impl Profile {
     pub fn new(name: &str, path: &Path) -> Self {
-        Self {
-            name: name.to_owned(),
-            path: path.to_owned(),
-            instances: None,
-        }
+        Self { name: name.to_owned(), path: path.to_owned(), instances: None }
     }
 
     pub fn with_name(mut self, name: &str) -> Self {
@@ -63,22 +56,21 @@ impl Profile {
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Instance {
     pub name: String,
-    pub files: Option<Lookup<PathBuf, FileInfo>>,
-    pub overwrites: Option<Lookup<String, Lookup<PathBuf, FileInfo>>>,
+    pub files: Option<Lookup<PathBuf, FileMetadata>>,
+    pub overwrites: Option<Lookup<String, Lookup<PathBuf, FileMetadata>>>,
     pub mods: Option<Vec<ModInfo>>,
 }
 
 impl Instance {
-    pub fn new(name: &str, files: Option<Lookup<PathBuf, FileInfo>>, mods: Option<Vec<ModInfo>>) -> Self {
-        Self {
-            name: name.to_owned(),
-            files,
-            overwrites: None,
-            mods,
-        }
+    pub fn new(
+        name: &str,
+        files: Option<Lookup<PathBuf, FileMetadata>>,
+        mods: Option<Vec<ModInfo>>,
+    ) -> Self {
+        Self { name: name.to_owned(), files, overwrites: None, mods }
     }
 
     pub fn with_name(mut self, name: &str) -> Self {
@@ -86,7 +78,7 @@ impl Instance {
         self
     }
 
-    pub fn with_files(mut self, files: Option<Lookup<PathBuf, FileInfo>>) -> Self {
+    pub fn with_files(mut self, files: Option<Lookup<PathBuf, FileMetadata>>) -> Self {
         self.files = files;
         self
     }
@@ -96,28 +88,31 @@ impl Instance {
         self
     }
 
-    pub fn with_overwrites(mut self, overwrites: Option<Lookup<String, Lookup<PathBuf, FileInfo>>>) -> Self {
+    pub fn with_overwrites(
+        mut self,
+        overwrites: Option<Lookup<String, Lookup<PathBuf, FileMetadata>>>,
+    ) -> Self {
         self.overwrites = overwrites;
         self
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ModInfo {
     pub enabled: bool,
     pub name: String,
     pub path: PathBuf,
-    pub files: Lookup<PathBuf, FileInfo>,
+    pub files: Lookup<PathBuf, FileMetadata>,
 }
 
 impl ModInfo {
-    pub fn new(enabled: bool, name: &str, path: &Path, files: Lookup<PathBuf, FileInfo>) -> Self {
-        Self {
-            enabled,
-            name: name.to_owned(),
-            path: path.to_owned(),
-            files,
-        }
+    pub fn new(
+        enabled: bool,
+        name: &str,
+        path: &Path,
+        files: Lookup<PathBuf, FileMetadata>,
+    ) -> Self {
+        Self { enabled, name: name.to_owned(), path: path.to_owned(), files }
     }
 
     pub fn with_enabled(mut self, enabled: bool) -> Self {
@@ -135,22 +130,27 @@ impl ModInfo {
         self
     }
 
-    pub fn with_files(mut self, files: Lookup<PathBuf, FileInfo>) -> Self {
+    pub fn with_files(mut self, files: Lookup<PathBuf, FileMetadata>) -> Self {
         self.files = files;
         self
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct FileInfo {
+#[derive(Debug, Default, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct FileMetadata {
     pub enabled: bool,
     pub source_path: PathBuf,
     pub target_path: PathBuf,
     pub parent_name: Option<String>,
 }
 
-impl FileInfo {
-    pub fn new(enabled: bool, source_path: &Path, target_path: &Path, parent_name: Option<String>) -> Self {
+impl FileMetadata {
+    pub fn new(
+        enabled: bool,
+        source_path: &Path,
+        target_path: &Path,
+        parent_name: Option<String>,
+    ) -> Self {
         Self {
             enabled,
             source_path: source_path.to_owned(),

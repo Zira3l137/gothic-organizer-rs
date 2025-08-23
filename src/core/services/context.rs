@@ -5,10 +5,10 @@ use std::path;
 use crate::core::lookup;
 use crate::core::profile;
 
-type Overwrites = lookup::Lookup<String, lookup::Lookup<path::PathBuf, profile::FileInfo>>;
+type Overwrites = lookup::Lookup<String, lookup::Lookup<path::PathBuf, profile::FileMetadata>>;
 type Mods = Vec<profile::ModInfo>;
 type Instances = lookup::Lookup<String, profile::Instance>;
-type InstanceFiles = lookup::Lookup<path::PathBuf, profile::FileInfo>;
+type InstanceFiles = lookup::Lookup<path::PathBuf, profile::FileMetadata>;
 
 #[derive(Debug)]
 pub struct Context<'ctx> {
@@ -18,10 +18,7 @@ pub struct Context<'ctx> {
 
 impl<'ctx> Context<'ctx> {
     pub fn new(profile: &'ctx mut profile::Profile, instance_name: &str) -> Self {
-        Self {
-            active_profile: profile,
-            active_instance_name: instance_name.to_owned(),
-        }
+        Self { active_profile: profile, active_instance_name: instance_name.to_owned() }
     }
 
     pub fn instance(&self, instance_name: Option<&str>) -> Option<&profile::Instance> {
@@ -39,39 +36,27 @@ impl<'ctx> Context<'ctx> {
     }
 
     pub fn instance_mods(&self) -> Option<&Mods> {
-        self.instance(Some(&self.active_instance_name))?
-            .mods
-            .as_ref()
+        self.instance(Some(&self.active_instance_name))?.mods.as_ref()
     }
 
     pub fn instance_mods_mut(&mut self) -> Option<&mut Mods> {
-        self.instance_mut(Some(&self.active_instance_name.clone()))?
-            .mods
-            .as_mut()
+        self.instance_mut(Some(&self.active_instance_name.clone()))?.mods.as_mut()
     }
 
     pub fn instance_overwrites(&self) -> Option<&Overwrites> {
-        self.instance(Some(&self.active_instance_name))?
-            .overwrites
-            .as_ref()
+        self.instance(Some(&self.active_instance_name))?.overwrites.as_ref()
     }
 
     pub fn instance_overwrites_mut(&mut self) -> Option<&mut Overwrites> {
-        self.instance_mut(Some(&self.active_instance_name.clone()))?
-            .overwrites
-            .as_mut()
+        self.instance_mut(Some(&self.active_instance_name.clone()))?.overwrites.as_mut()
     }
 
     pub fn instance_files(&self) -> Option<&InstanceFiles> {
-        self.instance(Some(&self.active_instance_name))?
-            .files
-            .as_ref()
+        self.instance(Some(&self.active_instance_name))?.files.as_ref()
     }
 
     pub fn instance_files_mut(&mut self) -> Option<&mut InstanceFiles> {
-        self.instance_mut(Some(&self.active_instance_name.clone()))?
-            .files
-            .as_mut()
+        self.instance_mut(Some(&self.active_instance_name.clone()))?.files.as_mut()
     }
 
     pub fn instances(&self) -> Option<&Instances> {
@@ -112,9 +97,9 @@ impl<'ctx> Context<'ctx> {
         }
     }
 
-    pub fn set_instance_files(&mut self, files: InstanceFiles) {
+    pub fn set_instance_files(&mut self, files: Option<InstanceFiles>) {
         if let Some(instance) = self.instance_mut(Some(&self.active_instance_name.clone())) {
-            instance.files = Some(files);
+            instance.files = files;
         }
     }
 
@@ -123,7 +108,7 @@ impl<'ctx> Context<'ctx> {
         T: IntoIterator<
             Item = (
                 String,
-                crate::core::lookup::Lookup<path::PathBuf, crate::core::profile::FileInfo>,
+                crate::core::lookup::Lookup<path::PathBuf, crate::core::profile::FileMetadata>,
             ),
         >,
     {
@@ -147,7 +132,7 @@ impl<'ctx> Context<'ctx> {
 
     pub fn extend_instance_files<T>(&mut self, files: T)
     where
-        T: IntoIterator<Item = (path::PathBuf, crate::core::profile::FileInfo)>,
+        T: IntoIterator<Item = (path::PathBuf, crate::core::profile::FileMetadata)>,
     {
         if let Some(instance) = self.instance_mut(Some(&self.active_instance_name.clone())) {
             if let Some(f) = instance.files.as_mut() {

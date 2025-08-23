@@ -24,13 +24,19 @@ pub fn mods_menu<'a>(
     )
     .height(20)
     .width(20);
+    let icon_overwrites = widget::svg("./resources/overwrites.svg").height(20).width(20);
 
-    let button_add_mod = widget::button(icon_add).on_press(app::Message::ModAdd(None));
+    let button_add_mod = widget::button(icon_add).on_press(app::Message::AddMod(None));
+    let button_overwrites = widget::button(icon_overwrites)
+        .on_press(app::Message::RequestWindowOpen("overwrites".into()));
 
-    let group_mod_controls =
-        styled_container!(widget::row!(button_add_mod), border_width = 1.0, border_radius = 4.0)
-            .padding(10)
-            .align_left(iced::Length::Fill);
+    let group_mod_controls = styled_container!(
+        widget::row!(button_add_mod, button_overwrites),
+        border_width = 1.0,
+        border_radius = 4.0
+    )
+    .padding(10)
+    .align_left(iced::Length::Fill);
 
     styled_container!(
         widget::column!(group_mod_controls, widget::scrollable(mods_view)),
@@ -55,11 +61,11 @@ pub fn mods_view<'a>(
                 let mod_name: iced::Element<_> = widget::text(mod_info.name.clone()).into();
 
                 let checkbox = widget::checkbox("", mod_info.enabled).on_toggle(|new_state| {
-                    app::Message::ModToggle(mod_info.name.clone(), new_state)
+                    app::Message::ToggleMod(mod_info.name.clone(), new_state)
                 });
 
                 let button_uninstall = clickable_text!("Uninstall")
-                    .on_press(app::Message::ModUninstall(mod_info.name.clone()));
+                    .on_press(app::Message::RequestModUninstall(mod_info.name.clone()));
 
                 let mod_entry = styled_container!(
                     widget::row![checkbox, mod_name, widget::horizontal_space(), button_uninstall],

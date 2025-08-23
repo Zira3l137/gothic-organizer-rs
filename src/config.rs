@@ -7,27 +7,27 @@ use crate::core::lookup::Lookup;
 use crate::core::profile;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-pub struct AppConfig {
+pub struct ApplicationPreferences {
     pub mod_storage_dir: PathBuf,
-    pub theme: String,
+    pub theme_name: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-pub struct Session {
-    pub selected_profile: Option<String>,
-    pub selected_instance: Option<String>,
-    pub launch_options: Option<LaunchOptions>,
-    pub cache: Option<Lookup<PathBuf, profile::FileInfo>>,
+pub struct ApplicationSession {
+    pub active_profile_name: Option<String>,
+    pub active_instance_name: Option<String>,
+    pub game_launch_config: Option<GameLaunchConfiguration>,
+    pub cache: Option<Lookup<PathBuf, profile::FileMetadata>>,
 }
 
-impl AsRef<Session> for Session {
-    fn as_ref(&self) -> &Session {
+impl AsRef<ApplicationSession> for ApplicationSession {
+    fn as_ref(&self) -> &ApplicationSession {
         self
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-pub struct LaunchOptions {
+pub struct GameLaunchConfiguration {
     pub game_settings: GameSettings,
     pub parser_settings: ParserSettings,
 }
@@ -35,8 +35,8 @@ pub struct LaunchOptions {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct GameSettings {
     pub renderer: RendererBackend,
-    pub zspy: ZSpyConfig,
-    pub marvin_mode: bool,
+    pub zspy: ZspyConfig,
+    pub is_marvin_mode_enabled: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -45,8 +45,8 @@ pub struct ParserSettings {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
-pub struct ZSpyConfig {
-    pub enabled: bool,
+pub struct ZspyConfig {
+    pub is_enabled: bool,
     pub verbosity: ZSpyVerbosity,
 }
 

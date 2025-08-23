@@ -7,13 +7,13 @@ use crate::impl_shared_error_from;
 #[derive(Error, Debug)]
 pub enum GothicOrganizerError {
     #[error("IO Error: {0}")]
-    IO(#[from] std::io::Error),
+    Io(#[from] std::io::Error),
     #[error("JSON Error: {0}")]
     Json(#[from] serde_json::Error),
-    #[error("Error: {0}")]
-    Other(String),
     #[error("Zip Error: {0}")]
     Zip(#[from] zip::result::ZipError),
+    #[error("Error: {0}")]
+    Other(String),
 }
 
 impl GothicOrganizerError {
@@ -22,7 +22,7 @@ impl GothicOrganizerError {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Error)]
 pub struct SharedError(std::sync::Arc<dyn std::error::Error + Send + Sync>);
 
 impl SharedError {
@@ -39,8 +39,6 @@ impl std::fmt::Display for SharedError {
         self.0.fmt(f)
     }
 }
-
-impl std::error::Error for SharedError {}
 
 impl_shared_error_from!(
     GothicOrganizerError,

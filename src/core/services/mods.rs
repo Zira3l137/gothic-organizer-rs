@@ -28,55 +28,54 @@ impl<'a> ModService<'a> {
             return Task::none();
         };
 
-        let mod_path = match self.move_mod_to_storage(&mod_source_path) {
-            Ok(path) => path,
-            Err(e) => {
-                log::warn!("Failed to move mod to storage: {e}");
-                return Task::none();
+        let mod_path = if Self::is_valid_mod_source(&mod_source_path) {
+            match self.move_mod_to_storage(&mod_source_path) {
+                Ok(path) => path,
+                Err(e) => {
+                    log::warn!("Failed to move mod to storage: {e}");
+                    return Task::none();
+                }
             }
+        } else {
+            return Task::none();
         };
 
-        if Self::is_valid_mod_source(&mod_path) {
-            let Ok(mut context) = self.context() else {
-                return Task::none();
-            };
+        let Ok(mut context) = self.context() else {
+            return Task::none();
+        };
 
-            let profile_path = context.active_profile.path.clone();
+        let profile_path = context.active_profile.path.clone();
+        let mod_name = mod_path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap();
 
-            let mod_name = mod_path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap();
-
-            let file_info = |path: &path::Path| {
-                core::profile::FileInfo::default()
-                    .with_enabled(true)
-                    .with_source_path(path)
-                    .with_parent_name(mod_name.clone())
-            };
-
-            let mod_files = ignore::WalkBuilder::new(mod_path.clone())
-                .ignore(false)
-                .build()
-                .filter_map(|e| e.ok().map(|e| (e.path().to_path_buf(), file_info(e.path()))))
-                .collect::<core::lookup::Lookup<path::PathBuf, core::profile::FileInfo>>();
-
-            let new_mod_info = core::profile::ModInfo::default()
+        let get_file_info = |path: &path::Path| {
+            core::profile::FileMetadata::default()
                 .with_enabled(true)
-                .with_name(&mod_name)
-                .with_path(&mod_path)
-                .with_files(mod_files);
+                .with_source_path(path)
+                .with_parent_name(mod_name.clone())
+        };
 
-            if let Some(instance) = context.instance_mut(None) {
-                Self::apply_mod_files(instance, &new_mod_info, &profile_path);
-                instance.mods.get_or_insert_default().push(new_mod_info.clone());
-            } else {
-                return Task::done(app::Message::ErrorReturned(error::SharedError::new(
-                    error::GothicOrganizerError::Other("No active instance".to_owned()),
-                )));
-            }
+        let mod_files = ignore::WalkBuilder::new(mod_path.clone())
+            .ignore(false)
+            .build()
+            .filter_map(|e| e.ok().map(|e| (e.path().to_path_buf(), get_file_info(e.path()))))
+            .collect::<core::lookup::Lookup<path::PathBuf, core::profile::FileMetadata>>();
 
-            return Task::done(app::Message::CurrentDirectoryUpdated);
+        let new_mod_info = core::profile::ModInfo::default()
+            .with_enabled(true)
+            .with_name(&mod_name)
+            .with_path(&mod_path)
+            .with_files(mod_files);
+
+        if let Some(instance) = context.instance_mut(None) {
+            Self::apply_mod_files(instance, &new_mod_info, &profile_path);
+            instance.mods.get_or_insert_default().push(new_mod_info.clone());
+        } else {
+            return Task::done(app::Message::RequestPanicWithErr(error::SharedError::new(
+                error::GothicOrganizerError::Other("No active instance".to_owned()),
+            )));
         }
 
-        Task::none()
+        Task::done(app::Message::RequestDirEntriesReload)
     }
 
     pub fn remove_mod(&mut self, mod_name: String) -> Task<app::Message> {
@@ -91,7 +90,7 @@ impl<'a> ModService<'a> {
             && let Some(mod_info) = mods.iter().find(|info| info.name == mod_name)
         {
             if let Err(e) = std::fs::remove_dir_all(&mod_info.path) {
-                return Task::done(app::Message::ErrorReturned(error::SharedError::new(e)));
+                return Task::done(app::Message::RequestPanicWithErr(error::SharedError::new(e)));
             };
 
             mods.retain(|info| info.name != mod_name);
@@ -100,7 +99,7 @@ impl<'a> ModService<'a> {
                 overwrites.remove(&mod_name);
             }
 
-            return Task::done(app::Message::CurrentDirectoryUpdated);
+            return Task::done(app::Message::RequestDirEntriesReload);
         }
         Task::none()
     }
@@ -199,7 +198,7 @@ impl<'a> ModService<'a> {
             }
         }
 
-        Task::done(app::Message::CurrentDirectoryUpdated)
+        Task::done(app::Message::RequestDirEntriesReload)
     }
 
     pub fn is_valid_mod_source(mod_path: &path::Path) -> bool {
@@ -211,12 +210,11 @@ impl<'a> ModService<'a> {
         &mut self,
         mod_path: &path::Path,
     ) -> Result<path::PathBuf, error::GothicOrganizerError> {
-        let storage_dir = self.session.mod_storage_dir.clone().unwrap_or_else(|| {
-            core::constants::default_mod_storage_dir().unwrap_or_else(|e| {
-                log::warn!("Failed to get default mod storage dir: {e}");
-                path::PathBuf::from("mods")
-            })
-        });
+        let storage_dir = self
+            .session
+            .mod_storage_dir
+            .clone()
+            .unwrap_or_else(core::constants::default_mod_storage_path);
 
         let context = self.context()?;
         let profile_name = context.active_profile.name.clone();

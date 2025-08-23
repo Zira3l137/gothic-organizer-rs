@@ -18,8 +18,8 @@ pub fn header<'a>(palette_ext: &iced::theme::palette::Extended) -> iced::Element
 
     let title = widget::text!("{}", constants::app_title_full()).size(30);
     let button_options_icon = svg_with_color!("./resources/options.svg").height(20).width(20);
-    let button_options =
-        widget::button(button_options_icon).on_press(app::Message::InvokeOptionsMenu);
+    let button_options = widget::button(button_options_icon)
+        .on_press(app::Message::RequestWindowOpen("options".into()));
 
     let header = widget::row!(title, widget::horizontal_space(), button_options)
         .spacing(10)

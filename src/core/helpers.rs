@@ -20,51 +20,59 @@ use crate::error;
 fn default_path<P: AsRef<Path>>(custom_path: Option<P>) -> PathBuf {
     match custom_path {
         Some(p) => p.as_ref().to_path_buf(),
-        None => PathBuf::from(crate::core::constants::local_app_data()).join(constants::APP_NAME),
+        None => crate::core::constants::local_app_data_path().join(constants::APP_NAME),
     }
 }
 
-pub fn save_config<P: AsRef<Path>>(
+pub fn save_app_preferences<P: AsRef<Path>>(
     theme: Option<String>,
     mod_storage_dir: Option<PathBuf>,
     custom_path: Option<P>,
 ) -> Result<(), error::GothicOrganizerError> {
-    let config = config::AppConfig {
-        theme: theme.unwrap_or("Dark".to_string()),
-        mod_storage_dir: mod_storage_dir.unwrap_or(constants::default_mod_storage_dir()?),
+    let prefs = config::ApplicationPreferences {
+        theme_name: theme.unwrap_or("Dark".to_string()),
+        mod_storage_dir: mod_storage_dir.unwrap_or(constants::default_mod_storage_path()),
     };
 
     let default_path = default_path(custom_path);
-    let config_string =
-        serde_json::to_string_pretty(&config).map_err(error::GothicOrganizerError::Json)?;
-    write(default_path.join("config.json"), config_string)
-        .map_err(error::GothicOrganizerError::IO)?;
+    let prefs_json =
+        serde_json::to_string_pretty(&prefs).map_err(error::GothicOrganizerError::Json)?;
+    write(default_path.join("preferences.json"), prefs_json)
+        .map_err(error::GothicOrganizerError::Io)?;
 
     Ok(())
 }
 
-pub fn load_config<P: AsRef<Path>>(custom_path: Option<P>) -> Option<config::AppConfig> {
+pub fn load_app_preferences<P: AsRef<Path>>(
+    custom_path: Option<P>,
+) -> Option<config::ApplicationPreferences> {
     let default_path = default_path(custom_path);
     if !default_path.exists() {
         return None;
     }
 
-    let config_json = read_to_string(default_path.join("config.json")).ok()?;
+    let prefs_json = read_to_string(default_path.join("preferences.json")).ok()?;
 
-    let Ok(config): Result<config::AppConfig, _> = serde_json::from_str(&config_json) else {
+    let Ok(prefs): Result<config::ApplicationPreferences, _> = serde_json::from_str(&prefs_json)
+    else {
         return None;
     };
 
-    Some(config)
+    Some(prefs)
 }
-pub fn save_session<P: AsRef<Path>>(
+pub fn save_app_session<P: AsRef<Path>>(
     selected_profile: Option<String>,
     selected_instance: Option<String>,
-    launch_options: Option<config::LaunchOptions>,
-    cache: Option<Lookup<PathBuf, profile::FileInfo>>,
+    launch_options: Option<config::GameLaunchConfiguration>,
+    cache: Option<Lookup<PathBuf, profile::FileMetadata>>,
     custom_path: Option<P>,
 ) -> Result<(), std::io::Error> {
-    let session = config::Session { selected_profile, selected_instance, launch_options, cache };
+    let session = config::ApplicationSession {
+        active_profile_name: selected_profile,
+        active_instance_name: selected_instance,
+        game_launch_config: launch_options,
+        cache,
+    };
 
     let default_path = default_path(custom_path);
     let session_string = serde_json::to_string_pretty(&session)?;
@@ -73,7 +81,9 @@ pub fn save_session<P: AsRef<Path>>(
     Ok(())
 }
 
-pub fn load_session<P: AsRef<Path>>(custom_path: Option<P>) -> Option<config::Session> {
+pub fn load_app_session<P: AsRef<Path>>(
+    custom_path: Option<P>,
+) -> Option<config::ApplicationSession> {
     let default_path = default_path(custom_path);
     if !default_path.exists() {
         return None;
@@ -81,7 +91,8 @@ pub fn load_session<P: AsRef<Path>>(custom_path: Option<P>) -> Option<config::Se
 
     let session_json = read_to_string(default_path.join("session.json")).ok()?;
 
-    let Ok(session): Result<config::Session, _> = serde_json::from_str(&session_json) else {
+    let Ok(session): Result<config::ApplicationSession, _> = serde_json::from_str(&session_json)
+    else {
         return None;
     };
 

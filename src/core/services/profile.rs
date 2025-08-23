@@ -11,7 +11,7 @@ use crate::error;
 
 pub struct ProfileService<'a> {
     session: &'a mut core::services::session::SessionService,
-    app_state: &'a mut app::InnerState,
+    app_state: &'a mut app::ApplicationState,
 }
 
 crate::impl_service!(ProfileService);
@@ -19,7 +19,7 @@ crate::impl_service!(ProfileService);
 impl<'a> ProfileService<'a> {
     pub fn new(
         session: &'a mut core::services::session::SessionService,
-        app_state: &'a mut app::InnerState,
+        app_state: &'a mut app::ApplicationState,
     ) -> Self {
         Self { session, app_state }
     }
@@ -42,7 +42,7 @@ impl<'a> ProfileService<'a> {
             self.app_state.instance_choices = iced::widget::combo_box::State::new(instances);
 
             if !next_profile.path.as_os_str().is_empty() {
-                return Task::done(app::Message::CurrentDirectoryUpdated);
+                return Task::done(app::Message::RequestDirEntriesReload);
             }
         }
 
@@ -50,18 +50,18 @@ impl<'a> ProfileService<'a> {
     }
 
     pub fn update_instance_from_cache(&mut self) -> Result<(), error::GothicOrganizerError> {
-        self.session.files.extend(self.app_state.current_directory_entries.iter().cloned());
+        self.session.files.extend(self.app_state.dir_entries.iter().cloned());
 
         let cached_files = self.session.files.clone();
         let mut context = self.context()?;
 
-        context.set_instance_files(cached_files);
+        context.set_instance_files(Some(cached_files));
         Ok(())
     }
 
     pub fn add_instance_for_profile(&mut self, profile_name: &str) -> Task<app::Message> {
         if let Some(profile) = self.session.profiles.get_mut(profile_name) {
-            let instance_name = self.app_state.instance_input.clone();
+            let instance_name = self.app_state.instance_name_field.clone();
             if instance_name.is_empty() {
                 return Task::none();
             }
@@ -73,12 +73,12 @@ impl<'a> ProfileService<'a> {
                 .map(|entry| {
                     (
                         entry.path().to_path_buf(),
-                        profile::FileInfo::default()
+                        profile::FileMetadata::default()
                             .with_source_path(entry.path())
                             .with_enabled(true),
                     )
                 })
-                .collect::<lookup::Lookup<path::PathBuf, profile::FileInfo>>();
+                .collect::<lookup::Lookup<path::PathBuf, profile::FileMetadata>>();
 
             let new_instance = core::profile::Instance::default()
                 .with_name(&instance_name)
@@ -92,7 +92,7 @@ impl<'a> ProfileService<'a> {
             instances.insert(instance_name.clone(), new_instance);
             self.app_state.instance_choices =
                 iced::widget::combo_box::State::new(instances.keys().cloned().collect());
-            self.app_state.instance_input = String::new();
+            self.app_state.instance_name_field = String::new();
 
             return self.switch_instance(&instance_name);
         }
@@ -121,7 +121,7 @@ impl<'a> ProfileService<'a> {
         }
 
         self.app_state.instance_choices = iced::widget::combo_box::State::new(instance_names);
-        self.app_state.instance_input = String::new();
+        self.app_state.instance_name_field = String::new();
         self.session.active_instance = None;
     }
 
@@ -130,11 +130,11 @@ impl<'a> ProfileService<'a> {
             log::error!("Failed to update instance from cache: {err}");
         }
         self.session.active_instance = Some(instance_name.to_owned());
-        Task::done(app::Message::CurrentDirectoryUpdated)
+        Task::done(app::Message::RequestDirEntriesReload)
     }
 
     pub fn set_game_dir(&mut self, path: Option<path::PathBuf>) -> Task<app::Message> {
-        let Ok(context) = self.context() else {
+        let Ok(mut context) = self.context() else {
             log::error!("Failed to get context");
             return Task::none();
         };
@@ -148,7 +148,8 @@ impl<'a> ProfileService<'a> {
         };
 
         context.active_profile.path = path.clone();
-        self.app_state.current_directory = path.clone();
+        context.set_instance_files(None);
+        self.app_state.current_dir = path.clone();
 
         self.session.files.clear();
         self.session.files.extend(
@@ -156,7 +157,7 @@ impl<'a> ProfileService<'a> {
                 |entry| {
                     (
                         entry.path().to_path_buf(),
-                        core::profile::FileInfo::default()
+                        core::profile::FileMetadata::default()
                             .with_source_path(entry.path())
                             .with_enabled(true),
                     )
@@ -169,8 +170,8 @@ impl<'a> ProfileService<'a> {
         }
 
         Task::batch(vec![
-            Task::done(app::Message::LoadModsRequested),
-            Task::done(app::Message::CurrentDirectoryUpdated),
+            Task::done(app::Message::RequestModsReload),
+            Task::done(app::Message::RequestDirEntriesReload),
         ])
     }
 
@@ -182,7 +183,10 @@ impl<'a> ProfileService<'a> {
 
         let Some(path) = path.or_else(|| {
             rfd::FileDialog::new()
-                .set_title(format!("Select {} directory", &context.active_profile.name))
+                .set_title(format!(
+                    "Select mod storage directory for {}",
+                    &context.active_profile.name
+                ))
                 .pick_folder()
         }) else {
             log::error!("Failed to get mod storage path");
@@ -192,9 +196,9 @@ impl<'a> ProfileService<'a> {
         self.session.mod_storage_dir = Some(path.clone());
 
         if let Err(err) = std::fs::create_dir_all(&path) {
-            Task::done(app::Message::ErrorReturned(error::SharedError::new(err)))
+            Task::done(app::Message::RequestPanicWithErr(error::SharedError::new(err)))
         } else {
-            Task::done(app::Message::CurrentDirectoryUpdated)
+            Task::done(app::Message::RequestDirEntriesReload)
         }
     }
 }

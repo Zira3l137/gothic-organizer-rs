@@ -35,28 +35,24 @@ pub fn file_view_controls<'a>(
     let icon_back = svg_with_color!("./resources/back.svg").height(20).width(20);
     let icon_home = svg_with_color!("./resources/home.svg").height(20).width(20);
     let button_back_message = current_profile.and_then(|profile| {
-        if profile.path == app.state.current_directory {
+        if profile.path == app.state.current_dir {
             return None;
         };
-        Some(app::Message::TraverseIntoDir(
-            app.state
-                .current_directory
-                .clone()
-                .parent()
-                .unwrap_or(profile.path.as_ref())
-                .to_path_buf(),
+        Some(app::Message::UpdateActiveUiDir(
+            app.state.current_dir.clone().parent().unwrap_or(profile.path.as_ref()).to_path_buf(),
         ))
     });
     let button_home_message = current_profile.and_then(|profile| {
-        if profile.path == app.state.current_directory {
+        if profile.path == app.state.current_dir {
             return None;
         };
-        Some(app::Message::TraverseIntoDir(profile.path.clone()))
+        Some(app::Message::UpdateActiveUiDir(profile.path.clone()))
     });
 
     let button_back = widget::button(icon_back).on_press_maybe(button_back_message);
     let button_home = widget::button(icon_home).on_press_maybe(button_home_message);
-    let button_toggle_all = widget::button("Toggle all").on_press(app::Message::FileToggleAll);
+    let button_toggle_all =
+        widget::button("Toggle all").on_press(app::Message::ToggleAllFileEntries);
 
     styled_container!(
         widget::row!(button_back, button_home, button_toggle_all).spacing(10),
@@ -77,7 +73,7 @@ pub fn file_view<'a>(
     };
 
     app.state
-        .current_directory_entries
+        .dir_entries
         .iter()
         .fold(widget::Column::new(), |column, (path, info)| {
             let file_name = path.file_name().unwrap().to_string_lossy().to_string();
@@ -91,7 +87,7 @@ pub fn file_view<'a>(
 
             let label: iced::Element<_> = match &is_dir {
                 true => clickable_text!("{file_name}")
-                    .on_press(app::Message::TraverseIntoDir(path.clone()))
+                    .on_press(app::Message::UpdateActiveUiDir(path.clone()))
                     .into(),
                 false => widget::text(file_name).into(),
             };
@@ -100,7 +96,7 @@ pub fn file_view<'a>(
             let tooltip_body =
                 styled_container!(tooltip_text, border_width = 1.0, border_radius = 4.0).padding(5);
             let checkbox = widget::checkbox("", info.enabled)
-                .on_toggle(|_| app::Message::FileToggle(path.clone()));
+                .on_toggle(|_| app::Message::ToggleFileEntry(path.clone()));
 
             let file_entry = widget::tooltip(
                 styled_container!(

@@ -5,7 +5,7 @@ use crate::styled_container;
 
 pub fn config_menu(app: &app::GothicOrganizer) -> iced::Element<app::Message> {
     let theme_setting = theme_setting(app);
-    let profile_setting = profile_setting(app);
+    let profile_setting = game_directory_setting(app);
     let mods_dir_setting = mods_dir_setting(app);
 
     styled_container!(
@@ -21,15 +21,13 @@ pub fn config_menu(app: &app::GothicOrganizer) -> iced::Element<app::Message> {
 pub fn mods_dir_setting(app: &app::GothicOrganizer) -> iced::Element<app::Message> {
     let label_mods_dir = widget::text!("Mods directory:");
     let input_mods_dir: iced::Element<app::Message> =
-        widget::text_input("Mods directory", app.state.mods_directory_input.as_ref())
+        widget::text_input("Mods directory", app.state.mods_dir_field.as_ref())
             .on_input_maybe(if app.session.active_profile.is_some() {
-                Some(app::Message::ModsDirInput)
+                Some(app::Message::UpdateModsDirField)
             } else {
                 None
             })
-            .on_submit(app::Message::SetModsDir(Some(
-                app.state.mods_directory_input.clone().into(),
-            )))
+            .on_submit(app::Message::SetModsDir(Some(app.state.mods_dir_field.clone().into())))
             .into();
 
     let button_browse_mods_dir =
@@ -49,18 +47,16 @@ pub fn mods_dir_setting(app: &app::GothicOrganizer) -> iced::Element<app::Messag
     .into()
 }
 
-pub fn profile_setting(app: &app::GothicOrganizer) -> iced::Element<app::Message> {
+pub fn game_directory_setting(app: &app::GothicOrganizer) -> iced::Element<app::Message> {
     let label_profile_dir = widget::text!("Game directory:");
     let input_profile_dir: iced::Element<app::Message> =
-        widget::text_input("Game directory", app.state.profile_directory_input.as_ref())
+        widget::text_input("Game directory", app.state.profile_dir_field.as_ref())
             .on_input_maybe(if app.session.active_profile.is_some() {
-                Some(app::Message::ProfileDirInput)
+                Some(app::Message::UpdateProfileDirField)
             } else {
                 None
             })
-            .on_submit(app::Message::SetGameDir(Some(
-                app.state.profile_directory_input.clone().into(),
-            )))
+            .on_submit(app::Message::SetGameDir(Some(app.state.profile_dir_field.clone().into())))
             .into();
 
     let button_browse_profile_dir =
@@ -87,7 +83,7 @@ pub fn theme_setting(app: &app::GothicOrganizer) -> iced::Element<app::Message> 
         &app.state.theme_choices,
         "Application theme",
         app.session.theme_selected.as_ref(),
-        app::Message::ThemeSwitch,
+        app::Message::SetUiTheme,
     );
 
     widget::row!(label_theme, iced::widget::horizontal_space(), choice_theme).spacing(10).into()

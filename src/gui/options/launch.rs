@@ -7,7 +7,7 @@ use crate::styled_container;
 
 fn parser_settings(
     _app: &app::GothicOrganizer,
-    launch_options: Option<config::LaunchOptions>,
+    launch_options: Option<config::GameLaunchConfiguration>,
 ) -> iced::Element<app::Message> {
     let mut parser_settings: Lookup<config::ParserCommand, bool> = Lookup::new();
     if let Some(launch_options) = launch_options {
@@ -50,7 +50,7 @@ fn parser_settings(
 
 fn game_settings(
     app: &app::GothicOrganizer,
-    launch_options: Option<config::LaunchOptions>,
+    launch_options: Option<config::GameLaunchConfiguration>,
 ) -> iced::Element<app::Message> {
     let mut game_settings = config::GameSettings::default();
     if let Some(launch_options) = launch_options {
@@ -62,14 +62,14 @@ fn game_settings(
 
     let zspy_slider: iced::Element<app::Message> = widget::Slider::new(
         std::ops::RangeInclusive::new(0, 10),
-        app.state.zspy_level_input,
+        app.state.zspy_level_field,
         |value| {
             if let Some(zspy_cfg) = &app.session.active_zspy_config
-                && zspy_cfg.enabled
+                && zspy_cfg.is_enabled
             {
-                app::Message::ZSpyLevelChanged(value)
+                app::Message::UpdateZspyLevelField(value)
             } else {
-                app::Message::None
+                app::Message::Idle
             }
         },
     )
@@ -79,7 +79,7 @@ fn game_settings(
         &app.state.renderer_choices,
         "Renderer Backend",
         app.session.active_renderer_backend.as_ref(),
-        app::Message::OptionsRendererSwitched,
+        app::Message::SetRendererBackend,
     )
     .into();
 
@@ -88,10 +88,10 @@ fn game_settings(
             .padding(10)
             .align_left(iced::Length::Fill),
         renderer_switcher,
-        widget::Checkbox::new("Enable MARVIN mode", game_settings.marvin_mode)
+        widget::Checkbox::new("Enable MARVIN mode", game_settings.is_marvin_mode_enabled)
             .on_toggle(|new_state| { app::Message::ToggleMarvinMode(new_state) }),
-        widget::Checkbox::new("Enable zSpy", game_settings.zspy.enabled)
-            .on_toggle(|new_state| { app::Message::ToggleZSpy(new_state) }),
+        widget::Checkbox::new("Enable zSpy", game_settings.zspy.is_enabled)
+            .on_toggle(|new_state| { app::Message::ToggleZSpyState(new_state) }),
         zspy_level_label,
         zspy_slider
     ]

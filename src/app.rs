@@ -13,29 +13,29 @@ use crate::gui::options;
 #[derive(Debug, Default)]
 pub struct GothicOrganizer {
     pub session: services::session::SessionService,
-    pub state: InnerState,
+    pub state: ApplicationState,
 }
 
 #[derive(Debug, Default)]
-pub struct InnerState {
-    pub current_directory: PathBuf,
-    pub instance_input: String,
-    pub profile_directory_input: String,
-    pub mods_directory_input: String,
-    pub zspy_level_input: u8,
-    pub current_options_menu: options::menu::OptionsMenu,
+pub struct ApplicationState {
+    pub current_dir: PathBuf,
+    pub instance_name_field: String,
+    pub profile_dir_field: String,
+    pub mods_dir_field: String,
+    pub zspy_level_field: u8,
+    pub active_options_menu: options::menu::OptionsMenu,
     pub profile_choices: combo_box::State<String>,
     pub theme_choices: combo_box::State<String>,
     pub instance_choices: combo_box::State<String>,
     pub renderer_choices: combo_box::State<config::RendererBackend>,
     pub themes: lookup::Lookup<String, iced::Theme>,
-    pub current_directory_entries: Vec<(PathBuf, profile::FileInfo)>,
+    pub dir_entries: Vec<(PathBuf, profile::FileMetadata)>,
 }
 
 #[derive(Debug, Default)]
 pub struct WindowState {
-    pub name: String,
-    pub closed: bool,
+    pub wnd_name: String,
+    pub is_closed: bool,
 }
 
 impl GothicOrganizer {
@@ -61,177 +61,45 @@ impl GothicOrganizer {
             config::RendererBackend::into_iter().cloned().collect::<Vec<_>>(),
         );
 
-        app.state.zspy_level_input =
+        app.state.zspy_level_field =
             app.session.active_zspy_config.get_or_insert_default().verbosity.into();
 
-        (app, iced::Task::done(Message::InitWindow))
+        (app, iced::Task::done(Message::RequestInitializeMainWindow))
     }
 
     pub fn update(&mut self, message: Message) -> iced::Task<Message> {
         match &message {
-            Message::InitWindow => {
+            Message::RequestInitializeMainWindow => {
                 return self.session.init_window();
             }
 
-            Message::ThemeSwitch(theme) => {
-                self.session.theme_selected = Some(theme.clone());
-            }
-
-            Message::ProfileSelected(profile_name) => {
-                let mut service =
-                    services::profile::ProfileService::new(&mut self.session, &mut self.state);
-                return service.switch_profile(profile_name);
-            }
-
-            Message::InstanceSelected(instance) => {
-                let mut service =
-                    services::profile::ProfileService::new(&mut self.session, &mut self.state);
-                return service.switch_instance(instance);
-            }
-
-            Message::InstanceInput(input) => {
-                self.state.instance_input = input.clone();
-            }
-
-            Message::InstanceAdd(profile_name) => {
-                let mut service =
-                    services::profile::ProfileService::new(&mut self.session, &mut self.state);
-                return service.add_instance_for_profile(profile_name);
-            }
-
-            Message::InstanceRemove() => {
-                let mut service =
-                    services::profile::ProfileService::new(&mut self.session, &mut self.state);
-                service.remove_instance_from_profile();
-            }
-
-            Message::FileToggle(path) => {
-                let mut service = services::ui::UiService::new(&mut self.session, &mut self.state);
-                service.toggle_state_recursive(Some(path));
-            }
-
-            Message::FileToggleAll => {
-                let mut service = services::ui::UiService::new(&mut self.session, &mut self.state);
-                service.toggle_state_recursive(None);
-            }
-
-            Message::SetGameDir(path) => {
-                let mut service =
-                    services::profile::ProfileService::new(&mut self.session, &mut self.state);
-                return service.set_game_dir(path.clone());
-            }
-
-            Message::ProfileDirInput(input) => {
-                self.state.profile_directory_input = input.clone();
-            }
-
-            Message::TraverseIntoDir(path) => {
-                let mut profile_service =
-                    services::profile::ProfileService::new(&mut self.session, &mut self.state);
-
-                if let Err(err) = profile_service.update_instance_from_cache() {
-                    log::warn!("Couldn't update instance cache: {err}");
-                }
-                self.state.current_directory = path.clone();
-                let mut ui_service =
-                    services::ui::UiService::new(&mut self.session, &mut self.state);
-                ui_service.reload_displayed_directory(Some(path.clone()))
-            }
-
-            Message::CurrentDirectoryUpdated => {
+            Message::RequestDirEntriesReload => {
                 let mut service = services::ui::UiService::new(&mut self.session, &mut self.state);
                 service.reload_displayed_directory(None);
             }
 
-            Message::LoadModsRequested => {
+            Message::RequestModsReload => {
                 let mut service = services::mods::ModService::new(&mut self.session);
                 return service.reload_mods();
             }
 
-            Message::ModToggle(name, new_state) => {
-                let mut profile_service =
-                    services::profile::ProfileService::new(&mut self.session, &mut self.state);
-
-                if let Err(err) = profile_service.update_instance_from_cache() {
-                    log::warn!("Couldn't update instance cache: {err}");
-                }
-                let mut service = services::mods::ModService::new(&mut self.session);
-                service.toggle_mod(name.clone(), *new_state);
-                return iced::Task::done(Message::CurrentDirectoryUpdated);
-            }
-
-            Message::ModUninstall(name) => {
+            Message::RequestModUninstall(name) => {
                 let mut service = services::mods::ModService::new(&mut self.session);
                 return service.remove_mod(name.clone());
             }
 
-            Message::ModAdd(path) => {
-                let mut service = services::mods::ModService::new(&mut self.session);
-                return service.add_mod(path.clone());
-            }
-
-            Message::ModsDirInput(input) => {
-                self.state.mods_directory_input = input.clone();
-            }
-
-            Message::SetModsDir(path) => {
-                let mut service =
-                    services::profile::ProfileService::new(&mut self.session, &mut self.state);
-                return service.set_mods_dir(path.clone());
-            }
-
-            Message::InvokeOptionsMenu => {
-                return self.session.invoke_options_window();
-            }
-
-            Message::ErrorReturned(err) => {
-                return self.session.exit_with_error(err.clone());
-            }
-
-            Message::OptionsMenuSwitched(menu) => {
-                self.state.current_options_menu = *menu;
-            }
-
-            Message::OptionsRendererSwitched(backend) => {
-                self.session.active_renderer_backend = Some(backend.clone());
-                self.session.launch_options.get_or_insert_default().game_settings.renderer =
-                    backend.clone();
-            }
-
-            Message::ToggleMarvinMode(new_state) => {
-                self.session.launch_options.get_or_insert_default().game_settings.marvin_mode =
-                    *new_state;
-            }
-
-            Message::ToggleParserSetting(option, new_state) => {
-                self.session.toggle_launch_option(option, *new_state);
-            }
-
-            Message::ToggleZSpy(new_state) => {
-                self.session.active_zspy_config.get_or_insert_default().enabled = *new_state;
-                self.session.launch_options.get_or_insert_default().game_settings.zspy.enabled =
-                    *new_state;
-            }
-
-            Message::ZSpyLevelChanged(level) => {
-                self.state.zspy_level_input = *level;
-                self.session.active_zspy_config.get_or_insert_default().verbosity = (*level).into();
-                self.session.launch_options.get_or_insert_default().game_settings.zspy.verbosity =
-                    (*level).into();
-            }
-
-            Message::OpenRepository => {
+            Message::RequestOpenRepository => {
                 if let Err(err) = services::browser_open(constants::APP_REPOSITORY) {
                     log::error!("Error opening repository: {err}");
                 }
             }
 
-            Message::CloseWindowRequest(wnd_id) => {
+            Message::RequestWindowClose(wnd_id) => {
                 return self.session.close_window(wnd_id);
             }
 
-            Message::ExitApplication => {
-                if self.session.windows.iter().all(|(_, wnd_state)| wnd_state.closed) {
+            Message::RequestExitApplication => {
+                if self.session.windows.iter().all(|(_, wnd_state)| wnd_state.is_closed) {
                     let mut profile_service =
                         services::profile::ProfileService::new(&mut self.session, &mut self.state);
 
@@ -244,7 +112,144 @@ impl GothicOrganizer {
                 }
             }
 
-            Message::None => {
+            Message::RequestPanicWithErr(err) => {
+                return self.session.exit_with_error(err.clone());
+            }
+
+            Message::RequestWindowOpen(name) => match name.as_str() {
+                "options" => return self.session.invoke_options_window(),
+                "overwrites" => return self.session.invoke_overwrites_window(),
+                _ => return iced::Task::none(),
+            },
+
+            Message::RemoveActiveInstance => {
+                let mut service =
+                    services::profile::ProfileService::new(&mut self.session, &mut self.state);
+                service.remove_instance_from_profile();
+            }
+
+            Message::SetUiTheme(theme) => {
+                self.session.theme_selected = Some(theme.clone());
+            }
+
+            Message::SetActiveProfile(profile_name) => {
+                let mut service =
+                    services::profile::ProfileService::new(&mut self.session, &mut self.state);
+                return service.switch_profile(profile_name);
+            }
+
+            Message::SetGameDir(path) => {
+                let mut service =
+                    services::profile::ProfileService::new(&mut self.session, &mut self.state);
+                return service.set_game_dir(path.clone());
+            }
+
+            Message::SetModsDir(path) => {
+                let mut service =
+                    services::profile::ProfileService::new(&mut self.session, &mut self.state);
+                return service.set_mods_dir(path.clone());
+            }
+
+            Message::SetActiveInstance(instance) => {
+                let mut service =
+                    services::profile::ProfileService::new(&mut self.session, &mut self.state);
+                return service.switch_instance(instance);
+            }
+
+            Message::SetOptionsMenu(menu) => {
+                self.state.active_options_menu = *menu;
+            }
+
+            Message::SetRendererBackend(backend) => {
+                self.session.active_renderer_backend = Some(backend.clone());
+                self.session.launch_options.get_or_insert_default().game_settings.renderer =
+                    backend.clone();
+            }
+
+            Message::UpdateInstanceNameField(input) => {
+                self.state.instance_name_field = input.clone();
+            }
+
+            Message::UpdateProfileDirField(input) => {
+                self.state.profile_dir_field = input.clone();
+            }
+
+            Message::UpdateActiveUiDir(path) => {
+                let mut profile_service =
+                    services::profile::ProfileService::new(&mut self.session, &mut self.state);
+
+                if let Err(err) = profile_service.update_instance_from_cache() {
+                    log::warn!("Couldn't update instance cache: {err}");
+                }
+                self.state.current_dir = path.clone();
+                let mut ui_service =
+                    services::ui::UiService::new(&mut self.session, &mut self.state);
+                ui_service.reload_displayed_directory(Some(path.clone()))
+            }
+
+            Message::UpdateModsDirField(input) => {
+                self.state.mods_dir_field = input.clone();
+            }
+
+            Message::UpdateZspyLevelField(level) => {
+                self.state.zspy_level_field = *level;
+                self.session.active_zspy_config.get_or_insert_default().verbosity = (*level).into();
+                self.session.launch_options.get_or_insert_default().game_settings.zspy.verbosity =
+                    (*level).into();
+            }
+
+            Message::ToggleFileEntry(path) => {
+                let mut service = services::ui::UiService::new(&mut self.session, &mut self.state);
+                service.toggle_state_recursive(Some(path));
+            }
+
+            Message::ToggleAllFileEntries => {
+                let mut service = services::ui::UiService::new(&mut self.session, &mut self.state);
+                service.toggle_state_recursive(None);
+            }
+
+            Message::ToggleMod(name, new_state) => {
+                let mut profile_service =
+                    services::profile::ProfileService::new(&mut self.session, &mut self.state);
+
+                if let Err(err) = profile_service.update_instance_from_cache() {
+                    log::warn!("Couldn't update instance cache: {err}");
+                }
+                let mut service = services::mods::ModService::new(&mut self.session);
+                service.toggle_mod(name.clone(), *new_state);
+                return iced::Task::done(Message::RequestDirEntriesReload);
+            }
+
+            Message::ToggleMarvinMode(new_state) => {
+                self.session
+                    .launch_options
+                    .get_or_insert_default()
+                    .game_settings
+                    .is_marvin_mode_enabled = *new_state;
+            }
+
+            Message::ToggleParserSetting(option, new_state) => {
+                self.session.toggle_launch_option(option, *new_state);
+            }
+
+            Message::ToggleZSpyState(new_state) => {
+                self.session.active_zspy_config.get_or_insert_default().is_enabled = *new_state;
+                self.session.launch_options.get_or_insert_default().game_settings.zspy.is_enabled =
+                    *new_state;
+            }
+
+            Message::AddMod(path) => {
+                let mut service = services::mods::ModService::new(&mut self.session);
+                return service.add_mod(path.clone());
+            }
+
+            Message::AddNewInstance(profile_name) => {
+                let mut service =
+                    services::profile::ProfileService::new(&mut self.session, &mut self.state);
+                return service.add_instance_for_profile(profile_name);
+            }
+
+            Message::Idle => {
                 return iced::Task::none();
             }
         }
@@ -255,10 +260,10 @@ impl GothicOrganizer {
     pub fn subscription(&self) -> iced::Subscription<Message> {
         iced::event::listen_with(|event, _, id| match event {
             iced::Event::Window(iced::window::Event::CloseRequested) => {
-                Some(Message::CloseWindowRequest(id))
+                Some(Message::RequestWindowClose(id))
             }
             iced::Event::Window(iced::window::Event::FileDropped(path)) => {
-                Some(Message::ModAdd(Some(path)))
+                Some(Message::AddMod(Some(path)))
             }
             _ => None,
         })
@@ -278,10 +283,10 @@ impl GothicOrganizer {
         if let Some((_, wnd_state)) =
             self.session.windows.iter().find(|(wnd_id, _)| **wnd_id == Some(id))
         {
-            if wnd_state.name == "options" {
-                crate::gui::options::options_view(self)
-            } else {
-                crate::gui::editor::editor_view(self)
+            match wnd_state.wnd_name.as_str() {
+                "options" => crate::gui::options::options_view(self),
+                "overwrites" => crate::gui::overwrites::overwrites_view(self),
+                _ => crate::gui::editor::editor_view(self),
             }
         } else {
             iced::widget::container(iced::widget::text("no window")).into()
@@ -291,35 +296,35 @@ impl GothicOrganizer {
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    CloseWindowRequest(iced::window::Id),
+    AddNewInstance(String),
+    AddMod(Option<PathBuf>),
     SetModsDir(Option<PathBuf>),
     SetGameDir(Option<PathBuf>),
-    ProfileSelected(String),
-    InstanceSelected(String),
-    InstanceAdd(String),
-    InstanceInput(String),
-    ProfileDirInput(String),
-    ModsDirInput(String),
-    FileToggle(PathBuf),
-    OptionsMenuSwitched(options::menu::OptionsMenu),
-    OptionsRendererSwitched(config::RendererBackend),
+    SetActiveProfile(String),
+    SetActiveInstance(String),
+    SetOptionsMenu(options::menu::OptionsMenu),
+    SetRendererBackend(config::RendererBackend),
+    SetUiTheme(String),
+    UpdateInstanceNameField(String),
+    UpdateProfileDirField(String),
+    UpdateModsDirField(String),
+    UpdateActiveUiDir(PathBuf),
+    UpdateZspyLevelField(u8),
+    ToggleFileEntry(PathBuf),
     ToggleParserSetting(config::ParserCommand, bool),
     ToggleMarvinMode(bool),
-    ToggleZSpy(bool),
-    TraverseIntoDir(PathBuf),
-    ThemeSwitch(String),
-    ModToggle(String, bool),
-    ModUninstall(String),
-    ModAdd(Option<PathBuf>),
-    ErrorReturned(error::SharedError),
-    ZSpyLevelChanged(u8),
-    ExitApplication,
-    OpenRepository,
-    InstanceRemove(),
-    InitWindow,
-    InvokeOptionsMenu,
-    FileToggleAll,
-    CurrentDirectoryUpdated,
-    LoadModsRequested,
-    None,
+    ToggleZSpyState(bool),
+    ToggleMod(String, bool),
+    ToggleAllFileEntries,
+    RequestWindowClose(iced::window::Id),
+    RequestWindowOpen(String),
+    RequestModUninstall(String),
+    RequestOpenRepository,
+    RequestDirEntriesReload,
+    RequestModsReload,
+    RequestInitializeMainWindow,
+    RequestExitApplication,
+    RemoveActiveInstance,
+    RequestPanicWithErr(error::SharedError),
+    Idle,
 }

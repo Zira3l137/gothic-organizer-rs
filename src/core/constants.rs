@@ -18,28 +18,26 @@ pub fn app_info() -> String {
     )
 }
 
-pub fn local_app_data() -> String {
+pub fn local_app_data_path() -> PathBuf {
     #[cfg(target_os = "windows")]
     {
-        std::env::var("LOCALAPPDATA").unwrap_or(String::from(""))
+        PathBuf::from(std::env::var("LOCALAPPDATA").unwrap_or(String::from("")))
     }
 
     #[cfg(target_os = "linux")]
     {
-        std::env::var("XDG_DATA_HOME").unwrap_or(String::from("~/.local/share"))
+        PathBuf::from(std::env::var("XDG_DATA_HOME").unwrap_or(String::from("~/.local/share")))
     }
 }
 
-pub fn local_profiles_dir() -> PathBuf {
-    PathBuf::from(local_app_data()).join(APP_NAME)
+pub fn local_profiles_path() -> PathBuf {
+    local_app_data_path().join(APP_NAME)
 }
 
-pub fn default_mod_storage_dir() -> Result<PathBuf, crate::error::GothicOrganizerError> {
-    let exe_path = std::env::current_exe()?;
-    let exe_dir = exe_path
-        .parent()
-        .ok_or(std::io::Error::new(std::io::ErrorKind::NotFound, "Failed to get exe directory"))?;
-    Ok(exe_dir.join("mods"))
+pub fn default_mod_storage_path() -> PathBuf {
+    let exe_path = std::env::current_exe().unwrap();
+    let exe_dir = exe_path.parent().unwrap();
+    exe_dir.join("mods")
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

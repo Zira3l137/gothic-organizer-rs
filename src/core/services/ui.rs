@@ -6,7 +6,7 @@ use crate::core::services::Service;
 
 pub struct UiService<'a> {
     session: &'a mut core::services::session::SessionService,
-    state: &'a mut app::InnerState,
+    state: &'a mut app::ApplicationState,
 }
 
 crate::impl_service!(UiService);
@@ -14,7 +14,7 @@ crate::impl_service!(UiService);
 impl<'a> UiService<'a> {
     pub fn new(
         session: &'a mut core::services::session::SessionService,
-        state: &'a mut app::InnerState,
+        state: &'a mut app::ApplicationState,
     ) -> Self {
         Self { session, state }
     }
@@ -28,7 +28,7 @@ impl<'a> UiService<'a> {
         let instance_files = context.instance_files().cloned();
 
         let root_dir = root.unwrap_or_else(|| profile_path.clone());
-        let mut current_directory_entries: Vec<(path::PathBuf, core::profile::FileInfo)>;
+        let mut current_directory_entries: Vec<(path::PathBuf, core::profile::FileMetadata)>;
 
         if let Some(instance_files) = instance_files {
             self.session.files.clear();
@@ -43,24 +43,23 @@ impl<'a> UiService<'a> {
             .iter()
             .filter(|(path, _)| path.parent() == Some(&root_dir))
             .map(|(path, info)| (path.clone(), info.clone()))
-            .collect::<Vec<(path::PathBuf, core::profile::FileInfo)>>();
+            .collect::<Vec<(path::PathBuf, core::profile::FileMetadata)>>();
 
         current_directory_entries.sort_unstable_by_key(|(path, _)| !path.is_dir());
 
-        self.state.current_directory = root_dir.clone();
-        self.state.current_directory_entries = current_directory_entries;
+        self.state.current_dir = root_dir.clone();
+        self.state.dir_entries = current_directory_entries;
     }
 
     pub fn toggle_state_recursive(&mut self, path: Option<&path::Path>) {
-        let paths_to_toggle: Vec<path::PathBuf> =
-            path.map(|p| vec![p.to_path_buf()]).unwrap_or_else(|| {
-                self.state.current_directory_entries.iter().map(|(p, _)| p.clone()).collect()
-            });
+        let paths_to_toggle: Vec<path::PathBuf> = path
+            .map(|p| vec![p.to_path_buf()])
+            .unwrap_or_else(|| self.state.dir_entries.iter().map(|(p, _)| p.clone()).collect());
 
         paths_to_toggle.iter().for_each(|path_to_toggle| {
             if let Some(info) = self
                 .state
-                .current_directory_entries
+                .dir_entries
                 .iter_mut()
                 .find_map(|(p, i)| (p == path_to_toggle).then_some(i))
             {

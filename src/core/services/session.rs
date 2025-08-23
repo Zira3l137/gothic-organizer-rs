@@ -8,13 +8,13 @@ use crate::core::constants;
 use crate::core::lookup;
 use crate::core::profile;
 use crate::error;
-use crate::load_config;
+use crate::load_app_preferences;
+use crate::load_app_session;
 use crate::load_profile;
-use crate::load_session;
 use crate::lookup;
-use crate::save_config;
+use crate::save_app_preferences;
+use crate::save_app_session;
 use crate::save_profile;
-use crate::save_session;
 
 #[derive(Debug, Default)]
 pub struct SessionService {
@@ -24,12 +24,12 @@ pub struct SessionService {
     pub active_profile: Option<String>,
     pub active_instance: Option<String>,
     pub active_renderer_backend: Option<config::RendererBackend>,
-    pub active_zspy_config: Option<config::ZSpyConfig>,
+    pub active_zspy_config: Option<config::ZspyConfig>,
     pub mod_storage_dir: Option<path::PathBuf>,
     pub theme_selected: Option<String>,
-    pub files: lookup::Lookup<path::PathBuf, profile::FileInfo>,
+    pub files: lookup::Lookup<path::PathBuf, profile::FileMetadata>,
     pub windows: lookup::Lookup<Option<iced::window::Id>, app::WindowState>,
-    pub launch_options: Option<config::LaunchOptions>,
+    pub launch_options: Option<config::GameLaunchConfiguration>,
 }
 
 impl SessionService {
@@ -57,19 +57,19 @@ impl SessionService {
         self.profiles = profiles.clone();
         self.profile_names = Some(profiles.keys().cloned().collect());
 
-        if let Some(last_session) = load_session!() {
-            if let Some(launch_options) = last_session.launch_options {
+        if let Some(last_session) = load_app_session!() {
+            if let Some(launch_options) = last_session.game_launch_config {
                 self.launch_options = Some(launch_options.clone());
                 self.active_renderer_backend = Some(launch_options.game_settings.renderer);
                 self.active_zspy_config = Some(launch_options.game_settings.zspy);
             }
 
-            if let Some(profile_name) = last_session.selected_profile
+            if let Some(profile_name) = last_session.active_profile_name
                 && let Some(profile) = profiles.get(&profile_name)
             {
                 if let Some(instances) = &profile.instances {
                     self.instance_names = Some(instances.keys().cloned().collect());
-                    if let Some(instance_name) = last_session.selected_instance
+                    if let Some(instance_name) = last_session.active_instance_name
                         && let Some(instance) = instances.get(&instance_name)
                     {
                         self.active_instance = Some(instance_name);
@@ -82,9 +82,9 @@ impl SessionService {
             }
         }
 
-        if let Some(config) = load_config!() {
-            self.theme_selected = Some(config.theme);
-            self.mod_storage_dir = Some(config.mod_storage_dir);
+        if let Some(prefs) = load_app_preferences!() {
+            self.theme_selected = Some(prefs.theme_name);
+            self.mod_storage_dir = Some(prefs.mod_storage_dir);
         }
     }
 
@@ -103,7 +103,7 @@ impl SessionService {
                 profile.instances.is_none().then(|| self.files.clone())
             });
 
-        if let Err(e) = save_session!(
+        if let Err(e) = save_app_session!(
             self.active_profile.clone(),
             self.active_instance.clone(),
             self.launch_options.clone(),
@@ -112,19 +112,21 @@ impl SessionService {
             log::error!("Failed saving session: {e}");
         }
 
-        if let Err(e) = save_config!(self.theme_selected.clone(), self.mod_storage_dir.clone()) {
+        if let Err(e) =
+            save_app_preferences!(self.theme_selected.clone(), self.mod_storage_dir.clone())
+        {
             log::error!("Failed saving config: {e}");
         }
     }
 
     pub fn close_window(&mut self, wnd_id: &iced::window::Id) -> Task<app::Message> {
         if let Some(wnd_state) = self.windows.get_mut(&Some(*wnd_id)) {
-            wnd_state.closed = true;
+            wnd_state.is_closed = true;
         }
 
         iced::Task::chain(
             iced::window::get_latest().and_then(iced::window::close),
-            Task::done(app::Message::ExitApplication),
+            Task::done(app::Message::RequestExitApplication),
         )
     }
 
@@ -147,9 +149,9 @@ impl SessionService {
         });
 
         self.windows
-            .insert(Some(id), app::WindowState { name: "editor".to_owned(), closed: false });
+            .insert(Some(id), app::WindowState { wnd_name: "editor".to_owned(), is_closed: false });
 
-        task.then(|_| Task::done(app::Message::CurrentDirectoryUpdated))
+        task.then(|_| Task::done(app::Message::RequestDirEntriesReload))
     }
 
     pub fn invoke_options_window(&mut self) -> Task<app::Message> {
@@ -161,8 +163,27 @@ impl SessionService {
             ..Default::default()
         });
 
-        self.windows
-            .insert(Some(id), app::WindowState { name: "options".to_owned(), closed: false });
+        self.windows.insert(
+            Some(id),
+            app::WindowState { wnd_name: "options".to_owned(), is_closed: false },
+        );
+
+        task.then(|_| Task::none())
+    }
+
+    pub fn invoke_overwrites_window(&mut self) -> Task<app::Message> {
+        let (id, task) = iced::window::open(iced::window::Settings {
+            position: iced::window::Position::Centered,
+            size: iced::Size { width: 460.0, height: 768.0 },
+            icon: iced::window::icon::from_file("./resources/icon.ico").ok(),
+            exit_on_close_request: false,
+            ..Default::default()
+        });
+
+        self.windows.insert(
+            Some(id),
+            app::WindowState { wnd_name: "overwrites".to_owned(), is_closed: false },
+        );
 
         task.then(|_| Task::none())
     }
@@ -182,7 +203,7 @@ impl SessionService {
         if let Some(options) = self.launch_options.as_mut() {
             options.parser_settings.commands.insert(option.clone(), new_state);
         } else {
-            self.launch_options = Some(config::LaunchOptions {
+            self.launch_options = Some(config::GameLaunchConfiguration {
                 parser_settings: config::ParserSettings {
                     commands: lookup![(option.clone() => new_state)],
                 },

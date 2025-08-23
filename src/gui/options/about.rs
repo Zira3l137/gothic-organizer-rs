@@ -25,7 +25,7 @@ pub fn about_menu<'a>(palette_ext: &palette::Extended) -> iced::Element<'a, app:
     let link = widget::row![
         widget::text!("Repository: "),
         clickable_text!("{}", constants::APP_REPOSITORY)
-            .on_press(app::Message::OpenRepository)
+            .on_press(app::Message::RequestOpenRepository)
             .color(palette_ext.primary.base.color)
             .color_hovered(palette_ext.primary.strong.color)
     ];

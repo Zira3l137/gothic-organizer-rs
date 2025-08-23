@@ -99,58 +99,31 @@ macro_rules! clickable_text {
     };
 }
 
-/// This macro is a shortcut for
-/// ```
-/// pub fn save_config<P: AsRef<Path>>(
-///    theme: Option<String>,
-///    mod_storage_dir: Option<PathBuf>,
-///    custom_path: Option<P>,
-///) -> Result<(), error::GothicOrganizerError>
-/// ```
-/// where `$theme` and `$mod_storage_dir` are the selected theme name and mod storage directory path.
-/// Optionally `$custom_path` can be provided for config.
 #[macro_export]
-macro_rules! save_config {
+macro_rules! save_app_preferences {
     ($theme: expr, $mod_storage_dir: expr, $custom_path: expr) => {
-        $crate::helpers::save_config($theme, $mod_storage_dir, $custom_path)
+        $crate::helpers::save_app_preferences($theme, $mod_storage_dir, $custom_path)
     };
     ($theme: expr, $mod_storage_dir: expr) => {
-        $crate::core::helpers::save_config::<String>($theme, $mod_storage_dir, None)
+        $crate::core::helpers::save_app_preferences::<String>($theme, $mod_storage_dir, None)
     };
 }
 
-/// This macro is a shortcut for
-/// ```
-/// pub fn load_config<P: AsRef<Path>>(custom_path: Option<P>) -> Option<config::AppConfig>
-/// ```
-/// Optionally `$custom_path` can be provided for config.
-/// Returns an `Option<config::AppConfig>`
 #[macro_export]
-macro_rules! load_config {
+macro_rules! load_app_preferences {
     () => {
-        $crate::core::helpers::load_config::<String>(None)
+        $crate::core::helpers::load_app_preferences::<String>(None)
     };
 
     ($custom_path: expr) => {
-        $crate::core::helpers::load_config($custom_path)
+        $crate::core::helpers::load_app_preferences($custom_path)
     };
 }
 
-/// This macro is a shortcut for
-/// ```
-/// pub fn save_session<P: AsRef<Path>>(
-///     selected_profile: Option<String>,
-///     selected_instance: Option<String>,
-///     cache: Option<Lookup<PathBuf, profile::FileInfo>>,
-///     custom_path: Option<P>,
-/// ) -> Result<(), std::io::Error>
-/// ```
-/// where `$selected_profile` and `$selected_instance` are the selected profile and instance **names**.
-/// Optionally `$custom_path` can be provided.
 #[macro_export]
-macro_rules! save_session {
+macro_rules! save_app_session {
     ($selected_profile: expr, $selected_instance: expr, $launch_options: expr, $cache: expr, $custom_path: expr) => {
-        $crate::helpers::save_session(
+        $crate::helpers::save_app_session(
             $selected_profile,
             $selected_instance,
             $launch_options,
@@ -159,7 +132,7 @@ macro_rules! save_session {
         )
     };
     ($selected_profile: expr, $selected_instance: expr, $launch_options: expr, $cache: expr) => {
-        $crate::core::helpers::save_session::<String>(
+        $crate::core::helpers::save_app_session::<String>(
             $selected_profile,
             $selected_instance,
             $launch_options,
@@ -169,48 +142,17 @@ macro_rules! save_session {
     };
 }
 
-/// This macro is a shortcut for
-/// ```
-/// fn load_session<P: AsRef<Path>>(custom_path: Option<P>) -> Option<Session>
-/// ```
-/// Optionally `$custom_path` can be provided.
-/// Returns an `Option<Session>`
 #[macro_export]
-macro_rules! load_session {
+macro_rules! load_app_session {
     () => {
-        $crate::core::helpers::load_session::<String>(None)
+        $crate::core::helpers::load_app_session::<String>(None)
     };
 
     ($custom_path: expr) => {
-        $crate::core::helpers::load_session($custom_path)
+        $crate::core::helpers::load_app_session($custom_path)
     };
 }
 
-/// This macro is a shortcut for
-/// ```
-/// fn load_profile<P: AsRef<Path>>(name: &str, custom_path: Option<P>) -> Option<Profile>
-/// ```
-/// where `$name` is the name of the profile.
-/// Optionally `$custom_path` can be provided.
-/// Returns an `Option<Profile>`
-#[macro_export]
-macro_rules! load_profile {
-    ($name: expr) => {
-        $crate::core::helpers::load_profile::<String>($name, None)
-    };
-    ($name: expr, $custom_path: expr) => {
-        $crate::core::helpers::load_profile($name, $custom_path)
-    };
-}
-
-/// This macro is a shortcut for
-/// ```
-/// fn save_profile<P: AsRef<Path>>(profile: &Profile, custom_path: Option<P>) -> Result<(),
-/// std::io::Error>
-/// ```
-/// where `$profile` is the profile.
-/// Optionally `$custom_path` can be provided.
-/// Saves the profile on a disk and returns a `Result<(), std::io::Error>`
 #[macro_export]
 macro_rules! save_profile {
     ($profile: expr) => {
@@ -218,6 +160,16 @@ macro_rules! save_profile {
     };
     ($profile: expr, $custom_path: expr) => {
         $crate::core::helpers::save_profile($profile, $custom_path)
+    };
+}
+
+#[macro_export]
+macro_rules! load_profile {
+    ($name: expr) => {
+        $crate::core::helpers::load_profile::<String>($name, None)
+    };
+    ($name: expr, $custom_path: expr) => {
+        $crate::core::helpers::load_profile($name, $custom_path)
     };
 }
 
@@ -234,7 +186,6 @@ macro_rules! impl_shared_error_from {
     };
 }
 
-/// This macro implements the `Service` trait for a struct.
 #[macro_export]
 macro_rules! impl_service {
     ($service:ident) => {

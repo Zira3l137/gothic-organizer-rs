@@ -17,7 +17,7 @@ pub fn profile_controls<'a>(
         &app.state.profile_choices,
         "Profile",
         app.session.active_profile.as_ref(),
-        app::Message::ProfileSelected,
+        app::Message::SetActiveProfile,
     );
 
     let instance_element = match current_profile {
@@ -48,21 +48,21 @@ pub fn instance_controls<'a>(
         &app.state.instance_choices,
         "Instance",
         app.session.active_instance.as_ref(),
-        app::Message::InstanceSelected,
+        app::Message::SetActiveInstance,
     )
-    .on_input(app::Message::InstanceInput);
+    .on_input(app::Message::UpdateInstanceNameField);
 
     let button_add_message = current_profile.and_then(|p| {
         if no_profile_path(p) {
             return None;
         };
-        Some(app::Message::InstanceAdd(p.name.clone()))
+        Some(app::Message::AddNewInstance(p.name.clone()))
     });
     let button_remove_message = current_profile.and_then(|p| {
         if no_profile_path(p) {
             return None;
         };
-        Some(app::Message::InstanceRemove())
+        Some(app::Message::RemoveActiveInstance)
     });
 
     let button_add = widget::button("Add").on_press_maybe(button_add_message);
