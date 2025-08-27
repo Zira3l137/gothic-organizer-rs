@@ -78,12 +78,8 @@ impl<'a> ModService<'a> {
             Self::apply_mod_files(instance, &new_mod_info, &profile_path);
             instance.mods.get_or_insert_default().push(new_mod_info.clone());
         } else {
-            return Task::done(
-                message::SystemMessage::PanicWithError(error::SharedError::new(
-                    error::GothicOrganizerError::Other("No active instance".to_owned()),
-                ))
-                .into(),
-            );
+            log::error!("No active instance");
+            return Task::none();
         }
 
         Task::done(message::UiMessage::ReloadDirEntries.into())
@@ -101,9 +97,8 @@ impl<'a> ModService<'a> {
             && let Some(mod_info) = mods.iter().find(|info| info.name == mod_name)
         {
             if let Err(e) = std::fs::remove_dir_all(&mod_info.path) {
-                return Task::done(
-                    message::SystemMessage::PanicWithError(error::SharedError::new(e)).into(),
-                );
+                log::error!("Failed to remove mod directory: {e}");
+                return Task::none();
             };
 
             mods.retain(|info| info.name != mod_name);
@@ -222,7 +217,7 @@ impl<'a> ModService<'a> {
     pub fn move_mod_to_storage(
         &mut self,
         mod_path: &path::Path,
-    ) -> Result<path::PathBuf, error::GothicOrganizerError> {
+    ) -> Result<path::PathBuf, error::AppError> {
         let storage_dir = self
             .session
             .mod_storage_dir
@@ -245,7 +240,7 @@ impl<'a> ModService<'a> {
 
         let dst_dir = storage_dir.join(mod_name);
         if dst_dir.exists() {
-            return Err(error::GothicOrganizerError::from(std::io::Error::new(
+            return Err(error::AppError::from(std::io::Error::new(
                 std::io::ErrorKind::AlreadyExists,
                 "Mod already exists",
             )));

@@ -190,20 +190,22 @@ macro_rules! impl_shared_error_from {
 macro_rules! impl_service {
     ($service:ident) => {
         impl Service for $service<'_> {
-            fn context(&mut self) -> Result<$crate::core::services::context::Context, $crate::error::GothicOrganizerError> {
+            fn context(
+                &mut self,
+            ) -> Result<$crate::core::services::context::Context, $crate::error::AppError> {
                 let profile = self
                     .session
                     .active_profile
                     .as_mut()
                     .and_then(|p| self.session.profiles.get_mut(&p.clone()))
-                    .ok_or_else(|| $crate::error::GothicOrganizerError::Other("No active profile".into()))?;
+                    .ok_or_else(|| $crate::error::AppError::ProfileService {
+                        operation: $crate::error::ProfileOperation::Load,
+                        details: "Failed to get active profile".to_string(),
+                    })?;
 
                 let instance_name = self.session.active_instance.clone().unwrap_or_default();
 
-                Ok($crate::core::services::context::Context::new(
-                    profile,
-                    &instance_name,
-                ))
+                Ok($crate::core::services::context::Context::new(profile, &instance_name))
             }
         }
     };

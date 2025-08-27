@@ -51,7 +51,7 @@ impl<'a> ProfileService<'a> {
         Task::none()
     }
 
-    pub fn update_instance_from_cache(&mut self) -> Result<(), error::GothicOrganizerError> {
+    pub fn update_instance_from_cache(&mut self) -> Result<(), error::AppError> {
         self.session.files.extend(self.app_state.ui.dir_entries.iter().cloned());
 
         let cached_files = self.session.files.clone();
@@ -207,7 +207,8 @@ impl<'a> ProfileService<'a> {
         self.session.mod_storage_dir = Some(path.clone());
 
         if let Err(err) = std::fs::create_dir_all(&path) {
-            Task::done(message::SystemMessage::PanicWithError(error::SharedError::new(err)).into())
+            log::error!("Failed to create mod storage directory: {err}");
+            Task::none()
         } else {
             Task::done(message::UiMessage::ReloadDirEntries.into())
         }

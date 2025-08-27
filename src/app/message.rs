@@ -1,7 +1,8 @@
+#![allow(dead_code)]
+
 use std::path::PathBuf;
 
 use crate::config;
-use crate::error;
 use crate::gui::options;
 
 #[derive(Debug, Clone)]
@@ -12,6 +13,15 @@ pub enum Message {
     Settings(SettingsMessage),
     Window(WindowMessage),
     System(SystemMessage),
+    Error(ErrorMessage),
+}
+
+#[derive(Debug, Clone)]
+pub enum ErrorMessage {
+    Handle(crate::error::ErrorContext),
+    Dismiss(uuid::Uuid),
+    ShowDetails(uuid::Uuid),
+    ClearAll,
 }
 
 #[derive(Debug, Clone)]
@@ -65,7 +75,6 @@ pub enum WindowMessage {
 pub enum SystemMessage {
     OpenRepository,
     ExitApplication,
-    PanicWithError(error::SharedError),
     Idle,
 }
 

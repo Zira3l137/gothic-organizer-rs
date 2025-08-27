@@ -54,20 +54,28 @@ impl GothicOrganizer {
             message::Message::Profile(msg) => {
                 handlers::handle_profile_message(&mut self.session, &mut self.state, msg)
             }
+
             message::Message::Mod(msg) => {
                 handlers::handle_mod_message(&mut self.session, &mut self.state, msg)
             }
+
             message::Message::UI(msg) => {
                 handlers::handle_ui_message(&mut self.session, &mut self.state, msg)
             }
+
             message::Message::Settings(msg) => {
                 handlers::handle_settings_message(&mut self.session, &mut self.state, msg)
             }
+
             message::Message::Window(msg) => {
                 handlers::handle_window_message(&mut self.session, &mut self.state, msg)
             }
+
             message::Message::System(msg) => {
                 handlers::handle_system_message(&mut self.session, &mut self.state, msg)
+            }
+            message::Message::Error(msg) => {
+                handlers::handle_error_message(&mut self.session, &mut self.state, msg)
             }
         }
     }

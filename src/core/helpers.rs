@@ -28,7 +28,7 @@ pub fn save_app_preferences<P: AsRef<Path>>(
     theme: Option<String>,
     mod_storage_dir: Option<PathBuf>,
     custom_path: Option<P>,
-) -> Result<(), error::GothicOrganizerError> {
+) -> Result<(), error::AppError> {
     let prefs = config::ApplicationPreferences {
         theme_name: theme.unwrap_or("Dark".to_string()),
         mod_storage_dir: mod_storage_dir.unwrap_or(constants::default_mod_storage_path()),
@@ -36,9 +36,18 @@ pub fn save_app_preferences<P: AsRef<Path>>(
 
     let default_path = default_path(custom_path);
     let prefs_json =
-        serde_json::to_string_pretty(&prefs).map_err(error::GothicOrganizerError::Json)?;
-    write(default_path.join("preferences.json"), prefs_json)
-        .map_err(error::GothicOrganizerError::Io)?;
+        serde_json::to_string_pretty(&prefs).map_err(|e| error::AppError::External {
+            service: "Json".to_owned(),
+            details: format!("Failed to serialize preferences {e}"),
+        })?;
+
+    write(default_path.join("preferences.json"), prefs_json).map_err(|e| {
+        error::AppError::FileSystem {
+            operation: "Write".to_owned(),
+            path: default_path.join("preferences.json"),
+            source: e.to_string(),
+        }
+    })?;
 
     Ok(())
 }

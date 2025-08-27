@@ -224,10 +224,31 @@ pub fn handle_system_message(
             }
         }
 
-        message::SystemMessage::PanicWithError(err) => {
-            session.exit_with_error(err).map(message::Message::from)
-        }
-
         message::SystemMessage::Idle => iced::Task::none(),
+    }
+}
+
+pub fn handle_error_message(
+    _session: &mut services::session::SessionService,
+    state: &mut state::ApplicationState,
+    message: message::ErrorMessage,
+) -> iced::Task<message::Message> {
+    match message {
+        message::ErrorMessage::Handle(error_ctx) => {
+            log::error!("{}", error_ctx.error);
+            iced::Task::none()
+        }
+        message::ErrorMessage::Dismiss(error_id) => {
+            state.errors.dismiss_error(error_id);
+            iced::Task::none()
+        }
+        message::ErrorMessage::ShowDetails(_) => {
+            // Could open a detailed error dialog
+            iced::Task::none()
+        }
+        message::ErrorMessage::ClearAll => {
+            state.errors.clear_all();
+            iced::Task::none()
+        }
     }
 }

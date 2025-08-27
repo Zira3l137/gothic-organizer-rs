@@ -8,7 +8,6 @@ use crate::config;
 use crate::core::constants;
 use crate::core::lookup;
 use crate::core::profile;
-use crate::error;
 use crate::load_app_preferences;
 use crate::load_app_session;
 use crate::load_profile;
@@ -129,13 +128,6 @@ impl SessionService {
             iced::window::get_latest().and_then(iced::window::close),
             Task::done(message::SystemMessage::ExitApplication.into()),
         )
-    }
-    pub fn exit_with_error(&mut self, err: error::SharedError) -> Task<message::Message> {
-        log::error!("Error: {err}");
-        log::info!("Saving current session and changes");
-        self.save_current_session();
-        log::info!("Exiting");
-        iced::exit()
     }
 
     pub fn init_window(&mut self) -> Task<message::Message> {
