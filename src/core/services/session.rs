@@ -2,7 +2,8 @@ use std::path;
 
 use iced::Task;
 
-use crate::app;
+use crate::app::message;
+use crate::app::state;
 use crate::config;
 use crate::core::constants;
 use crate::core::lookup;
@@ -28,7 +29,7 @@ pub struct SessionService {
     pub mod_storage_dir: Option<path::PathBuf>,
     pub theme_selected: Option<String>,
     pub files: lookup::Lookup<path::PathBuf, profile::FileMetadata>,
-    pub windows: lookup::Lookup<Option<iced::window::Id>, app::WindowState>,
+    pub windows: lookup::Lookup<Option<iced::window::Id>, crate::app::state::WindowState>,
     pub launch_options: Option<config::GameLaunchConfiguration>,
 }
 
@@ -119,29 +120,27 @@ impl SessionService {
         }
     }
 
-    pub fn close_window(&mut self, wnd_id: &iced::window::Id) -> Task<app::Message> {
+    pub fn close_window(&mut self, wnd_id: &iced::window::Id) -> Task<message::Message> {
         if let Some(wnd_state) = self.windows.get_mut(&Some(*wnd_id)) {
             wnd_state.is_closed = true;
         }
 
         iced::Task::chain(
             iced::window::get_latest().and_then(iced::window::close),
-            Task::done(app::Message::RequestExitApplication),
+            Task::done(message::SystemMessage::ExitApplication.into()),
         )
     }
-
-    pub fn exit_with_error(&mut self, err: error::SharedError) -> Task<app::Message> {
+    pub fn exit_with_error(&mut self, err: error::SharedError) -> Task<message::Message> {
         log::error!("Error: {err}");
         log::info!("Saving current session and changes");
         self.save_current_session();
-
         log::info!("Exiting");
         iced::exit()
     }
 
-    pub fn init_window(&mut self) -> Task<app::Message> {
+    pub fn init_window(&mut self) -> Task<message::Message> {
         let (id, task) = iced::window::open(iced::window::Settings {
-            size: iced::Size::from(app::GothicOrganizer::WINDOW_SIZE),
+            size: iced::Size::from(crate::app::GothicOrganizer::WINDOW_SIZE),
             position: iced::window::Position::Centered,
             icon: iced::window::icon::from_file("./resources/icon.ico").ok(),
             exit_on_close_request: false,
@@ -149,12 +148,12 @@ impl SessionService {
         });
 
         self.windows
-            .insert(Some(id), app::WindowState { wnd_name: "editor".to_owned(), is_closed: false });
+            .insert(Some(id), state::WindowState { name: "editor".to_owned(), is_closed: false });
 
-        task.then(|_| Task::done(app::Message::RequestDirEntriesReload))
+        task.then(|_| Task::done(message::UiMessage::ReloadDirEntries.into()))
     }
 
-    pub fn invoke_options_window(&mut self) -> Task<app::Message> {
+    pub fn invoke_options_window(&mut self) -> Task<message::Message> {
         let (id, task) = iced::window::open(iced::window::Settings {
             position: iced::window::Position::Centered,
             size: iced::Size { width: 768.0, height: 460.0 },
@@ -163,15 +162,13 @@ impl SessionService {
             ..Default::default()
         });
 
-        self.windows.insert(
-            Some(id),
-            app::WindowState { wnd_name: "options".to_owned(), is_closed: false },
-        );
+        self.windows
+            .insert(Some(id), state::WindowState { name: "options".to_owned(), is_closed: false });
 
         task.then(|_| Task::none())
     }
 
-    pub fn invoke_overwrites_window(&mut self) -> Task<app::Message> {
+    pub fn invoke_overwrites_window(&mut self) -> Task<message::Message> {
         let (id, task) = iced::window::open(iced::window::Settings {
             position: iced::window::Position::Centered,
             size: iced::Size { width: 460.0, height: 768.0 },
@@ -182,7 +179,7 @@ impl SessionService {
 
         self.windows.insert(
             Some(id),
-            app::WindowState { wnd_name: "overwrites".to_owned(), is_closed: false },
+            state::WindowState { name: "overwrites".to_owned(), is_closed: false },
         );
 
         task.then(|_| Task::none())

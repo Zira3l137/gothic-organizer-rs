@@ -1,18 +1,18 @@
 use iced::widget;
 
-use crate::app;
+use crate::app::message;
 
 pub mod about;
 pub mod config;
 pub mod launch;
 pub mod menu;
 
-pub fn options_view(app: &app::GothicOrganizer) -> iced::Element<app::Message> {
+pub fn options_view(app: &crate::app::GothicOrganizer) -> iced::Element<message::Message> {
     let theme = app.theme();
     let palette_ext = theme.extended_palette();
     let menu_bar = menu::menu_bar(app);
 
-    let options_menu = match app.state.active_options_menu {
+    let options_menu = match app.state.ui.active_options_menu {
         menu::OptionsMenu::Config => config::config_menu(app),
         menu::OptionsMenu::Launch => launch::launch_menu(app),
         menu::OptionsMenu::About => about::about_menu(palette_ext),

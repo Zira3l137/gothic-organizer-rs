@@ -2,14 +2,14 @@ use iced::widget::column;
 use iced::widget::container;
 use iced::widget::row;
 
-use crate::app::Message;
+use crate::app::message;
 
 pub mod files;
 pub mod header;
 pub mod mods;
 pub mod profile;
 
-pub fn editor_view(app: &crate::app::GothicOrganizer) -> iced::Element<Message> {
+pub fn editor_view(app: &crate::app::GothicOrganizer) -> iced::Element<message::Message> {
     let current_profile =
         app.session.active_profile.as_ref().and_then(|s| app.session.profiles.get(s));
 

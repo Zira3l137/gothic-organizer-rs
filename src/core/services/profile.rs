@@ -2,7 +2,8 @@ use std::path;
 
 use iced::Task;
 
-use crate::app;
+use crate::app::message;
+use crate::app::state;
 use crate::core;
 use crate::core::lookup;
 use crate::core::profile;
@@ -11,7 +12,7 @@ use crate::error;
 
 pub struct ProfileService<'a> {
     session: &'a mut core::services::session::SessionService,
-    app_state: &'a mut app::ApplicationState,
+    app_state: &'a mut state::ApplicationState,
 }
 
 crate::impl_service!(ProfileService);
@@ -19,12 +20,12 @@ crate::impl_service!(ProfileService);
 impl<'a> ProfileService<'a> {
     pub fn new(
         session: &'a mut core::services::session::SessionService,
-        app_state: &'a mut app::ApplicationState,
+        app_state: &'a mut state::ApplicationState,
     ) -> Self {
         Self { session, app_state }
     }
 
-    pub fn switch_profile(&mut self, profile_name: &str) -> Task<app::Message> {
+    pub fn switch_profile(&mut self, profile_name: &str) -> Task<message::Message> {
         if let Err(err) = self.update_instance_from_cache() {
             log::error!("Failed to update instance from cache: {err}");
         }
@@ -39,10 +40,11 @@ impl<'a> ProfileService<'a> {
                 .map(|i| i.keys().cloned().collect())
                 .unwrap_or_default();
 
-            self.app_state.instance_choices = iced::widget::combo_box::State::new(instances);
+            self.app_state.profile.instance_choices =
+                iced::widget::combo_box::State::new(instances);
 
             if !next_profile.path.as_os_str().is_empty() {
-                return Task::done(app::Message::RequestDirEntriesReload);
+                return Task::done(message::UiMessage::ReloadDirEntries.into());
             }
         }
 
@@ -50,7 +52,7 @@ impl<'a> ProfileService<'a> {
     }
 
     pub fn update_instance_from_cache(&mut self) -> Result<(), error::GothicOrganizerError> {
-        self.session.files.extend(self.app_state.dir_entries.iter().cloned());
+        self.session.files.extend(self.app_state.ui.dir_entries.iter().cloned());
 
         let cached_files = self.session.files.clone();
         let mut context = self.context()?;
@@ -59,9 +61,9 @@ impl<'a> ProfileService<'a> {
         Ok(())
     }
 
-    pub fn add_instance_for_profile(&mut self, profile_name: &str) -> Task<app::Message> {
+    pub fn add_instance_for_profile(&mut self, profile_name: &str) -> Task<message::Message> {
         if let Some(profile) = self.session.profiles.get_mut(profile_name) {
-            let instance_name = self.app_state.instance_name_field.clone();
+            let instance_name = self.app_state.profile.instance_name_field.clone();
             if instance_name.is_empty() {
                 return Task::none();
             }
@@ -98,9 +100,9 @@ impl<'a> ProfileService<'a> {
             }
 
             instances.insert(instance_name.clone(), new_instance);
-            self.app_state.instance_choices =
+            self.app_state.profile.instance_choices =
                 iced::widget::combo_box::State::new(instances.keys().cloned().collect());
-            self.app_state.instance_name_field = String::new();
+            self.app_state.profile.instance_name_field = String::new();
 
             return self.switch_instance(&instance_name);
         }
@@ -128,20 +130,21 @@ impl<'a> ProfileService<'a> {
             return;
         }
 
-        self.app_state.instance_choices = iced::widget::combo_box::State::new(instance_names);
-        self.app_state.instance_name_field = String::new();
+        self.app_state.profile.instance_choices =
+            iced::widget::combo_box::State::new(instance_names);
+        self.app_state.profile.instance_name_field = String::new();
         self.session.active_instance = None;
     }
 
-    pub fn switch_instance(&mut self, instance_name: &str) -> Task<app::Message> {
+    pub fn switch_instance(&mut self, instance_name: &str) -> Task<message::Message> {
         if let Err(err) = self.update_instance_from_cache() {
             log::error!("Failed to update instance from cache: {err}");
         }
         self.session.active_instance = Some(instance_name.to_owned());
-        Task::done(app::Message::RequestDirEntriesReload)
+        Task::done(message::UiMessage::ReloadDirEntries.into())
     }
 
-    pub fn set_game_dir(&mut self, path: Option<path::PathBuf>) -> Task<app::Message> {
+    pub fn set_game_dir(&mut self, path: Option<path::PathBuf>) -> Task<message::Message> {
         let Ok(mut context) = self.context() else {
             log::error!("Failed to get context");
             return Task::none();
@@ -157,7 +160,7 @@ impl<'a> ProfileService<'a> {
 
         context.active_profile.path = path.clone();
         context.set_instance_files(None);
-        self.app_state.current_dir = path.clone();
+        self.app_state.ui.current_dir = path.clone();
 
         self.session.files.clear();
         self.session.files.extend(
@@ -178,12 +181,12 @@ impl<'a> ProfileService<'a> {
         }
 
         Task::batch(vec![
-            Task::done(app::Message::RequestModsReload),
-            Task::done(app::Message::RequestDirEntriesReload),
+            Task::done(message::ModMessage::Reload.into()),
+            Task::done(message::UiMessage::ReloadDirEntries.into()),
         ])
     }
 
-    pub fn set_mods_dir(&mut self, path: Option<path::PathBuf>) -> Task<app::Message> {
+    pub fn set_mods_dir(&mut self, path: Option<path::PathBuf>) -> Task<message::Message> {
         let Ok(context) = self.context() else {
             log::error!("Failed to get context");
             return Task::none();
@@ -204,9 +207,9 @@ impl<'a> ProfileService<'a> {
         self.session.mod_storage_dir = Some(path.clone());
 
         if let Err(err) = std::fs::create_dir_all(&path) {
-            Task::done(app::Message::RequestPanicWithErr(error::SharedError::new(err)))
+            Task::done(message::SystemMessage::PanicWithError(error::SharedError::new(err)).into())
         } else {
-            Task::done(app::Message::RequestDirEntriesReload)
+            Task::done(message::UiMessage::ReloadDirEntries.into())
         }
     }
 }

@@ -1,7 +1,8 @@
-use crate::app;
-use crate::svg_with_color;
 use boolinator::Boolinator;
 use iced::widget;
+
+use crate::app::message;
+use crate::svg_with_color;
 
 #[derive(Default, Debug, Clone, Copy, PartialEq)]
 pub enum OptionsMenu {
@@ -41,13 +42,15 @@ impl<'a, Message: 'a> From<OptionsMenu> for iced::Element<'a, Message> {
     }
 }
 
-pub fn menu_bar(app: &app::GothicOrganizer) -> iced::Element<app::Message> {
-    let current_menu = app.state.active_options_menu;
+pub fn menu_bar(app: &crate::app::GothicOrganizer) -> iced::Element<message::Message> {
+    let current_menu = app.state.ui.active_options_menu;
     widget::container(OptionsMenu::into_iter(OptionsMenu::default()).fold(
         widget::row![],
         |bar, menu| {
             let menu_button = widget::button(menu)
-                .on_press_maybe((current_menu != menu).as_some(app::Message::SetOptionsMenu(menu)))
+                .on_press_maybe(
+                    (current_menu != menu).as_some(message::UiMessage::SetOptionsMenu(menu).into()),
+                )
                 .width(iced::Length::Fill);
             bar.push(menu_button)
         },

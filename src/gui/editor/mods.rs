@@ -2,7 +2,7 @@ use iced::alignment;
 use iced::theme::palette;
 use iced::widget;
 
-use crate::app;
+use crate::app::message;
 use crate::clickable_text;
 use crate::core::profile;
 use crate::styled_container;
@@ -11,7 +11,7 @@ use crate::svg_with_color;
 pub fn mods_menu<'a>(
     palette_ext: &palette::Extended,
     instance_selected: Option<&'a profile::Instance>,
-) -> iced::Element<'a, app::Message> {
+) -> iced::Element<'a, message::Message> {
     let mut container_bg_color = palette_ext.primary.weak.color;
     container_bg_color.a = 0.3;
 
@@ -26,9 +26,9 @@ pub fn mods_menu<'a>(
     .width(20);
     let icon_overwrites = widget::svg("./resources/overwrites.svg").height(20).width(20);
 
-    let button_add_mod = widget::button(icon_add).on_press(app::Message::AddMod(None));
+    let button_add_mod = widget::button(icon_add).on_press(message::ModMessage::Add(None).into());
     let button_overwrites = widget::button(icon_overwrites)
-        .on_press(app::Message::RequestWindowOpen("overwrites".into()));
+        .on_press(message::WindowMessage::Open("overwrites".into()).into());
 
     let group_mod_controls = styled_container!(
         widget::row!(button_add_mod, button_overwrites),
@@ -52,7 +52,7 @@ pub fn mods_menu<'a>(
 
 pub fn mods_view<'a>(
     current_instance: Option<&'a crate::core::profile::Instance>,
-) -> iced::Element<'a, app::Message> {
+) -> iced::Element<'a, message::Message> {
     if let Some(instance) = current_instance
         && let Some(mods) = &instance.mods
     {
@@ -61,11 +61,11 @@ pub fn mods_view<'a>(
                 let mod_name: iced::Element<_> = widget::text(mod_info.name.clone()).into();
 
                 let checkbox = widget::checkbox("", mod_info.enabled).on_toggle(|new_state| {
-                    app::Message::ToggleMod(mod_info.name.clone(), new_state)
+                    message::ModMessage::Toggle(mod_info.name.clone(), new_state).into()
                 });
 
                 let button_uninstall = clickable_text!("Uninstall")
-                    .on_press(app::Message::RequestModUninstall(mod_info.name.clone()));
+                    .on_press(message::ModMessage::Uninstall(mod_info.name.clone()).into());
 
                 let mod_entry = styled_container!(
                     widget::row![checkbox, mod_name, widget::horizontal_space(), button_uninstall],

@@ -1,10 +1,10 @@
 use iced::widget::column;
 
-use crate::app::Message;
+use crate::app::message;
 use crate::styled_container;
 
-pub fn overwrites_view(app: &crate::app::GothicOrganizer) -> iced::Element<Message> {
-    let mut mod_sections: iced::widget::Column<Message> = column![];
+pub fn overwrites_view(app: &crate::app::GothicOrganizer) -> iced::Element<message::Message> {
+    let mut mod_sections: iced::widget::Column<message::Message> = column![];
 
     if let Some(profile_name) = app.session.active_profile.as_ref()
         && let Some(instance_name) = app.session.active_instance.as_ref()
@@ -24,7 +24,7 @@ pub fn overwrites_view(app: &crate::app::GothicOrganizer) -> iced::Element<Messa
             .fold(column![], |col, (mod_name, file_data)| {
                 let overwritten_count = file_data.len();
 
-                let mod_info: iced::Element<Message> = iced::widget::text(format!(
+                let mod_info: iced::Element<message::Message> = iced::widget::text(format!(
                     "Mod - {mod_name}: {overwritten_count} files overwritten"
                 ))
                 .into();
@@ -36,12 +36,13 @@ pub fn overwrites_view(app: &crate::app::GothicOrganizer) -> iced::Element<Messa
                             get_relative_path(replaces.source_path.clone()),
                             get_relative_path(replaced.source_path.clone()),
                         );
-                        let file_info: iced::Element<Message> = iced::widget::text(format!(
-                            "\"{}\" overwrites \"{}\"",
-                            active.display(),
-                            original.display(),
-                        ))
-                        .into();
+                        let file_info: iced::Element<message::Message> =
+                            iced::widget::text(format!(
+                                "\"{}\" overwrites \"{}\"",
+                                active.display(),
+                                original.display(),
+                            ))
+                            .into();
                         col.push(file_info)
                     })
                     .padding(10)

@@ -1,11 +1,14 @@
-use crate::app;
-use crate::core::constants;
-use crate::styled_container;
-use crate::svg_with_color;
 use iced::alignment;
 use iced::widget;
 
-pub fn header<'a>(palette_ext: &iced::theme::palette::Extended) -> iced::Element<'a, app::Message> {
+use crate::app::message;
+use crate::core::constants;
+use crate::styled_container;
+use crate::svg_with_color;
+
+pub fn header<'a>(
+    palette_ext: &iced::theme::palette::Extended,
+) -> iced::Element<'a, message::Message> {
     let mut container_bg_color = palette_ext.primary.weak.color;
     container_bg_color.a = 0.3;
     let logo = svg_with_color!(
@@ -19,7 +22,7 @@ pub fn header<'a>(palette_ext: &iced::theme::palette::Extended) -> iced::Element
     let title = widget::text!("{}", constants::app_title_full()).size(30);
     let button_options_icon = svg_with_color!("./resources/options.svg").height(20).width(20);
     let button_options = widget::button(button_options_icon)
-        .on_press(app::Message::RequestWindowOpen("options".into()));
+        .on_press(message::WindowMessage::Open("options".into()).into());
 
     let header = widget::row!(title, widget::horizontal_space(), button_options)
         .spacing(10)

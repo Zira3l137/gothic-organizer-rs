@@ -1,6 +1,6 @@
 use iced::widget;
 
-use crate::app;
+use crate::app::message;
 use crate::clickable_text;
 use crate::core::profile;
 use crate::styled_container;
@@ -11,7 +11,7 @@ pub fn files_menu<'a>(
     palette_ext: &iced::theme::palette::Extended,
     current_profile: Option<&profile::Profile>,
     instance_selected: Option<&profile::Instance>,
-) -> iced::Element<'a, app::Message> {
+) -> iced::Element<'a, message::Message> {
     let mut container_bg_color = palette_ext.primary.weak.color;
     container_bg_color.a = 0.3;
     let file_view_controls = file_view_controls(app, current_profile);
@@ -29,30 +29,39 @@ pub fn files_menu<'a>(
 }
 
 pub fn file_view_controls<'a>(
-    app: &'a app::GothicOrganizer,
+    app: &'a crate::app::GothicOrganizer,
     current_profile: Option<&profile::Profile>,
-) -> iced::Element<'a, app::Message> {
+) -> iced::Element<'a, message::Message> {
     let icon_back = svg_with_color!("./resources/back.svg").height(20).width(20);
     let icon_home = svg_with_color!("./resources/home.svg").height(20).width(20);
     let button_back_message = current_profile.and_then(|profile| {
-        if profile.path == app.state.current_dir {
+        if profile.path == app.state.ui.current_dir {
             return None;
         };
-        Some(app::Message::UpdateActiveUiDir(
-            app.state.current_dir.clone().parent().unwrap_or(profile.path.as_ref()).to_path_buf(),
-        ))
+        Some(
+            message::UiMessage::UpdateActiveDir(
+                app.state
+                    .ui
+                    .current_dir
+                    .clone()
+                    .parent()
+                    .unwrap_or(profile.path.as_ref())
+                    .to_path_buf(),
+            )
+            .into(),
+        )
     });
     let button_home_message = current_profile.and_then(|profile| {
-        if profile.path == app.state.current_dir {
+        if profile.path == app.state.ui.current_dir {
             return None;
         };
-        Some(app::Message::UpdateActiveUiDir(profile.path.clone()))
+        Some(message::UiMessage::UpdateActiveDir(profile.path.clone()).into())
     });
 
     let button_back = widget::button(icon_back).on_press_maybe(button_back_message);
     let button_home = widget::button(icon_home).on_press_maybe(button_home_message);
     let button_toggle_all =
-        widget::button("Toggle all").on_press(app::Message::ToggleAllFileEntries);
+        widget::button("Toggle all").on_press(message::UiMessage::ToggleAllFileEntries.into());
 
     styled_container!(
         widget::row!(button_back, button_home, button_toggle_all).spacing(10),
@@ -65,14 +74,15 @@ pub fn file_view_controls<'a>(
 }
 
 pub fn file_view<'a>(
-    app: &'a app::GothicOrganizer,
+    app: &'a crate::app::GothicOrganizer,
     instance_selected: Option<&profile::Instance>,
-) -> iced::Element<'a, app::Message> {
+) -> iced::Element<'a, message::Message> {
     if instance_selected.is_none() {
         return widget::Column::new().into();
     };
 
     app.state
+        .ui
         .dir_entries
         .iter()
         .fold(widget::Column::new(), |column, (path, info)| {
@@ -87,7 +97,7 @@ pub fn file_view<'a>(
 
             let label: iced::Element<_> = match &is_dir {
                 true => clickable_text!("{file_name}")
-                    .on_press(app::Message::UpdateActiveUiDir(path.clone()))
+                    .on_press(message::UiMessage::UpdateActiveDir(path.clone()).into())
                     .into(),
                 false => widget::text(file_name).into(),
             };
@@ -96,7 +106,7 @@ pub fn file_view<'a>(
             let tooltip_body =
                 styled_container!(tooltip_text, border_width = 1.0, border_radius = 4.0).padding(5);
             let checkbox = widget::checkbox("", info.enabled)
-                .on_toggle(|_| app::Message::ToggleFileEntry(path.clone()));
+                .on_toggle(|_| message::UiMessage::ToggleFileEntry(path.clone()).into());
 
             let file_entry = widget::tooltip(
                 styled_container!(

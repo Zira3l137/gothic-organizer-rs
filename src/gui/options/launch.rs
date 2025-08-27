@@ -1,14 +1,14 @@
 use iced::widget;
 
-use crate::app;
+use crate::app::message;
 use crate::config;
 use crate::core::lookup::Lookup;
 use crate::styled_container;
 
 fn parser_settings(
-    _app: &app::GothicOrganizer,
+    _app: &crate::app::GothicOrganizer,
     launch_options: Option<config::GameLaunchConfiguration>,
-) -> iced::Element<app::Message> {
+) -> iced::Element<message::Message> {
     let mut parser_settings: Lookup<config::ParserCommand, bool> = Lookup::new();
     if let Some(launch_options) = launch_options {
         parser_settings = launch_options.parser_settings.commands.clone();
@@ -34,7 +34,8 @@ fn parser_settings(
                         *parser_settings.get(option).unwrap_or(&false),
                     )
                     .on_toggle(|new_state| {
-                        app::Message::ToggleParserSetting(option.clone(), new_state)
+                        message::SettingsMessage::ToggleParserSetting(option.clone(), new_state)
+                            .into()
                     }),
                 )
             }
@@ -49,37 +50,37 @@ fn parser_settings(
 }
 
 fn game_settings(
-    app: &app::GothicOrganizer,
+    app: &crate::app::GothicOrganizer,
     launch_options: Option<config::GameLaunchConfiguration>,
-) -> iced::Element<app::Message> {
+) -> iced::Element<message::Message> {
     let mut game_settings = config::GameSettings::default();
     if let Some(launch_options) = launch_options {
         game_settings = launch_options.game_settings.clone();
     }
 
-    let zspy_level_label: iced::Element<app::Message> =
+    let zspy_level_label: iced::Element<message::Message> =
         widget::Text::new(format!("ZSpy verbosity Level: {}", game_settings.zspy.verbosity)).into();
 
-    let zspy_slider: iced::Element<app::Message> = widget::Slider::new(
+    let zspy_slider: iced::Element<message::Message> = widget::Slider::new(
         std::ops::RangeInclusive::new(0, 10),
-        app.state.zspy_level_field,
+        app.state.settings.zspy_level_field,
         |value| {
             if let Some(zspy_cfg) = &app.session.active_zspy_config
                 && zspy_cfg.is_enabled
             {
-                app::Message::UpdateZspyLevelField(value)
+                message::SettingsMessage::UpdateZspyLevel(value).into()
             } else {
-                app::Message::Idle
+                message::SystemMessage::Idle.into()
             }
         },
     )
     .into();
 
-    let renderer_switcher: iced::Element<app::Message> = widget::ComboBox::new(
-        &app.state.renderer_choices,
+    let renderer_switcher: iced::Element<message::Message> = widget::ComboBox::new(
+        &app.state.settings.renderer_choices,
         "Renderer Backend",
         app.session.active_renderer_backend.as_ref(),
-        app::Message::SetRendererBackend,
+        |renderer| message::SettingsMessage::SetRendererBackend(renderer).into(),
     )
     .into();
 
@@ -89,9 +90,11 @@ fn game_settings(
             .align_left(iced::Length::Fill),
         renderer_switcher,
         widget::Checkbox::new("Enable MARVIN mode", game_settings.is_marvin_mode_enabled)
-            .on_toggle(|new_state| { app::Message::ToggleMarvinMode(new_state) }),
+            .on_toggle(|new_state| {
+                message::SettingsMessage::ToggleMarvinMode(new_state).into()
+            }),
         widget::Checkbox::new("Enable zSpy", game_settings.zspy.is_enabled)
-            .on_toggle(|new_state| { app::Message::ToggleZSpyState(new_state) }),
+            .on_toggle(|new_state| { message::SettingsMessage::ToggleZSpyState(new_state).into() }),
         zspy_level_label,
         zspy_slider
     ]
@@ -105,7 +108,7 @@ fn game_settings(
         .into()
 }
 
-pub fn launch_menu(app: &app::GothicOrganizer) -> iced::Element<app::Message> {
+pub fn launch_menu(app: &crate::app::GothicOrganizer) -> iced::Element<message::Message> {
     let launch_options = &app.session.launch_options;
     styled_container!(
         widget::row![

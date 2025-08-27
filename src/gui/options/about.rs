@@ -2,13 +2,13 @@ use iced::alignment;
 use iced::theme::palette;
 use iced::widget;
 
-use crate::app;
+use crate::app::message;
 use crate::clickable_text;
 use crate::core::constants;
 use crate::styled_container;
 use crate::svg_with_color;
 
-pub fn about_menu<'a>(palette_ext: &palette::Extended) -> iced::Element<'a, app::Message> {
+pub fn about_menu<'a>(palette_ext: &palette::Extended) -> iced::Element<'a, message::Message> {
     let logo = svg_with_color!(
         "./resources/logo.svg",
         color_idle = palette_ext.primary.strong.color,
@@ -25,7 +25,7 @@ pub fn about_menu<'a>(palette_ext: &palette::Extended) -> iced::Element<'a, app:
     let link = widget::row![
         widget::text!("Repository: "),
         clickable_text!("{}", constants::APP_REPOSITORY)
-            .on_press(app::Message::RequestOpenRepository)
+            .on_press(message::SystemMessage::OpenRepository.into())
             .color(palette_ext.primary.base.color)
             .color_hovered(palette_ext.primary.strong.color)
     ];

@@ -2,7 +2,7 @@ use std::path;
 
 use iced::Task;
 
-use crate::app;
+use crate::app::message;
 use crate::core;
 use crate::core::services::Service;
 use crate::error;
@@ -18,7 +18,7 @@ impl<'a> ModService<'a> {
         Self { session }
     }
 
-    pub fn add_mod(&mut self, mod_source_path: Option<path::PathBuf>) -> Task<app::Message> {
+    pub fn add_mod(&mut self, mod_source_path: Option<path::PathBuf>) -> Task<message::Message> {
         let Some(mod_source_path) = mod_source_path.or_else(|| {
             rfd::FileDialog::new()
                 .set_title("Select a zip archive with mod files")
@@ -78,15 +78,18 @@ impl<'a> ModService<'a> {
             Self::apply_mod_files(instance, &new_mod_info, &profile_path);
             instance.mods.get_or_insert_default().push(new_mod_info.clone());
         } else {
-            return Task::done(app::Message::RequestPanicWithErr(error::SharedError::new(
-                error::GothicOrganizerError::Other("No active instance".to_owned()),
-            )));
+            return Task::done(
+                message::SystemMessage::PanicWithError(error::SharedError::new(
+                    error::GothicOrganizerError::Other("No active instance".to_owned()),
+                ))
+                .into(),
+            );
         }
 
-        Task::done(app::Message::RequestDirEntriesReload)
+        Task::done(message::UiMessage::ReloadDirEntries.into())
     }
 
-    pub fn remove_mod(&mut self, mod_name: String) -> Task<app::Message> {
+    pub fn remove_mod(&mut self, mod_name: String) -> Task<message::Message> {
         self.toggle_mod(mod_name.clone(), false);
         let Ok(mut context) = self.context() else {
             return Task::none();
@@ -98,7 +101,9 @@ impl<'a> ModService<'a> {
             && let Some(mod_info) = mods.iter().find(|info| info.name == mod_name)
         {
             if let Err(e) = std::fs::remove_dir_all(&mod_info.path) {
-                return Task::done(app::Message::RequestPanicWithErr(error::SharedError::new(e)));
+                return Task::done(
+                    message::SystemMessage::PanicWithError(error::SharedError::new(e)).into(),
+                );
             };
 
             mods.retain(|info| info.name != mod_name);
@@ -107,7 +112,7 @@ impl<'a> ModService<'a> {
                 overwrites.remove(&mod_name);
             }
 
-            return Task::done(app::Message::RequestDirEntriesReload);
+            return Task::done(message::UiMessage::ReloadDirEntries.into());
         }
         Task::none()
     }
@@ -189,7 +194,7 @@ impl<'a> ModService<'a> {
         });
     }
 
-    pub fn reload_mods(&mut self) -> Task<app::Message> {
+    pub fn reload_mods(&mut self) -> Task<message::Message> {
         let Ok(mut context) = self.context() else {
             return Task::none();
         };
@@ -206,7 +211,7 @@ impl<'a> ModService<'a> {
             }
         }
 
-        Task::done(app::Message::RequestDirEntriesReload)
+        Task::done(message::UiMessage::ReloadDirEntries.into())
     }
 
     pub fn is_valid_mod_source(mod_path: &path::Path) -> bool {

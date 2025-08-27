@@ -1,9 +1,9 @@
 use iced::widget;
 
-use crate::app;
+use crate::app::message;
 use crate::styled_container;
 
-pub fn config_menu(app: &app::GothicOrganizer) -> iced::Element<app::Message> {
+pub fn config_menu(app: &crate::app::GothicOrganizer) -> iced::Element<message::Message> {
     let theme_setting = theme_setting(app);
     let profile_setting = game_directory_setting(app);
     let mods_dir_setting = mods_dir_setting(app);
@@ -18,21 +18,25 @@ pub fn config_menu(app: &app::GothicOrganizer) -> iced::Element<app::Message> {
     .into()
 }
 
-pub fn mods_dir_setting(app: &app::GothicOrganizer) -> iced::Element<app::Message> {
+pub fn mods_dir_setting(app: &crate::app::GothicOrganizer) -> iced::Element<message::Message> {
     let label_mods_dir = widget::text!("Mods directory:");
-    let input_mods_dir: iced::Element<app::Message> =
-        widget::text_input("Mods directory", app.state.mods_dir_field.as_ref())
-            .on_input_maybe(if app.session.active_profile.is_some() {
-                Some(app::Message::UpdateModsDirField)
-            } else {
-                None
+    let input_mods_dir: iced::Element<message::Message> =
+        widget::text_input("Mods directory", app.state.mod_management.mods_dir_field.as_ref())
+            .on_input_maybe(match app.session.active_profile {
+                Some(_) => Some(|input| message::ModMessage::UpdateModsDirField(input).into()),
+                None => None,
             })
-            .on_submit(app::Message::SetModsDir(Some(app.state.mods_dir_field.clone().into())))
+            .on_submit(
+                message::ModMessage::SetModsDir(Some(
+                    app.state.mod_management.mods_dir_field.clone().into(),
+                ))
+                .into(),
+            )
             .into();
 
     let button_browse_mods_dir =
         widget::button("...").on_press_maybe(if app.session.active_profile.is_some() {
-            Some(app::Message::SetModsDir(None))
+            Some(message::ModMessage::SetModsDir(None).into())
         } else {
             None
         });
@@ -47,21 +51,29 @@ pub fn mods_dir_setting(app: &app::GothicOrganizer) -> iced::Element<app::Messag
     .into()
 }
 
-pub fn game_directory_setting(app: &app::GothicOrganizer) -> iced::Element<app::Message> {
+pub fn game_directory_setting(
+    app: &crate::app::GothicOrganizer,
+) -> iced::Element<message::Message> {
     let label_profile_dir = widget::text!("Game directory:");
-    let input_profile_dir: iced::Element<app::Message> =
-        widget::text_input("Game directory", app.state.profile_dir_field.as_ref())
-            .on_input_maybe(if app.session.active_profile.is_some() {
-                Some(app::Message::UpdateProfileDirField)
-            } else {
-                None
+    let input_profile_dir: iced::Element<message::Message> =
+        widget::text_input("Game directory", app.state.profile.profile_dir_field.as_ref())
+            .on_input_maybe(match app.session.active_profile {
+                Some(_) => {
+                    Some(|input| message::ProfileMessage::UpdateProfileDirField(input).into())
+                }
+                None => None,
             })
-            .on_submit(app::Message::SetGameDir(Some(app.state.profile_dir_field.clone().into())))
+            .on_submit(
+                message::ProfileMessage::SetGameDir(Some(
+                    app.state.profile.profile_dir_field.clone().into(),
+                ))
+                .into(),
+            )
             .into();
 
     let button_browse_profile_dir =
         widget::button("...").on_press_maybe(if app.session.active_profile.is_some() {
-            Some(app::Message::SetGameDir(None))
+            Some(message::ProfileMessage::SetGameDir(None).into())
         } else {
             None
         });
@@ -76,14 +88,14 @@ pub fn game_directory_setting(app: &app::GothicOrganizer) -> iced::Element<app::
     .into()
 }
 
-pub fn theme_setting(app: &app::GothicOrganizer) -> iced::Element<app::Message> {
+pub fn theme_setting(app: &crate::app::GothicOrganizer) -> iced::Element<message::Message> {
     let label_theme = widget::text!("Application theme:");
 
     let choice_theme = widget::combo_box(
-        &app.state.theme_choices,
+        &app.state.settings.theme_choices,
         "Application theme",
         app.session.theme_selected.as_ref(),
-        app::Message::SetUiTheme,
+        |theme| message::UiMessage::SetTheme(theme).into(),
     );
 
     widget::row!(label_theme, iced::widget::horizontal_space(), choice_theme).spacing(10).into()
