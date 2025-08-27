@@ -1,11 +1,12 @@
 use std::path;
 
+use crate::app::session;
 use crate::app::state;
 use crate::core;
 use crate::core::services::Service;
 
 pub struct UiService<'a> {
-    session: &'a mut core::services::session::SessionService,
+    session: &'a mut session::ApplicationSession,
     state: &'a mut state::ApplicationState,
 }
 
@@ -13,7 +14,7 @@ crate::impl_service!(UiService);
 
 impl<'a> UiService<'a> {
     pub fn new(
-        session: &'a mut core::services::session::SessionService,
+        session: &'a mut session::ApplicationSession,
         state: &'a mut state::ApplicationState,
     ) -> Self {
         Self { session, state }

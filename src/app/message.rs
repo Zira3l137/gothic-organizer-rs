@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use crate::config;
+use crate::app::session;
 use crate::gui::options;
 
 #[derive(Debug, Clone)]
@@ -57,11 +57,12 @@ pub enum UiMessage {
 
 #[derive(Debug, Clone)]
 pub enum SettingsMessage {
-    SetRendererBackend(config::RendererBackend),
+    SetRendererBackend(session::RendererBackend),
     UpdateZspyLevel(u8),
     ToggleMarvinMode(bool),
-    ToggleParserSetting(config::ParserCommand, bool),
+    ToggleParserSetting(session::ParserCommand, bool),
     ToggleZSpyState(bool),
+    ToggleErrorNotifications(bool),
 }
 
 #[derive(Debug, Clone)]

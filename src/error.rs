@@ -12,10 +12,10 @@ pub enum AppError {
     ModService { operation: ModOperation, mod_name: String, details: String },
     UiService { operation: UiOperation, details: String },
     Configuration { setting: String, value: String, reason: String },
-    Validation(ValidationError),
     System { component: String, details: String },
     UserInput { field: String, value: String, expected: String },
     External { service: String, details: String },
+    Validation(ValidationError),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -1,21 +1,21 @@
 use iced::widget;
 
 use crate::app::message;
-use crate::config;
+use crate::app::session;
 use crate::core::lookup::Lookup;
 use crate::styled_container;
 
 fn parser_settings(
     _app: &crate::app::GothicOrganizer,
-    launch_options: Option<config::GameLaunchConfiguration>,
+    launch_options: Option<session::GameLaunchConfiguration>,
 ) -> iced::Element<message::Message> {
-    let mut parser_settings: Lookup<config::ParserCommand, bool> = Lookup::new();
+    let mut parser_settings: Lookup<session::ParserCommand, bool> = Lookup::new();
     if let Some(launch_options) = launch_options {
         parser_settings = launch_options.parser_settings.commands.clone();
     }
 
     styled_container!(
-        config::ParserCommand::into_iter().fold(
+        session::ParserCommand::into_iter().fold(
             widget::column![
                 styled_container!(
                     widget::text("Parser Settings"),
@@ -51,9 +51,9 @@ fn parser_settings(
 
 fn game_settings(
     app: &crate::app::GothicOrganizer,
-    launch_options: Option<config::GameLaunchConfiguration>,
+    launch_options: Option<session::GameLaunchConfiguration>,
 ) -> iced::Element<message::Message> {
-    let mut game_settings = config::GameSettings::default();
+    let mut game_settings = session::GameSettings::default();
     if let Some(launch_options) = launch_options {
         game_settings = launch_options.game_settings.clone();
     }

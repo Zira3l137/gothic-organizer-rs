@@ -8,7 +8,7 @@ pub fn overwrites_view(app: &crate::app::GothicOrganizer) -> iced::Element<messa
 
     if let Some(profile_name) = app.session.active_profile.as_ref()
         && let Some(instance_name) = app.session.active_instance.as_ref()
-        && let Some(profile) = app.session.profiles.get(profile_name)
+        && let Some(profile) = app.state.profile.profiles.get(profile_name)
         && let Some(instances) = profile.instances.as_ref()
         && let Some(instance) = instances.get(instance_name)
         && let Some(overwrites) = instance.overwrites.as_ref()

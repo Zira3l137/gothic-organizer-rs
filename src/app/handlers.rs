@@ -1,10 +1,12 @@
 use crate::app::message;
+use crate::app::session;
 use crate::app::state;
 use crate::core::constants;
 use crate::core::services;
+use crate::lookup;
 
 pub fn handle_profile_message(
-    session: &mut services::session::SessionService,
+    session: &mut session::ApplicationSession,
     state: &mut state::ApplicationState,
     message: message::ProfileMessage,
 ) -> iced::Task<message::Message> {
@@ -46,13 +48,13 @@ pub fn handle_profile_message(
 }
 
 pub fn handle_mod_message(
-    session: &mut services::session::SessionService,
+    session: &mut session::ApplicationSession,
     state: &mut state::ApplicationState,
     message: message::ModMessage,
 ) -> iced::Task<message::Message> {
     match message {
         message::ModMessage::Add(path) => {
-            let mut service = services::mods::ModService::new(session);
+            let mut service = services::mods::ModService::new(session, state);
             service.add_mod(path).map(message::Message::from)
         }
 
@@ -62,18 +64,18 @@ pub fn handle_mod_message(
                 log::warn!("Couldn't update instance cache: {err}");
             }
 
-            let mut service = services::mods::ModService::new(session);
+            let mut service = services::mods::ModService::new(session, state);
             service.toggle_mod(name, new_state);
             iced::Task::done(message::Message::UI(message::UiMessage::ReloadDirEntries))
         }
 
         message::ModMessage::Uninstall(name) => {
-            let mut service = services::mods::ModService::new(session);
+            let mut service = services::mods::ModService::new(session, state);
             service.remove_mod(name).map(message::Message::from)
         }
 
         message::ModMessage::Reload => {
-            let mut service = services::mods::ModService::new(session);
+            let mut service = services::mods::ModService::new(session, state);
             service.reload_mods().map(message::Message::from)
         }
 
@@ -90,7 +92,7 @@ pub fn handle_mod_message(
 }
 
 pub fn handle_ui_message(
-    session: &mut services::session::SessionService,
+    session: &mut session::ApplicationSession,
     state: &mut state::ApplicationState,
     message: message::UiMessage,
 ) -> iced::Task<message::Message> {
@@ -138,7 +140,7 @@ pub fn handle_ui_message(
 }
 
 pub fn handle_settings_message(
-    session: &mut services::session::SessionService,
+    session: &mut session::ApplicationSession,
     state: &mut state::ApplicationState,
     message: message::SettingsMessage,
 ) -> iced::Task<message::Message> {
@@ -164,7 +166,16 @@ pub fn handle_settings_message(
         }
 
         message::SettingsMessage::ToggleParserSetting(option, new_state) => {
-            session.toggle_launch_option(&option, new_state);
+            if let Some(options) = session.launch_options.as_mut() {
+                options.parser_settings.commands.insert(option.clone(), new_state);
+            } else {
+                session.launch_options = Some(session::GameLaunchConfiguration {
+                    parser_settings: session::ParserSettings {
+                        commands: lookup![(option.clone() => new_state)],
+                    },
+                    ..Default::default()
+                });
+            }
             iced::Task::none()
         }
 
@@ -175,31 +186,45 @@ pub fn handle_settings_message(
                 new_state;
             iced::Task::none()
         }
+
+        message::SettingsMessage::ToggleErrorNotifications(new_state) => {
+            session.error_notifications_enabled = new_state;
+            iced::Task::none()
+        }
     }
 }
 
 pub fn handle_window_message(
-    session: &mut services::session::SessionService,
-    _state: &mut state::ApplicationState,
+    session: &mut session::ApplicationSession,
+    state: &mut state::ApplicationState,
     message: message::WindowMessage,
 ) -> iced::Task<message::Message> {
     match message {
         message::WindowMessage::Close(wnd_id) => {
-            session.close_window(&wnd_id).map(message::Message::from)
+            let mut session_service = services::session::SessionService::new(session, state);
+            session_service.close_window(&wnd_id).map(message::Message::from)
         }
 
-        message::WindowMessage::Open(name) => match name.as_str() {
-            "options" => session.invoke_options_window().map(message::Message::from),
-            "overwrites" => session.invoke_overwrites_window().map(message::Message::from),
-            _ => iced::Task::none(),
-        },
+        message::WindowMessage::Open(name) => {
+            let mut session_service = services::session::SessionService::new(session, state);
+            match name.as_str() {
+                "options" => session_service.invoke_options_window().map(message::Message::from),
+                "overwrites" => {
+                    session_service.invoke_overwrites_window().map(message::Message::from)
+                }
+                _ => iced::Task::none(),
+            }
+        }
 
-        message::WindowMessage::Initialize => session.init_window().map(message::Message::from),
+        message::WindowMessage::Initialize => {
+            let mut session_service = services::session::SessionService::new(session, state);
+            session_service.init_window().map(message::Message::from)
+        }
     }
 }
 
 pub fn handle_system_message(
-    session: &mut services::session::SessionService,
+    session: &mut session::ApplicationSession,
     state: &mut state::ApplicationState,
     message: message::SystemMessage,
 ) -> iced::Task<message::Message> {
@@ -212,12 +237,13 @@ pub fn handle_system_message(
         }
 
         message::SystemMessage::ExitApplication => {
-            if session.windows.iter().all(|(_, wnd_state)| wnd_state.is_closed) {
+            if state.windows.window_states.iter().all(|(_, wnd_state)| wnd_state.is_closed) {
                 let mut profile_service = services::profile::ProfileService::new(session, state);
                 if let Err(err) = profile_service.update_instance_from_cache() {
                     log::warn!("Couldn't update instance cache: {err}");
                 }
-                session.save_current_session();
+                let session_service = services::session::SessionService::new(session, state);
+                session_service.save_current_session();
                 iced::exit()
             } else {
                 iced::Task::none()
@@ -229,7 +255,7 @@ pub fn handle_system_message(
 }
 
 pub fn handle_error_message(
-    _session: &mut services::session::SessionService,
+    _session: &mut session::ApplicationSession,
     state: &mut state::ApplicationState,
     message: message::ErrorMessage,
 ) -> iced::Task<message::Message> {
@@ -238,14 +264,17 @@ pub fn handle_error_message(
             log::error!("{}", error_ctx.error);
             iced::Task::none()
         }
+
         message::ErrorMessage::Dismiss(error_id) => {
             state.errors.dismiss_error(error_id);
             iced::Task::none()
         }
-        message::ErrorMessage::ShowDetails(_) => {
-            // Could open a detailed error dialog
+
+        message::ErrorMessage::ShowDetails(_error_id) => {
+            // FIXME:  Could open a detailed error dialog
             iced::Task::none()
         }
+
         message::ErrorMessage::ClearAll => {
             state.errors.clear_all();
             iced::Task::none()

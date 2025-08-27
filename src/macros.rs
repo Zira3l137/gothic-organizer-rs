@@ -122,23 +122,11 @@ macro_rules! load_app_preferences {
 
 #[macro_export]
 macro_rules! save_app_session {
-    ($selected_profile: expr, $selected_instance: expr, $launch_options: expr, $cache: expr, $custom_path: expr) => {
-        $crate::helpers::save_app_session(
-            $selected_profile,
-            $selected_instance,
-            $launch_options,
-            $cache,
-            $custom_path,
-        )
+    ($session: expr, $custom_path: expr) => {
+        $crate::core::helpers::save_app_session($session, $custom_path)
     };
-    ($selected_profile: expr, $selected_instance: expr, $launch_options: expr, $cache: expr) => {
-        $crate::core::helpers::save_app_session::<String>(
-            $selected_profile,
-            $selected_instance,
-            $launch_options,
-            $cache,
-            None,
-        )
+    ($session: expr) => {
+        $crate::core::helpers::save_app_session::<String>($session, None)
     };
 }
 
@@ -174,19 +162,6 @@ macro_rules! load_profile {
 }
 
 #[macro_export]
-macro_rules! impl_shared_error_from {
-    ($($err_ty:ty),* $(,)?) => {
-        $(
-            impl From<$err_ty> for $crate::error::SharedError {
-                fn from(err: $err_ty) -> Self {
-                    $crate::error::SharedError::new(err)
-                }
-            }
-        )*
-    };
-}
-
-#[macro_export]
 macro_rules! impl_service {
     ($service:ident) => {
         impl Service for $service<'_> {
@@ -197,7 +172,7 @@ macro_rules! impl_service {
                     .session
                     .active_profile
                     .as_mut()
-                    .and_then(|p| self.session.profiles.get_mut(&p.clone()))
+                    .and_then(|p| self.state.profile.profiles.get_mut(&p.clone()))
                     .ok_or_else(|| $crate::error::AppError::ProfileService {
                         operation: $crate::error::ProfileOperation::Load,
                         details: "Failed to get active profile".to_string(),

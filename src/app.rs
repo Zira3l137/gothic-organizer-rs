@@ -1,15 +1,17 @@
-use iced::widget::combo_box;
+use iced::widget::combo_box::State;
 
-use crate::config;
+use crate::core::lookup::Lookup;
 use crate::core::services;
+use crate::load_app_session;
 
 pub mod handlers;
 pub mod message;
+pub mod session;
 pub mod state;
 
 #[derive(Debug, Default)]
 pub struct GothicOrganizer {
-    pub session: services::session::SessionService,
+    pub session: session::ApplicationSession,
     pub state: state::ApplicationState,
 }
 
@@ -18,35 +20,28 @@ impl GothicOrganizer {
     pub const WINDOW_SIZE: (f32, f32) = (768.0, 768.0);
 
     pub fn new() -> (Self, iced::Task<message::Message>) {
-        let mut session = services::session::SessionService::new();
         let mut state = state::ApplicationState::default();
-
+        let mut session = load_app_session!().unwrap_or_default();
         Self::initialize_state(&mut session, &mut state);
+
         let app = Self { session, state };
         (app, iced::Task::done(message::Message::Window(message::WindowMessage::Initialize)))
     }
 
-    fn initialize_state(
-        session: &mut services::session::SessionService,
-        state: &mut state::ApplicationState,
-    ) {
-        state.profile.profile_choices =
-            combo_box::State::new(session.profile_names.clone().unwrap_or_default());
-
-        state.profile.instance_choices =
-            combo_box::State::new(session.instance_names.clone().unwrap_or_default());
+    fn initialize_state(session: &mut session::ApplicationSession, state: &mut state::ApplicationState) {
+        let active_profile_name = session.active_profile.as_ref();
+        let active_profile = active_profile_name.and_then(|n| state.profile.profiles.get(n));
+        let instances = active_profile.and_then(|p| p.instances.as_ref());
+        let instance_names = instances.map(|i| i.keys().cloned().collect::<Vec<_>>()).unwrap_or_default();
+        let renderers = session::RendererBackend::into_iter().cloned().collect::<Vec<_>>();
+        let zspy_level = session.active_zspy_config.get_or_insert_default().verbosity;
+        let themes = |themes: &mut Lookup<String, iced::Theme>| themes.keys().cloned().collect::<Vec<_>>();
 
         state.ui.themes = services::session::SessionService::load_default_themes();
-
-        state.settings.theme_choices =
-            combo_box::State::new(state.ui.themes.iter().map(|(_, t)| t.to_string()).collect());
-
-        state.settings.renderer_choices = combo_box::State::new(
-            config::RendererBackend::into_iter().cloned().collect::<Vec<_>>(),
-        );
-
-        state.settings.zspy_level_field =
-            session.active_zspy_config.get_or_insert_default().verbosity.into();
+        state.profile.instance_choices = State::new(instance_names);
+        state.settings.theme_choices = State::new(themes(&mut state.ui.themes));
+        state.settings.renderer_choices = State::new(renderers);
+        state.settings.zspy_level_field = zspy_level.into();
     }
 
     pub fn update(&mut self, message: message::Message) -> iced::Task<message::Message> {
@@ -59,9 +54,7 @@ impl GothicOrganizer {
                 handlers::handle_mod_message(&mut self.session, &mut self.state, msg)
             }
 
-            message::Message::UI(msg) => {
-                handlers::handle_ui_message(&mut self.session, &mut self.state, msg)
-            }
+            message::Message::UI(msg) => handlers::handle_ui_message(&mut self.session, &mut self.state, msg),
 
             message::Message::Settings(msg) => {
                 handlers::handle_settings_message(&mut self.session, &mut self.state, msg)
@@ -107,7 +100,7 @@ impl GothicOrganizer {
 
     pub fn view(&self, id: iced::window::Id) -> iced::Element<message::Message> {
         if let Some((_, wnd_state)) =
-            self.session.windows.iter().find(|(wnd_id, _)| **wnd_id == Some(id))
+            self.state.windows.window_states.iter().find(|(wnd_id, _)| **wnd_id == Some(id))
         {
             match wnd_state.name.as_str() {
                 "options" => crate::gui::options::options_view(self),

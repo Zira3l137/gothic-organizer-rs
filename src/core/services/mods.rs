@@ -3,19 +3,25 @@ use std::path;
 use iced::Task;
 
 use crate::app::message;
+use crate::app::session;
+use crate::app::state;
 use crate::core;
 use crate::core::services::Service;
 use crate::error;
 
 pub struct ModService<'a> {
-    session: &'a mut core::services::session::SessionService,
+    session: &'a mut session::ApplicationSession,
+    state: &'a mut state::ApplicationState,
 }
 
 crate::impl_service!(ModService);
 
 impl<'a> ModService<'a> {
-    pub fn new(session: &'a mut core::services::session::SessionService) -> Self {
-        Self { session }
+    pub fn new(
+        session: &'a mut session::ApplicationSession,
+        state: &'a mut state::ApplicationState,
+    ) -> Self {
+        Self { session, state }
     }
 
     pub fn add_mod(&mut self, mod_source_path: Option<path::PathBuf>) -> Task<message::Message> {

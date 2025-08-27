@@ -11,7 +11,7 @@ pub mod profile;
 
 pub fn editor_view(app: &crate::app::GothicOrganizer) -> iced::Element<message::Message> {
     let current_profile =
-        app.session.active_profile.as_ref().and_then(|s| app.session.profiles.get(s));
+        app.session.active_profile.as_ref().and_then(|s| app.state.profile.profiles.get(s));
 
     let instance_selected =
         app.session.active_instance.as_ref().and_then(|s| {

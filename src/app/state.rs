@@ -3,12 +3,15 @@
 use std::path::PathBuf;
 
 use iced::widget::combo_box;
+use serde::{Deserialize, Serialize};
 
-use crate::config;
+use crate::app::session;
+use crate::core::constants;
 use crate::core::lookup;
 use crate::core::profile;
 use crate::error;
 use crate::gui::options;
+use crate::load_profile;
 
 #[derive(Debug, Default)]
 pub struct ApplicationState {
@@ -16,7 +19,13 @@ pub struct ApplicationState {
     pub profile: ProfileState,
     pub mod_management: ModState,
     pub settings: SettingsState,
+    pub windows: WindowsState,
     pub errors: ErrorState,
+}
+
+#[derive(Debug, Default)]
+pub struct WindowsState {
+    pub window_states: lookup::Lookup<Option<iced::window::Id>, WindowInfo>,
 }
 
 #[derive(Debug, Default)]
@@ -27,12 +36,35 @@ pub struct UiState {
     pub active_options_menu: options::menu::OptionsMenu,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct ProfileState {
+    pub profiles: lookup::Lookup<String, profile::Profile>,
     pub instance_name_field: String,
     pub profile_dir_field: String,
     pub profile_choices: combo_box::State<String>,
     pub instance_choices: combo_box::State<String>,
+}
+
+impl std::default::Default for ProfileState {
+    fn default() -> Self {
+        Self {
+            profiles: constants::Profile::into_iter()
+                .map(|profile_name| {
+                    let name_str = (*profile_name).to_string();
+                    let profile = load_profile!(&name_str)
+                        .unwrap_or_else(|| profile::Profile::default().with_name(&name_str));
+                    (name_str, profile)
+                })
+                .collect(),
+
+            profile_choices: iced::widget::combo_box::State::new(
+                constants::Profile::into_iter().map(|p| p.to_string()).collect(),
+            ),
+            instance_choices: Default::default(),
+            instance_name_field: String::new(),
+            profile_dir_field: String::new(),
+        }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -44,11 +76,11 @@ pub struct ModState {
 pub struct SettingsState {
     pub zspy_level_field: u8,
     pub theme_choices: combo_box::State<String>,
-    pub renderer_choices: combo_box::State<config::RendererBackend>,
+    pub renderer_choices: combo_box::State<session::RendererBackend>,
 }
 
-#[derive(Debug, Default, Clone)]
-pub struct WindowState {
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct WindowInfo {
     pub name: String,
     pub is_closed: bool,
 }

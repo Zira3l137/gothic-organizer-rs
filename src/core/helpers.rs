@@ -11,9 +11,9 @@ use iced::border::Radius;
 use iced::widget::Container;
 use iced::widget::Svg;
 
+use crate::app::session;
 use crate::config;
 use crate::core::constants;
-use crate::core::lookup::Lookup;
 use crate::core::profile;
 use crate::error;
 
@@ -70,21 +70,11 @@ pub fn load_app_preferences<P: AsRef<Path>>(
     Some(prefs)
 }
 pub fn save_app_session<P: AsRef<Path>>(
-    selected_profile: Option<String>,
-    selected_instance: Option<String>,
-    launch_options: Option<config::GameLaunchConfiguration>,
-    cache: Option<Lookup<PathBuf, profile::FileMetadata>>,
+    session: &session::ApplicationSession,
     custom_path: Option<P>,
 ) -> Result<(), std::io::Error> {
-    let session = config::ApplicationSession {
-        active_profile_name: selected_profile,
-        active_instance_name: selected_instance,
-        game_launch_config: launch_options,
-        cache,
-    };
-
     let default_path = default_path(custom_path);
-    let session_string = serde_json::to_string_pretty(&session)?;
+    let session_string = serde_json::to_string_pretty(session)?;
     write(default_path.join("session.json"), session_string)?;
 
     Ok(())
@@ -92,7 +82,7 @@ pub fn save_app_session<P: AsRef<Path>>(
 
 pub fn load_app_session<P: AsRef<Path>>(
     custom_path: Option<P>,
-) -> Option<config::ApplicationSession> {
+) -> Option<session::ApplicationSession> {
     let default_path = default_path(custom_path);
     if !default_path.exists() {
         return None;
@@ -100,7 +90,7 @@ pub fn load_app_session<P: AsRef<Path>>(
 
     let session_json = read_to_string(default_path.join("session.json")).ok()?;
 
-    let Ok(session): Result<config::ApplicationSession, _> = serde_json::from_str(&session_json)
+    let Ok(session): Result<session::ApplicationSession, _> = serde_json::from_str(&session_json)
     else {
         return None;
     };

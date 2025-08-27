@@ -3,6 +3,7 @@ use std::path;
 use iced::Task;
 
 use crate::app::message;
+use crate::app::session;
 use crate::app::state;
 use crate::core;
 use crate::core::lookup;
@@ -11,18 +12,18 @@ use crate::core::services::Service;
 use crate::error;
 
 pub struct ProfileService<'a> {
-    session: &'a mut core::services::session::SessionService,
-    app_state: &'a mut state::ApplicationState,
+    session: &'a mut session::ApplicationSession,
+    state: &'a mut state::ApplicationState,
 }
 
 crate::impl_service!(ProfileService);
 
 impl<'a> ProfileService<'a> {
     pub fn new(
-        session: &'a mut core::services::session::SessionService,
+        session: &'a mut session::ApplicationSession,
         app_state: &'a mut state::ApplicationState,
     ) -> Self {
-        Self { session, app_state }
+        Self { session, state: app_state }
     }
 
     pub fn switch_profile(&mut self, profile_name: &str) -> Task<message::Message> {
@@ -30,7 +31,7 @@ impl<'a> ProfileService<'a> {
             log::error!("Failed to update instance from cache: {err}");
         }
 
-        if let Some(next_profile) = self.session.profiles.get(profile_name) {
+        if let Some(next_profile) = self.state.profile.profiles.get(profile_name) {
             self.session.active_profile = Some(profile_name.to_owned());
             self.session.active_instance = None;
 
@@ -40,8 +41,7 @@ impl<'a> ProfileService<'a> {
                 .map(|i| i.keys().cloned().collect())
                 .unwrap_or_default();
 
-            self.app_state.profile.instance_choices =
-                iced::widget::combo_box::State::new(instances);
+            self.state.profile.instance_choices = iced::widget::combo_box::State::new(instances);
 
             if !next_profile.path.as_os_str().is_empty() {
                 return Task::done(message::UiMessage::ReloadDirEntries.into());
@@ -52,7 +52,7 @@ impl<'a> ProfileService<'a> {
     }
 
     pub fn update_instance_from_cache(&mut self) -> Result<(), error::AppError> {
-        self.session.files.extend(self.app_state.ui.dir_entries.iter().cloned());
+        self.session.files.extend(self.state.ui.dir_entries.iter().cloned());
 
         let cached_files = self.session.files.clone();
         let mut context = self.context()?;
@@ -62,8 +62,8 @@ impl<'a> ProfileService<'a> {
     }
 
     pub fn add_instance_for_profile(&mut self, profile_name: &str) -> Task<message::Message> {
-        if let Some(profile) = self.session.profiles.get_mut(profile_name) {
-            let instance_name = self.app_state.profile.instance_name_field.clone();
+        if let Some(profile) = self.state.profile.profiles.get_mut(profile_name) {
+            let instance_name = self.state.profile.instance_name_field.clone();
             if instance_name.is_empty() {
                 return Task::none();
             }
@@ -100,9 +100,9 @@ impl<'a> ProfileService<'a> {
             }
 
             instances.insert(instance_name.clone(), new_instance);
-            self.app_state.profile.instance_choices =
+            self.state.profile.instance_choices =
                 iced::widget::combo_box::State::new(instances.keys().cloned().collect());
-            self.app_state.profile.instance_name_field = String::new();
+            self.state.profile.instance_name_field = String::new();
 
             return self.switch_instance(&instance_name);
         }
@@ -130,9 +130,8 @@ impl<'a> ProfileService<'a> {
             return;
         }
 
-        self.app_state.profile.instance_choices =
-            iced::widget::combo_box::State::new(instance_names);
-        self.app_state.profile.instance_name_field = String::new();
+        self.state.profile.instance_choices = iced::widget::combo_box::State::new(instance_names);
+        self.state.profile.instance_name_field = String::new();
         self.session.active_instance = None;
     }
 
@@ -160,7 +159,7 @@ impl<'a> ProfileService<'a> {
 
         context.active_profile.path = path.clone();
         context.set_instance_files(None);
-        self.app_state.ui.current_dir = path.clone();
+        self.state.ui.current_dir = path.clone();
 
         self.session.files.clear();
         self.session.files.extend(

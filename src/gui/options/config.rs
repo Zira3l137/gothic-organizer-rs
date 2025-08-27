@@ -7,9 +7,12 @@ pub fn config_menu(app: &crate::app::GothicOrganizer) -> iced::Element<message::
     let theme_setting = theme_setting(app);
     let profile_setting = game_directory_setting(app);
     let mods_dir_setting = mods_dir_setting(app);
+    let notifications_setting = notifications_setting(app);
 
     styled_container!(
-        widget::column!(theme_setting, profile_setting, mods_dir_setting).spacing(10).padding(10),
+        widget::column!(theme_setting, profile_setting, mods_dir_setting, notifications_setting)
+            .spacing(10)
+            .padding(10),
         border_width = 4.0,
         border_radius = 4.0
     )
@@ -22,10 +25,12 @@ pub fn mods_dir_setting(app: &crate::app::GothicOrganizer) -> iced::Element<mess
     let label_mods_dir = widget::text!("Mods directory:");
     let input_mods_dir: iced::Element<message::Message> =
         widget::text_input("Mods directory", app.state.mod_management.mods_dir_field.as_ref())
-            .on_input_maybe(match app.session.active_profile {
-                Some(_) => Some(|input| message::ModMessage::UpdateModsDirField(input).into()),
-                None => None,
-            })
+            .on_input_maybe(
+                app.session
+                    .active_profile
+                    .clone()
+                    .map(|_| |input| message::ModMessage::UpdateModsDirField(input).into()),
+            )
             .on_submit(
                 message::ModMessage::SetModsDir(Some(
                     app.state.mod_management.mods_dir_field.clone().into(),
@@ -57,12 +62,12 @@ pub fn game_directory_setting(
     let label_profile_dir = widget::text!("Game directory:");
     let input_profile_dir: iced::Element<message::Message> =
         widget::text_input("Game directory", app.state.profile.profile_dir_field.as_ref())
-            .on_input_maybe(match app.session.active_profile {
-                Some(_) => {
-                    Some(|input| message::ProfileMessage::UpdateProfileDirField(input).into())
-                }
-                None => None,
-            })
+            .on_input_maybe(
+                app.session
+                    .active_profile
+                    .clone()
+                    .map(|_| |input| message::ProfileMessage::UpdateProfileDirField(input).into()),
+            )
             .on_submit(
                 message::ProfileMessage::SetGameDir(Some(
                     app.state.profile.profile_dir_field.clone().into(),
@@ -99,4 +104,13 @@ pub fn theme_setting(app: &crate::app::GothicOrganizer) -> iced::Element<message
     );
 
     widget::row!(label_theme, iced::widget::horizontal_space(), choice_theme).spacing(10).into()
+}
+
+pub fn notifications_setting(app: &crate::app::GothicOrganizer) -> iced::Element<message::Message> {
+    let notify_on_error_checkbox =
+        widget::checkbox("Notify on error", app.session.error_notifications_enabled).on_toggle(
+            |new_state| message::SettingsMessage::ToggleErrorNotifications(new_state).into(),
+        );
+
+    widget::row!(notify_on_error_checkbox).spacing(10).into()
 }
