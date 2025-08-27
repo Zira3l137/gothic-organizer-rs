@@ -5,7 +5,8 @@ use std::path;
 use crate::core::lookup;
 use crate::core::profile;
 
-type Overwrites = lookup::Lookup<String, lookup::Lookup<path::PathBuf, profile::FileMetadata>>;
+type Overwrites =
+    lookup::Lookup<String, lookup::Lookup<profile::FileMetadata, profile::FileMetadata>>;
 type Mods = Vec<profile::ModInfo>;
 type Instances = lookup::Lookup<String, profile::Instance>;
 type InstanceFiles = lookup::Lookup<path::PathBuf, profile::FileMetadata>;
@@ -106,10 +107,7 @@ impl<'ctx> Context<'ctx> {
     pub fn extend_instance_overwrites<T>(&mut self, overwrites: T)
     where
         T: IntoIterator<
-            Item = (
-                String,
-                crate::core::lookup::Lookup<path::PathBuf, crate::core::profile::FileMetadata>,
-            ),
+            Item = (String, lookup::Lookup<profile::FileMetadata, profile::FileMetadata>),
         >,
     {
         if let Some(instance) = self.instance_mut(Some(&self.active_instance_name.clone())) {
@@ -121,7 +119,7 @@ impl<'ctx> Context<'ctx> {
 
     pub fn extend_instance_mods<T>(&mut self, mods: T)
     where
-        T: IntoIterator<Item = crate::core::profile::ModInfo>,
+        T: IntoIterator<Item = profile::ModInfo>,
     {
         if let Some(instance) = self.instance_mut(Some(&self.active_instance_name.clone())) {
             if let Some(m) = instance.mods.as_mut() {
@@ -132,7 +130,7 @@ impl<'ctx> Context<'ctx> {
 
     pub fn extend_instance_files<T>(&mut self, files: T)
     where
-        T: IntoIterator<Item = (path::PathBuf, crate::core::profile::FileMetadata)>,
+        T: IntoIterator<Item = (path::PathBuf, profile::FileMetadata)>,
     {
         if let Some(instance) = self.instance_mut(Some(&self.active_instance_name.clone())) {
             if let Some(f) = instance.files.as_mut() {

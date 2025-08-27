@@ -69,7 +69,15 @@ impl<'a> ProfileService<'a> {
             let base_files = ignore::WalkBuilder::new(&profile.path)
                 .ignore(false)
                 .build()
-                .filter_map(Result::ok)
+                .filter_map(|e| {
+                    let entry = e.clone().ok();
+                    if let Some(entry) = entry
+                        && entry.path() == profile.path
+                    {
+                        return None;
+                    };
+                    e.ok()
+                })
                 .map(|entry| {
                     (
                         entry.path().to_path_buf(),

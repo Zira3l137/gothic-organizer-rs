@@ -57,7 +57,15 @@ impl<'a> ModService<'a> {
         let mod_files = ignore::WalkBuilder::new(mod_path.clone())
             .ignore(false)
             .build()
-            .filter_map(|e| e.ok().map(|e| (e.path().to_path_buf(), get_file_info(e.path()))))
+            .filter_map(|e| {
+                let entry = e.clone().ok();
+                if let Some(entry) = entry
+                    && entry.path() == mod_path
+                {
+                    return None;
+                };
+                e.ok().map(|e| (e.path().to_path_buf(), get_file_info(e.path())))
+            })
             .collect::<core::lookup::Lookup<path::PathBuf, core::profile::FileMetadata>>();
 
         let new_mod_info = core::profile::ModInfo::default()
@@ -153,7 +161,7 @@ impl<'a> ModService<'a> {
                         .access
                         .entry(mod_info.name.clone())
                         .or_default()
-                        .insert(dst_path, existing_file);
+                        .insert(info.clone(), existing_file);
                 }
             }
         });
@@ -167,13 +175,13 @@ impl<'a> ModService<'a> {
         let Some(instance_files) = instance.files.as_mut() else {
             return;
         };
-        mod_info.files.iter().for_each(|(path, _)| {
+        mod_info.files.iter().for_each(|(path, info)| {
             if let Ok(relative_path) = path.strip_prefix(&mod_info.path) {
                 let dst_path = profile_path.join(relative_path);
                 instance_files.remove(&dst_path);
                 if let Some(mod_overwrites) =
                     instance.overwrites.as_mut().and_then(|o| o.get_mut(&mod_info.name))
-                    && let Some(original_file) = mod_overwrites.remove(&dst_path)
+                    && let Some(original_file) = mod_overwrites.remove(info)
                 {
                     instance_files.insert(dst_path, original_file);
                 }

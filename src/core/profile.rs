@@ -60,7 +60,7 @@ impl Profile {
 pub struct Instance {
     pub name: String,
     pub files: Option<Lookup<PathBuf, FileMetadata>>,
-    pub overwrites: Option<Lookup<String, Lookup<PathBuf, FileMetadata>>>,
+    pub overwrites: Option<Lookup<String, Lookup<FileMetadata, FileMetadata>>>,
     pub mods: Option<Vec<ModInfo>>,
 }
 
@@ -90,7 +90,7 @@ impl Instance {
 
     pub fn with_overwrites(
         mut self,
-        overwrites: Option<Lookup<String, Lookup<PathBuf, FileMetadata>>>,
+        overwrites: Option<Lookup<String, Lookup<FileMetadata, FileMetadata>>>,
     ) -> Self {
         self.overwrites = overwrites;
         self
@@ -136,7 +136,7 @@ impl ModInfo {
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct FileMetadata {
     pub enabled: bool,
     pub source_path: PathBuf,
