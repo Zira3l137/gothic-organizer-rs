@@ -3,4 +3,5 @@ mods/
 .cargo/
 .ps1
 .bat
+.log
 cargo.lock
