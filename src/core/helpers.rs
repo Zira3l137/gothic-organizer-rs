@@ -35,40 +35,20 @@ pub fn save_app_preferences<P: AsRef<Path>>(
     };
 
     let default_path = default_path(custom_path);
-    let prefs_json =
-        serde_json::to_string_pretty(&prefs).map_err(|e| error::AppError::External {
-            service: "Json".to_owned(),
-            details: format!("Failed to serialize preferences {e}"),
-        })?;
+    let prefs_json = serde_json::to_string_pretty(&prefs).map_err(|e| error::AppError::External {
+        service: "Json".to_owned(),
+        details: format!("Failed to serialize preferences {e}"),
+    })?;
 
-    write(default_path.join("preferences.json"), prefs_json).map_err(|e| {
-        error::AppError::FileSystem {
-            operation: "Write".to_owned(),
-            path: default_path.join("preferences.json"),
-            source: e.to_string(),
-        }
+    write(default_path.join("preferences.json"), prefs_json).map_err(|e| error::AppError::FileSystem {
+        operation: "Write".to_owned(),
+        path: default_path.join("preferences.json"),
+        source: e.to_string(),
     })?;
 
     Ok(())
 }
 
-pub fn load_app_preferences<P: AsRef<Path>>(
-    custom_path: Option<P>,
-) -> Option<config::ApplicationPreferences> {
-    let default_path = default_path(custom_path);
-    if !default_path.exists() {
-        return None;
-    }
-
-    let prefs_json = read_to_string(default_path.join("preferences.json")).ok()?;
-
-    let Ok(prefs): Result<config::ApplicationPreferences, _> = serde_json::from_str(&prefs_json)
-    else {
-        return None;
-    };
-
-    Some(prefs)
-}
 pub fn save_app_session<P: AsRef<Path>>(
     session: &session::ApplicationSession,
     custom_path: Option<P>,
@@ -80,9 +60,7 @@ pub fn save_app_session<P: AsRef<Path>>(
     Ok(())
 }
 
-pub fn load_app_session<P: AsRef<Path>>(
-    custom_path: Option<P>,
-) -> Option<session::ApplicationSession> {
+pub fn load_app_session<P: AsRef<Path>>(custom_path: Option<P>) -> Option<session::ApplicationSession> {
     let default_path = default_path(custom_path);
     if !default_path.exists() {
         return None;
@@ -90,8 +68,7 @@ pub fn load_app_session<P: AsRef<Path>>(
 
     let session_json = read_to_string(default_path.join("session.json")).ok()?;
 
-    let Ok(session): Result<session::ApplicationSession, _> = serde_json::from_str(&session_json)
-    else {
+    let Ok(session): Result<session::ApplicationSession, _> = serde_json::from_str(&session_json) else {
         return None;
     };
 
@@ -105,25 +82,20 @@ pub fn save_profile<P: AsRef<Path>>(
     let default_profile_path = default_path(custom_path);
     let profile_json = serde_json::to_string_pretty(&profile).map_err(std::io::Error::other)?;
 
-    create_dir_all(default_profile_path.join(&profile.name))
-        .map_err(|e| std::io::Error::new(e.kind(), e))?;
+    create_dir_all(default_profile_path.join(&profile.name)).map_err(|e| std::io::Error::new(e.kind(), e))?;
     write(default_profile_path.join(&profile.name).join("profile.json"), profile_json)?;
 
     Ok(())
 }
 
-pub fn load_profile<P: AsRef<Path>>(
-    name: &str,
-    custom_path: Option<P>,
-) -> Option<profile::Profile> {
+pub fn load_profile<P: AsRef<Path>>(name: &str, custom_path: Option<P>) -> Option<profile::Profile> {
     let default_profile_path = default_path(custom_path);
     let mut entries = read_dir(default_profile_path).ok()?;
 
     let profile = entries.find_map(|e| {
         let entry = e.ok()?;
 
-        if !entry.path().is_dir()
-            || entry.file_name().to_string_lossy().to_lowercase() != name.to_lowercase()
+        if !entry.path().is_dir() || entry.file_name().to_string_lossy().to_lowercase() != name.to_lowercase()
         {
             return None;
         }
@@ -133,9 +105,7 @@ pub fn load_profile<P: AsRef<Path>>(
         let profile_str = profile_dir.find_map(|e| {
             let entry = e.ok()?;
 
-            if entry.path().is_dir()
-                || entry.file_name().to_string_lossy().to_lowercase() != "profile.json"
-            {
+            if entry.path().is_dir() || entry.file_name().to_string_lossy().to_lowercase() != "profile.json" {
                 return None;
             }
 
@@ -210,11 +180,7 @@ where
             background: Some(background),
             text_color: Some(text_color),
 
-            border: Border {
-                color: border_color,
-                width: border_width.unwrap_or(1.0),
-                radius: border_radius,
-            },
+            border: Border { color: border_color, width: border_width.unwrap_or(1.0), radius: border_radius },
 
             shadow: Shadow {
                 color: shadow_color,

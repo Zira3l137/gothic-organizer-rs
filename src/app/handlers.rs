@@ -17,9 +17,7 @@ pub fn handle_profile_message(
             service.switch_profile(&profile_name).map(message::Message::from)
         }
 
-        message::ProfileMessage::SetGameDir(path) => {
-            service.set_game_dir(path).map(message::Message::from)
-        }
+        message::ProfileMessage::SetGameDir(path) => service.set_game_dir(path).map(message::Message::from),
 
         message::ProfileMessage::AddInstance(profile_name) => {
             service.add_instance_for_profile(&profile_name).map(message::Message::from)
@@ -154,14 +152,12 @@ pub fn handle_settings_message(
         message::SettingsMessage::UpdateZspyLevel(level) => {
             state.settings.zspy_level_field = level;
             session.active_zspy_config.get_or_insert_default().verbosity = level.into();
-            session.launch_options.get_or_insert_default().game_settings.zspy.verbosity =
-                level.into();
+            session.launch_options.get_or_insert_default().game_settings.zspy.verbosity = level.into();
             iced::Task::none()
         }
 
         message::SettingsMessage::ToggleMarvinMode(new_state) => {
-            session.launch_options.get_or_insert_default().game_settings.is_marvin_mode_enabled =
-                new_state;
+            session.launch_options.get_or_insert_default().game_settings.is_marvin_mode_enabled = new_state;
             iced::Task::none()
         }
 
@@ -182,8 +178,7 @@ pub fn handle_settings_message(
         message::SettingsMessage::ToggleZSpyState(new_state) => {
             let config = session.active_zspy_config.get_or_insert_default();
             config.is_enabled = new_state;
-            session.launch_options.get_or_insert_default().game_settings.zspy.is_enabled =
-                new_state;
+            session.launch_options.get_or_insert_default().game_settings.zspy.is_enabled = new_state;
             iced::Task::none()
         }
 
@@ -209,9 +204,7 @@ pub fn handle_window_message(
             let mut session_service = services::session::SessionService::new(session, state);
             match name.as_str() {
                 "options" => session_service.invoke_options_window().map(message::Message::from),
-                "overwrites" => {
-                    session_service.invoke_overwrites_window().map(message::Message::from)
-                }
+                "overwrites" => session_service.invoke_overwrites_window().map(message::Message::from),
                 _ => iced::Task::none(),
             }
         }
@@ -237,7 +230,7 @@ pub fn handle_system_message(
         }
 
         message::SystemMessage::ExitApplication => {
-            if state.windows.window_states.iter().all(|(_, wnd_state)| wnd_state.is_closed) {
+            if state.ui.windows.iter().all(|(_, wnd_state)| wnd_state.is_closed) {
                 let mut profile_service = services::profile::ProfileService::new(session, state);
                 if let Err(err) = profile_service.update_instance_from_cache() {
                     log::warn!("Couldn't update instance cache: {err}");

@@ -3,11 +3,12 @@
 use std::path::PathBuf;
 
 use iced::widget::combo_box;
+use iced::window::Id;
 use serde::{Deserialize, Serialize};
 
 use crate::app::session;
 use crate::core::constants;
-use crate::core::lookup;
+use crate::core::lookup::Lookup;
 use crate::core::profile;
 use crate::error;
 use crate::gui::options;
@@ -19,26 +20,21 @@ pub struct ApplicationState {
     pub profile: ProfileState,
     pub mod_management: ModState,
     pub settings: SettingsState,
-    pub windows: WindowsState,
     pub errors: ErrorState,
-}
-
-#[derive(Debug, Default)]
-pub struct WindowsState {
-    pub window_states: lookup::Lookup<Option<iced::window::Id>, WindowInfo>,
 }
 
 #[derive(Debug, Default)]
 pub struct UiState {
     pub current_dir: PathBuf,
     pub dir_entries: Vec<(PathBuf, profile::FileMetadata)>,
-    pub themes: lookup::Lookup<String, iced::Theme>,
+    pub themes: Lookup<String, iced::Theme>,
     pub active_options_menu: options::menu::OptionsMenu,
+    pub windows: Lookup<Option<Id>, WindowInfo>,
 }
 
 #[derive(Debug)]
 pub struct ProfileState {
-    pub profiles: lookup::Lookup<String, profile::Profile>,
+    pub profiles: Lookup<String, profile::Profile>,
     pub instance_name_field: String,
     pub profile_dir_field: String,
     pub profile_choices: combo_box::State<String>,
@@ -87,7 +83,7 @@ pub struct WindowInfo {
 
 #[derive(Debug, Default)]
 pub struct ErrorState {
-    pub active_errors: lookup::Lookup<uuid::Uuid, error::ErrorContext>,
+    pub active_errors: Lookup<uuid::Uuid, error::ErrorContext>,
     pub error_history: Vec<error::ErrorContext>,
     pub notifications_enabled: bool,
     pub max_history_size: usize,
@@ -96,7 +92,7 @@ pub struct ErrorState {
 impl ErrorState {
     pub fn new() -> Self {
         Self {
-            active_errors: lookup::Lookup::new(),
+            active_errors: Lookup::new(),
             error_history: Vec::new(),
             notifications_enabled: true,
             max_history_size: 100,

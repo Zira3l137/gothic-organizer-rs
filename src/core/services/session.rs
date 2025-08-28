@@ -31,16 +31,15 @@ impl<'a> SessionService<'a> {
             log::error!("Failed saving session: {e}");
         }
 
-        if let Err(e) = save_app_preferences!(
-            self.session.theme_selected.clone(),
-            self.session.mod_storage_dir.clone()
-        ) {
+        if let Err(e) =
+            save_app_preferences!(self.session.theme_selected.clone(), self.session.mod_storage_dir.clone())
+        {
             log::error!("Failed saving config: {e}");
         }
     }
 
     pub fn close_window(&mut self, wnd_id: &iced::window::Id) -> Task<message::Message> {
-        if let Some(wnd_state) = self.state.windows.window_states.get_mut(&Some(*wnd_id)) {
+        if let Some(wnd_state) = self.state.ui.windows.get_mut(&Some(*wnd_id)) {
             wnd_state.is_closed = true;
         }
 
@@ -60,8 +59,8 @@ impl<'a> SessionService<'a> {
         });
 
         self.state
+            .ui
             .windows
-            .window_states
             .insert(Some(id), state::WindowInfo { name: "editor".to_owned(), is_closed: false });
 
         task.then(|_| Task::done(message::UiMessage::ReloadDirEntries.into()))
@@ -77,8 +76,8 @@ impl<'a> SessionService<'a> {
         });
 
         self.state
+            .ui
             .windows
-            .window_states
             .insert(Some(id), state::WindowInfo { name: "options".to_owned(), is_closed: false });
 
         task.then(|_| Task::none())
@@ -93,10 +92,10 @@ impl<'a> SessionService<'a> {
             ..Default::default()
         });
 
-        self.state.windows.window_states.insert(
-            Some(id),
-            state::WindowInfo { name: "overwrites".to_owned(), is_closed: false },
-        );
+        self.state
+            .ui
+            .windows
+            .insert(Some(id), state::WindowInfo { name: "overwrites".to_owned(), is_closed: false });
 
         task.then(|_| Task::none())
     }

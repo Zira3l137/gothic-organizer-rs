@@ -99,9 +99,7 @@ impl GothicOrganizer {
     }
 
     pub fn view(&self, id: iced::window::Id) -> iced::Element<message::Message> {
-        if let Some((_, wnd_state)) =
-            self.state.windows.window_states.iter().find(|(wnd_id, _)| **wnd_id == Some(id))
-        {
+        if let Some((_, wnd_state)) = self.state.ui.windows.iter().find(|(wnd_id, _)| **wnd_id == Some(id)) {
             match wnd_state.name.as_str() {
                 "options" => crate::gui::options::options_view(self),
                 "overwrites" => crate::gui::overwrites::overwrites_view(self),
