@@ -59,7 +59,7 @@ pub fn handle_mod_message(
         message::ModMessage::Toggle(name, new_state) => {
             let mut profile_service = services::profile::ProfileService::new(session, state);
             if let Err(err) = profile_service.update_instance_from_cache() {
-                log::warn!("Couldn't update instance cache: {err}");
+                tracing::warn!("Couldn't update instance cache: {err}");
             }
 
             let mut service = services::mods::ModService::new(session, state);
@@ -98,7 +98,7 @@ pub fn handle_ui_message(
         message::UiMessage::UpdateActiveDir(path) => {
             let mut profile_service = services::profile::ProfileService::new(session, state);
             if let Err(err) = profile_service.update_instance_from_cache() {
-                log::warn!("Couldn't update instance cache: {err}");
+                tracing::warn!("Couldn't update instance cache: {err}");
             }
 
             state.ui.current_dir = path.clone();
@@ -224,7 +224,7 @@ pub fn handle_system_message(
     match message {
         message::SystemMessage::OpenRepository => {
             if let Err(err) = services::browser_open(constants::APP_REPOSITORY) {
-                log::error!("Error opening repository: {err}");
+                tracing::error!("Error opening repository: {err}");
             }
             iced::Task::none()
         }
@@ -233,7 +233,7 @@ pub fn handle_system_message(
             if state.ui.windows.iter().all(|(_, wnd_state)| wnd_state.is_closed) {
                 let mut profile_service = services::profile::ProfileService::new(session, state);
                 if let Err(err) = profile_service.update_instance_from_cache() {
-                    log::warn!("Couldn't update instance cache: {err}");
+                    tracing::warn!("Couldn't update instance cache: {err}");
                 }
                 let session_service = services::session::SessionService::new(session, state);
                 session_service.save_current_session();
@@ -254,7 +254,7 @@ pub fn handle_error_message(
 ) -> iced::Task<message::Message> {
     match message {
         message::ErrorMessage::Handle(error_ctx) => {
-            log::error!("{}", error_ctx.error);
+            tracing::error!("{}", error_ctx.error);
             iced::Task::none()
         }
 

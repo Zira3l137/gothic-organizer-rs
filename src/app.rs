@@ -92,7 +92,7 @@ impl GothicOrganizer {
             .and_then(|theme| self.state.ui.themes.get(theme).cloned())
             .unwrap_or_else(|| {
                 if let Some(theme) = &self.session.theme_selected {
-                    log::warn!("Theme {theme} not found, defaulting to dark");
+                    tracing::warn!("Theme {theme} not found, defaulting to dark");
                 }
                 iced::Theme::Dark
             })

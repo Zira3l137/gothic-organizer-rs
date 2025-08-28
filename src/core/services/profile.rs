@@ -28,18 +28,15 @@ impl<'a> ProfileService<'a> {
 
     pub fn switch_profile(&mut self, profile_name: &str) -> Task<message::Message> {
         if let Err(err) = self.update_instance_from_cache() {
-            log::error!("Failed to update instance from cache: {err}");
+            tracing::error!("Failed to update instance from cache: {err}");
         }
 
         if let Some(next_profile) = self.state.profile.profiles.get(profile_name) {
             self.session.active_profile = Some(profile_name.to_owned());
             self.session.active_instance = None;
 
-            let instances = next_profile
-                .instances
-                .as_ref()
-                .map(|i| i.keys().cloned().collect())
-                .unwrap_or_default();
+            let instances =
+                next_profile.instances.as_ref().map(|i| i.keys().cloned().collect()).unwrap_or_default();
 
             self.state.profile.instance_choices = iced::widget::combo_box::State::new(instances);
 
@@ -83,16 +80,13 @@ impl<'a> ProfileService<'a> {
                 .map(|entry| {
                     (
                         entry.path().to_path_buf(),
-                        profile::FileMetadata::default()
-                            .with_source_path(entry.path())
-                            .with_enabled(true),
+                        profile::FileMetadata::default().with_source_path(entry.path()).with_enabled(true),
                     )
                 })
                 .collect::<lookup::Lookup<path::PathBuf, profile::FileMetadata>>();
 
-            let new_instance = core::profile::Instance::default()
-                .with_name(&instance_name)
-                .with_files(Some(base_files));
+            let new_instance =
+                core::profile::Instance::default().with_name(&instance_name).with_files(Some(base_files));
 
             let instances = profile.instances.get_or_insert_with(Default::default);
             if instances.contains_key(&instance_name) {
@@ -112,7 +106,7 @@ impl<'a> ProfileService<'a> {
 
     pub fn remove_instance_from_profile(&mut self) {
         let Ok(mut context) = self.context() else {
-            log::error!("Failed to get context");
+            tracing::error!("Failed to get context");
             return;
         };
 
@@ -126,7 +120,7 @@ impl<'a> ProfileService<'a> {
                 context.active_profile.instances = None;
             }
         } else {
-            log::error!("Failed to get instances");
+            tracing::error!("Failed to get instances");
             return;
         }
 
@@ -137,7 +131,7 @@ impl<'a> ProfileService<'a> {
 
     pub fn switch_instance(&mut self, instance_name: &str) -> Task<message::Message> {
         if let Err(err) = self.update_instance_from_cache() {
-            log::error!("Failed to update instance from cache: {err}");
+            tracing::error!("Failed to update instance from cache: {err}");
         }
         self.session.active_instance = Some(instance_name.to_owned());
         Task::done(message::UiMessage::ReloadDirEntries.into())
@@ -145,7 +139,7 @@ impl<'a> ProfileService<'a> {
 
     pub fn set_game_dir(&mut self, path: Option<path::PathBuf>) -> Task<message::Message> {
         let Ok(mut context) = self.context() else {
-            log::error!("Failed to get context");
+            tracing::error!("Failed to get context");
             return Task::none();
         };
 
@@ -163,20 +157,16 @@ impl<'a> ProfileService<'a> {
 
         self.session.files.clear();
         self.session.files.extend(
-            ignore::WalkBuilder::new(path).ignore(false).build().filter_map(Result::ok).map(
-                |entry| {
-                    (
-                        entry.path().to_path_buf(),
-                        core::profile::FileMetadata::default()
-                            .with_source_path(entry.path())
-                            .with_enabled(true),
-                    )
-                },
-            ),
+            ignore::WalkBuilder::new(path).ignore(false).build().filter_map(Result::ok).map(|entry| {
+                (
+                    entry.path().to_path_buf(),
+                    core::profile::FileMetadata::default().with_source_path(entry.path()).with_enabled(true),
+                )
+            }),
         );
 
         if let Err(err) = self.update_instance_from_cache() {
-            log::error!("Failed to update instance from cache: {err}");
+            tracing::error!("Failed to update instance from cache: {err}");
         }
 
         Task::batch(vec![
@@ -187,26 +177,23 @@ impl<'a> ProfileService<'a> {
 
     pub fn set_mods_dir(&mut self, path: Option<path::PathBuf>) -> Task<message::Message> {
         let Ok(context) = self.context() else {
-            log::error!("Failed to get context");
+            tracing::error!("Failed to get context");
             return Task::none();
         };
 
         let Some(path) = path.or_else(|| {
             rfd::FileDialog::new()
-                .set_title(format!(
-                    "Select mod storage directory for {}",
-                    &context.active_profile.name
-                ))
+                .set_title(format!("Select mod storage directory for {}", &context.active_profile.name))
                 .pick_folder()
         }) else {
-            log::error!("Failed to get mod storage path");
+            tracing::error!("Failed to get mod storage path");
             return Task::none();
         };
 
         self.session.mod_storage_dir = Some(path.clone());
 
         if let Err(err) = std::fs::create_dir_all(&path) {
-            log::error!("Failed to create mod storage directory: {err}");
+            tracing::error!("Failed to create mod storage directory: {err}");
             Task::none()
         } else {
             Task::done(message::UiMessage::ReloadDirEntries.into())

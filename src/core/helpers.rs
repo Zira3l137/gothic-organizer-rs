@@ -12,41 +12,14 @@ use iced::widget::Container;
 use iced::widget::Svg;
 
 use crate::app::session;
-use crate::config;
 use crate::core::constants;
 use crate::core::profile;
-use crate::error;
 
 fn default_path<P: AsRef<Path>>(custom_path: Option<P>) -> PathBuf {
     match custom_path {
         Some(p) => p.as_ref().to_path_buf(),
         None => crate::core::constants::local_app_data_path().join(constants::APP_NAME),
     }
-}
-
-pub fn save_app_preferences<P: AsRef<Path>>(
-    theme: Option<String>,
-    mod_storage_dir: Option<PathBuf>,
-    custom_path: Option<P>,
-) -> Result<(), error::AppError> {
-    let prefs = config::ApplicationPreferences {
-        theme_name: theme.unwrap_or("Dark".to_string()),
-        mod_storage_dir: mod_storage_dir.unwrap_or(constants::default_mod_storage_path()),
-    };
-
-    let default_path = default_path(custom_path);
-    let prefs_json = serde_json::to_string_pretty(&prefs).map_err(|e| error::AppError::External {
-        service: "Json".to_owned(),
-        details: format!("Failed to serialize preferences {e}"),
-    })?;
-
-    write(default_path.join("preferences.json"), prefs_json).map_err(|e| error::AppError::FileSystem {
-        operation: "Write".to_owned(),
-        path: default_path.join("preferences.json"),
-        source: e.to_string(),
-    })?;
-
-    Ok(())
 }
 
 pub fn save_app_session<P: AsRef<Path>>(

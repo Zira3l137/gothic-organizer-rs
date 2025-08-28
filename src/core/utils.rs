@@ -26,7 +26,7 @@ pub fn copy_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
 }
 
 pub fn extract_zip(zip_path: &Path, dst_path: &Path) -> Result<(), crate::error::AppError> {
-    log::trace!("Extracting zip file {} to {}", zip_path.display(), dst_path.display());
+    tracing::trace!("Extracting zip file {} to {}", zip_path.display(), dst_path.display());
     let handle = std::fs::File::open(zip_path).map_err(|e| crate::error::AppError::FileSystem {
         operation: "open".to_string(),
         path: zip_path.into(),
@@ -38,7 +38,7 @@ pub fn extract_zip(zip_path: &Path, dst_path: &Path) -> Result<(), crate::error:
         details: e.to_string(),
     })?;
 
-    log::trace!("Processing {} files", archive.len());
+    tracing::trace!("Processing {} files", archive.len());
     for i in 0..archive.len() {
         let mut file = archive.by_index(i).map_err(|e| crate::error::AppError::External {
             service: "zip".to_string(),

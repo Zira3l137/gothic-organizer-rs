@@ -35,7 +35,7 @@ impl<'a> UiService<'a> {
             self.session.files.clear();
             self.session.files.extend(instance_files);
         } else {
-            log::warn!("No instance selected, displaying only base files for current directory");
+            tracing::warn!("No instance selected, displaying only base files for current directory");
         }
 
         current_directory_entries = self

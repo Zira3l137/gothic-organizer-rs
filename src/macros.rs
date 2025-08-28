@@ -100,27 +100,6 @@ macro_rules! clickable_text {
 }
 
 #[macro_export]
-macro_rules! save_app_preferences {
-    ($theme: expr, $mod_storage_dir: expr, $custom_path: expr) => {
-        $crate::helpers::save_app_preferences($theme, $mod_storage_dir, $custom_path)
-    };
-    ($theme: expr, $mod_storage_dir: expr) => {
-        $crate::core::helpers::save_app_preferences::<String>($theme, $mod_storage_dir, None)
-    };
-}
-
-#[macro_export]
-macro_rules! load_app_preferences {
-    () => {
-        $crate::core::helpers::load_app_preferences::<String>(None)
-    };
-
-    ($custom_path: expr) => {
-        $crate::core::helpers::load_app_preferences($custom_path)
-    };
-}
-
-#[macro_export]
 macro_rules! save_app_session {
     ($session: expr, $custom_path: expr) => {
         $crate::core::helpers::save_app_session($session, $custom_path)

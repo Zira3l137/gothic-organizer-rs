@@ -3,7 +3,6 @@ use iced::Task;
 use crate::app::message;
 use crate::app::state;
 use crate::core::lookup;
-use crate::save_app_preferences;
 use crate::save_app_session;
 use crate::save_profile;
 
@@ -23,18 +22,12 @@ impl<'a> SessionService<'a> {
     pub fn save_current_session(&self) {
         self.state.profile.profiles.values().for_each(|p| {
             if let Err(e) = save_profile!(p) {
-                log::error!("Failed saving profile: {e}");
+                tracing::error!("Failed saving profile: {e}");
             }
         });
 
         if let Err(e) = save_app_session!(self.session) {
-            log::error!("Failed saving session: {e}");
-        }
-
-        if let Err(e) =
-            save_app_preferences!(self.session.theme_selected.clone(), self.session.mod_storage_dir.clone())
-        {
-            log::error!("Failed saving config: {e}");
+            tracing::error!("Failed saving session: {e}");
         }
     }
 

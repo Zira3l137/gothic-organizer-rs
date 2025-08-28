@@ -17,10 +17,7 @@ pub struct ModService<'a> {
 crate::impl_service!(ModService);
 
 impl<'a> ModService<'a> {
-    pub fn new(
-        session: &'a mut session::ApplicationSession,
-        state: &'a mut state::ApplicationState,
-    ) -> Self {
+    pub fn new(session: &'a mut session::ApplicationSession, state: &'a mut state::ApplicationState) -> Self {
         Self { session, state }
     }
 
@@ -38,7 +35,7 @@ impl<'a> ModService<'a> {
             match self.move_mod_to_storage(&mod_source_path) {
                 Ok(path) => path,
                 Err(e) => {
-                    log::warn!("Failed to move mod to storage: {e}");
+                    tracing::warn!("Failed to move mod to storage: {e}");
                     return Task::none();
                 }
             }
@@ -84,7 +81,7 @@ impl<'a> ModService<'a> {
             Self::apply_mod_files(instance, &new_mod_info, &profile_path);
             instance.mods.get_or_insert_default().push(new_mod_info.clone());
         } else {
-            log::error!("No active instance");
+            tracing::error!("No active instance");
             return Task::none();
         }
 
@@ -103,7 +100,7 @@ impl<'a> ModService<'a> {
             && let Some(mod_info) = mods.iter().find(|info| info.name == mod_name)
         {
             if let Err(e) = std::fs::remove_dir_all(&mod_info.path) {
-                log::error!("Failed to remove mod directory: {e}");
+                tracing::error!("Failed to remove mod directory: {e}");
                 return Task::none();
             };
 
@@ -125,7 +122,7 @@ impl<'a> ModService<'a> {
         let profile_path = context.active_profile.path.clone();
         let mods = context.instance_mods().cloned();
         let Some(instance) = context.instance_mut(None) else {
-            log::error!("No active instance");
+            tracing::error!("No active instance");
             return;
         };
 
@@ -137,10 +134,10 @@ impl<'a> ModService<'a> {
             }
 
             if enabled {
-                log::info!("Enabling \"{mod_name}\"");
+                tracing::info!("Enabling \"{mod_name}\"");
                 Self::apply_mod_files(instance, mod_info, &profile_path);
             } else {
-                log::info!("Disabling \"{mod_name}\"");
+                tracing::info!("Disabling \"{mod_name}\"");
                 Self::unapply_mod_files(instance, mod_info, &profile_path);
             }
 
@@ -158,8 +155,8 @@ impl<'a> ModService<'a> {
         mod_info.files.iter().for_each(|(path, info)| {
             if let Ok(relative_path) = path.strip_prefix(&mod_info.path) {
                 let dst_path = profile_path.join(relative_path);
-                if let Some(existing_file) = instance_files
-                    .insert(dst_path.clone(), info.clone().with_target_path(&dst_path))
+                if let Some(existing_file) =
+                    instance_files.insert(dst_path.clone(), info.clone().with_target_path(&dst_path))
                 {
                     instance
                         .overwrites
@@ -220,15 +217,9 @@ impl<'a> ModService<'a> {
             && (mod_path.is_dir() || mod_path.extension().and_then(|e| e.to_str()) == Some("zip"))
     }
 
-    pub fn move_mod_to_storage(
-        &mut self,
-        mod_path: &path::Path,
-    ) -> Result<path::PathBuf, error::AppError> {
-        let storage_dir = self
-            .session
-            .mod_storage_dir
-            .clone()
-            .unwrap_or_else(core::constants::default_mod_storage_path);
+    pub fn move_mod_to_storage(&mut self, mod_path: &path::Path) -> Result<path::PathBuf, error::AppError> {
+        let storage_dir =
+            self.session.mod_storage_dir.clone().unwrap_or_else(core::constants::default_mod_storage_path);
 
         let context = self.context()?;
         let profile_name = context.active_profile.name.clone();
@@ -240,9 +231,7 @@ impl<'a> ModService<'a> {
             .file_name()
             .and_then(|n| n.to_str())
             .map(|s| s.strip_suffix(".zip").unwrap_or(s))
-            .ok_or_else(|| {
-                std::io::Error::new(std::io::ErrorKind::InvalidData, "Failed to get mod name")
-            })?;
+            .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "Failed to get mod name"))?;
 
         let dst_dir = storage_dir.join(mod_name);
         if dst_dir.exists() {

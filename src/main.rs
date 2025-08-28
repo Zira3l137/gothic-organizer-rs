@@ -1,45 +1,32 @@
 mod app;
-mod config;
 mod core;
 mod error;
 mod gui;
+mod logger;
 mod macros;
+
+use std::path::PathBuf;
 
 use clap::Parser;
 use iced::daemon;
-use log::LevelFilter;
+use tracing_subscriber::filter::LevelFilter;
 
 #[derive(Debug, clap::Parser)]
 #[clap(author, version, about, long_about = None)]
 struct CliArgs {
     #[clap(short, long, default_value = None)]
     verbosity: Option<LevelFilter>,
+    #[clap(short, long, default_value = None)]
+    log_file: Option<PathBuf>,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = CliArgs::parse();
-    setup_logger(args.verbosity.unwrap_or(LevelFilter::Error))?;
+    logger::setup_logger(args.verbosity.unwrap_or(LevelFilter::ERROR), args.log_file.as_deref())?;
 
-    daemon(
-        app::GothicOrganizer::WINDOW_TITLE,
-        app::GothicOrganizer::update,
-        app::GothicOrganizer::view,
-    )
-    .theme(|state, _| app::GothicOrganizer::theme(state))
-    .subscription(app::GothicOrganizer::subscription)
-    .run_with(app::GothicOrganizer::new)?;
-    Ok(())
-}
-
-fn setup_logger(verbosity: LevelFilter) -> Result<(), Box<dyn std::error::Error>> {
-    env_logger::Builder::new()
-        .filter_module(module_path!(), verbosity)
-        .format_file(true)
-        .format_line_number(true)
-        .format_target(false)
-        .format_timestamp(None)
-        .init();
-
-    log::debug!("Logger initialized with level: {verbosity}");
+    daemon(app::GothicOrganizer::WINDOW_TITLE, app::GothicOrganizer::update, app::GothicOrganizer::view)
+        .theme(|state, _| app::GothicOrganizer::theme(state))
+        .subscription(app::GothicOrganizer::subscription)
+        .run_with(app::GothicOrganizer::new)?;
     Ok(())
 }
