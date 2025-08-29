@@ -48,7 +48,7 @@ impl<'a> ProfileService<'a> {
         Task::none()
     }
 
-    pub fn update_instance_from_cache(&mut self) -> Result<(), error::AppError> {
+    pub fn update_instance_from_cache(&mut self) -> Result<(), error::Error> {
         self.session.files.extend(self.state.ui.dir_entries.iter().cloned());
 
         let cached_files = self.session.files.clone();

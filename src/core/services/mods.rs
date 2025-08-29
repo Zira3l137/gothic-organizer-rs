@@ -217,7 +217,7 @@ impl<'a> ModService<'a> {
             && (mod_path.is_dir() || mod_path.extension().and_then(|e| e.to_str()) == Some("zip"))
     }
 
-    pub fn move_mod_to_storage(&mut self, mod_path: &path::Path) -> Result<path::PathBuf, error::AppError> {
+    pub fn move_mod_to_storage(&mut self, mod_path: &path::Path) -> Result<path::PathBuf, error::Error> {
         let storage_dir =
             self.session.mod_storage_dir.clone().unwrap_or_else(core::constants::default_mod_storage_path);
 
@@ -235,7 +235,7 @@ impl<'a> ModService<'a> {
 
         let dst_dir = storage_dir.join(mod_name);
         if dst_dir.exists() {
-            return Err(error::AppError::from(std::io::Error::new(
+            return Err(error::Error::from(std::io::Error::new(
                 std::io::ErrorKind::AlreadyExists,
                 "Mod already exists",
             )));

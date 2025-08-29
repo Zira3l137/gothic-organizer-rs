@@ -126,8 +126,13 @@ pub fn handle_ui_message(
         }
 
         message::UiMessage::SetTheme(theme) => {
+            tracing::info!("Setting theme to {theme}");
+            let test_error = crate::error::ErrorContext::builder()
+                .error(crate::error::Error::ui_service("This theme is disgusting!", "Set Theme"))
+                .suggested_action("Try a different theme".to_string())
+                .build();
             session.theme_selected = Some(theme);
-            iced::Task::none()
+            iced::Task::done(message::Message::Error(message::ErrorMessage::Handle(test_error)))
         }
 
         message::UiMessage::SetOptionsMenu(menu) => {
@@ -205,6 +210,7 @@ pub fn handle_window_message(
             match name.as_str() {
                 "options" => session_service.invoke_options_window().map(message::Message::from),
                 "overwrites" => session_service.invoke_overwrites_window().map(message::Message::from),
+                "logs" => session_service.invoke_logs_window().map(message::Message::from),
                 _ => iced::Task::none(),
             }
         }
@@ -254,7 +260,8 @@ pub fn handle_error_message(
 ) -> iced::Task<message::Message> {
     match message {
         message::ErrorMessage::Handle(error_ctx) => {
-            tracing::error!("{}", error_ctx.error);
+            tracing::error!("Error: {error_ctx}");
+            state.errors.add_error(error_ctx);
             iced::Task::none()
         }
 

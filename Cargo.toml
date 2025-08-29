@@ -15,13 +15,13 @@ uuid = { version = "1.18.0", features = ["v4"] }
 iced_core = "0.13.1"
 iced = { version = "0.13.1", features = ['svg', 'image', 'advanced'] }
 rfd = "0.15.3"
-hashbrown = "0.15.3"
+hashbrown = "0.16"
 ahash = "0.8.12"
 ignore = "0.4.23"
-clap = { version = "4.5.40", features = ["derive"] }
+clap = { version = "4.5.40", features = ['derive'] }
 zip = "4.2.0"
 boolinator = "2.4.0"
-chrono = "0.4.41"
+chrono = { version = "0.4.41", features = ['serde'] }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ['env-filter'] }
 

@@ -81,7 +81,7 @@ pub struct WindowInfo {
     pub is_closed: bool,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct ErrorState {
     pub active_errors: Lookup<uuid::Uuid, error::ErrorContext>,
     pub error_history: Vec<error::ErrorContext>,
@@ -89,8 +89,8 @@ pub struct ErrorState {
     pub max_history_size: usize,
 }
 
-impl ErrorState {
-    pub fn new() -> Self {
+impl std::default::Default for ErrorState {
+    fn default() -> Self {
         Self {
             active_errors: Lookup::new(),
             error_history: Vec::new(),
@@ -98,7 +98,9 @@ impl ErrorState {
             max_history_size: 100,
         }
     }
+}
 
+impl ErrorState {
     pub fn add_error(&mut self, error: error::ErrorContext) -> uuid::Uuid {
         let id = uuid::Uuid::new_v4();
 
@@ -107,9 +109,7 @@ impl ErrorState {
             self.error_history.remove(0);
         }
 
-        if !self.should_auto_dismiss(&error) {
-            self.active_errors.insert(id, error);
-        }
+        self.active_errors.insert(id, error);
 
         id
     }
@@ -124,9 +124,5 @@ impl ErrorState {
 
     pub fn get_errors(&self) -> Vec<&error::ErrorContext> {
         self.active_errors.values().collect()
-    }
-
-    fn should_auto_dismiss(&self, error: &error::ErrorContext) -> bool {
-        error.recoverable
     }
 }

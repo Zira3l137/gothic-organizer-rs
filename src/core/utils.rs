@@ -25,25 +25,19 @@ pub fn copy_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-pub fn extract_zip(zip_path: &Path, dst_path: &Path) -> Result<(), crate::error::AppError> {
+pub fn extract_zip(zip_path: &Path, dst_path: &Path) -> Result<(), crate::error::Error> {
     tracing::trace!("Extracting zip file {} to {}", zip_path.display(), dst_path.display());
-    let handle = std::fs::File::open(zip_path).map_err(|e| crate::error::AppError::FileSystem {
-        operation: "open".to_string(),
-        path: zip_path.into(),
-        source: e.to_string(),
-    })?;
+    let handle = std::fs::File::open(zip_path)
+        .map_err(|e| crate::error::Error::file_system(e.to_string(), "Open".to_string()))?;
 
-    let mut archive = ZipArchive::new(handle).map_err(|e| crate::error::AppError::External {
-        service: "zip".to_string(),
-        details: e.to_string(),
-    })?;
+    let mut archive = ZipArchive::new(handle)
+        .map_err(|e| crate::error::Error::external(e.to_string(), "Extract Zip".to_string()))?;
 
     tracing::trace!("Processing {} files", archive.len());
     for i in 0..archive.len() {
-        let mut file = archive.by_index(i).map_err(|e| crate::error::AppError::External {
-            service: "zip".to_string(),
-            details: e.to_string(),
-        })?;
+        let mut file = archive
+            .by_index(i)
+            .map_err(|e| crate::error::Error::external(e.to_string(), "Extract Zip".to_string()))?;
         let output_path = match file.enclosed_name() {
             Some(path) => dst_path.join(path),
             None => continue,

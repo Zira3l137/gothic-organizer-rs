@@ -103,6 +103,7 @@ impl GothicOrganizer {
             match wnd_state.name.as_str() {
                 "options" => crate::gui::options::options_view(self),
                 "overwrites" => crate::gui::overwrites::overwrites_view(self),
+                "logs" => crate::gui::logs::logs_view(self),
                 _ => crate::gui::editor::editor_view(self),
             }
         } else {

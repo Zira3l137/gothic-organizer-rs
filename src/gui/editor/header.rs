@@ -7,6 +7,7 @@ use crate::styled_container;
 use crate::svg_with_color;
 
 pub fn header<'a>(
+    app: &crate::app::GothicOrganizer,
     palette_ext: &iced::theme::palette::Extended,
 ) -> iced::Element<'a, message::Message> {
     let mut container_bg_color = palette_ext.primary.weak.color;
@@ -20,11 +21,28 @@ pub fn header<'a>(
     .width(60);
 
     let title = widget::text!("{}", constants::app_title_full()).size(30);
-    let button_options_icon = svg_with_color!("./resources/options.svg").height(20).width(20);
-    let button_options = widget::button(button_options_icon)
-        .on_press(message::WindowMessage::Open("options".into()).into());
 
-    let header = widget::row!(title, widget::horizontal_space(), button_options)
+    let button_options_icon = widget::svg("./resources/options.svg").height(20).width(20);
+    let button_options =
+        widget::button(button_options_icon).on_press(message::WindowMessage::Open("options".into()).into());
+
+    let (button_logs_color_idle, buton_logs_color_hovered) = match app.state.errors.active_errors.len() {
+        0 => (palette_ext.primary.strong.text, palette_ext.background.strong.text),
+        _ => (palette_ext.danger.strong.color, palette_ext.danger.strong.color),
+    };
+
+    let button_logs_icon = svg_with_color!(
+        "./resources/logs.svg",
+        color_idle = button_logs_color_idle,
+        color_hovered = buton_logs_color_hovered
+    )
+    .height(20)
+    .width(20);
+
+    let button_logs =
+        widget::button(button_logs_icon).on_press(message::WindowMessage::Open("logs".into()).into());
+
+    let header = widget::row!(title, widget::horizontal_space(), button_logs, button_options)
         .spacing(10)
         .padding(10)
         .align_y(alignment::Vertical::Center);

@@ -144,17 +144,17 @@ macro_rules! load_profile {
 macro_rules! impl_service {
     ($service:ident) => {
         impl Service for $service<'_> {
-            fn context(
-                &mut self,
-            ) -> Result<$crate::core::services::context::Context, $crate::error::AppError> {
+            fn context(&mut self) -> Result<$crate::core::services::context::Context, $crate::error::Error> {
                 let profile = self
                     .session
                     .active_profile
                     .as_mut()
                     .and_then(|p| self.state.profile.profiles.get_mut(&p.clone()))
-                    .ok_or_else(|| $crate::error::AppError::ProfileService {
-                        operation: $crate::error::ProfileOperation::Load,
-                        details: "Failed to get active profile".to_string(),
+                    .ok_or_else(|| {
+                        $crate::error::Error::profile_service(
+                            "Failed to get active profile".to_string(),
+                            "Load".to_string(),
+                        )
                     })?;
 
                 let instance_name = self.session.active_instance.clone().unwrap_or_default();

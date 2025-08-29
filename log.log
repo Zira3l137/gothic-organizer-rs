@@ -1,0 +1,188 @@
+2025-08-29T11:41:43.687666Z DEBUG gothic_organizer_rs::logger: src\logger.rs:47: Logger initialized with level: debug
+2025-08-29T12:07:01.253633Z DEBUG gothic_organizer_rs::logger: src\logger.rs:47: Logger initialized with level: debug
+2025-08-29T12:08:59.185796Z DEBUG gothic_organizer_rs::logger: src\logger.rs:47: Logger initialized with level: debug
+2025-08-29T12:10:58.265922Z DEBUG gothic_organizer_rs::logger: src\logger.rs:47: Logger initialized with level: debug
+2025-08-29T12:12:38.173924Z DEBUG gothic_organizer_rs::logger: src\logger.rs:47: Logger initialized with level: debug
+2025-08-29T12:39:18.533911Z DEBUG gothic_organizer_rs::logger: src\logger.rs:47: Logger initialized with level: debug
+2025-08-29T12:41:12.983370Z DEBUG gothic_organizer_rs::logger: src\logger.rs:47: Logger initialized with level: debug
+2025-08-29T12:41:28.937643Z DEBUG gothic_organizer_rs::logger: src\logger.rs:47: Logger initialized with level: debug
+2025-08-29T12:45:50.087060Z DEBUG gothic_organizer_rs::logger: src\logger.rs:47: Logger initialized with level: debug
+2025-08-29T12:46:44.383250Z DEBUG gothic_organizer_rs::logger: src\logger.rs:47: Logger initialized with level: debug
+2025-08-29T12:46:47.534429Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Tokyo Night Light
+2025-08-29T12:47:26.361180Z DEBUG gothic_organizer_rs::logger: src\logger.rs:47: Logger initialized with level: debug
+2025-08-29T12:50:44.555832Z DEBUG gothic_organizer_rs::logger: src\logger.rs:47: Logger initialized with level: debug
+2025-08-29T12:50:49.070404Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Gruvbox Light
+2025-08-29T12:50:49.074980Z ERROR gothic_organizer_rs::app::handlers: src\app\handlers.rs:266: Validation error: Conflict { field1: "Theme", field2: "Theme", reason: "You chose a disgusting theme!" }
+2025-08-29T12:50:51.988795Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Kanagawa Lotus
+2025-08-29T12:50:51.992888Z ERROR gothic_organizer_rs::app::handlers: src\app\handlers.rs:266: Validation error: Conflict { field1: "Theme", field2: "Theme", reason: "You chose a disgusting theme!" }
+2025-08-29T12:50:53.468575Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Moonfly
+2025-08-29T12:50:53.472608Z ERROR gothic_organizer_rs::app::handlers: src\app\handlers.rs:266: Validation error: Conflict { field1: "Theme", field2: "Theme", reason: "You chose a disgusting theme!" }
+2025-08-29T12:51:20.770333Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Kanagawa Lotus
+2025-08-29T12:51:20.774551Z ERROR gothic_organizer_rs::app::handlers: src\app\handlers.rs:266: Validation error: Conflict { field1: "Theme", field2: "Theme", reason: "You chose a disgusting theme!" }
+2025-08-29T12:51:22.214510Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Moonfly
+2025-08-29T12:51:22.217279Z ERROR gothic_organizer_rs::app::handlers: src\app\handlers.rs:266: Validation error: Conflict { field1: "Theme", field2: "Theme", reason: "You chose a disgusting theme!" }
+2025-08-29T12:51:23.496377Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Solarized Light
+2025-08-29T12:51:23.500632Z ERROR gothic_organizer_rs::app::handlers: src\app\handlers.rs:266: Validation error: Conflict { field1: "Theme", field2: "Theme", reason: "You chose a disgusting theme!" }
+2025-08-29T12:51:25.332450Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Tokyo Night Light
+2025-08-29T12:51:25.339682Z ERROR gothic_organizer_rs::app::handlers: src\app\handlers.rs:266: Validation error: Conflict { field1: "Theme", field2: "Theme", reason: "You chose a disgusting theme!" }
+2025-08-29T12:51:26.780431Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Catppuccin Macchiato
+2025-08-29T12:51:26.784831Z ERROR gothic_organizer_rs::app::handlers: src\app\handlers.rs:266: Validation error: Conflict { field1: "Theme", field2: "Theme", reason: "You chose a disgusting theme!" }
+2025-08-29T12:54:53.462809Z DEBUG gothic_organizer_rs::logger: src\logger.rs:47: Logger initialized with level: debug
+2025-08-29T12:54:58.222591Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Nord
+2025-08-29T12:54:58.226910Z ERROR gothic_organizer_rs::app::handlers: src\app\handlers.rs:266: Validation error: Conflict { field1: "Theme", field2: "Theme", reason: "You chose a disgusting theme!" }
+2025-08-29T12:54:59.519445Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Dark
+2025-08-29T12:54:59.526405Z ERROR gothic_organizer_rs::app::handlers: src\app\handlers.rs:266: Validation error: Conflict { field1: "Theme", field2: "Theme", reason: "You chose a disgusting theme!" }
+2025-08-29T12:55:00.664558Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Light
+2025-08-29T12:55:00.668512Z ERROR gothic_organizer_rs::app::handlers: src\app\handlers.rs:266: Validation error: Conflict { field1: "Theme", field2: "Theme", reason: "You chose a disgusting theme!" }
+2025-08-29T12:58:21.143366Z DEBUG gothic_organizer_rs::logger: src\logger.rs:47: Logger initialized with level: debug
+2025-08-29T12:58:25.367475Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Catppuccin Macchiato
+2025-08-29T12:58:25.371680Z ERROR gothic_organizer_rs::app::handlers: src\app\handlers.rs:266: Validation error: Conflict { field1: "Theme", field2: "Theme", reason: "You chose a disgusting theme!" }
+2025-08-29T12:59:45.798230Z DEBUG gothic_organizer_rs::logger: src\logger.rs:47: Logger initialized with level: debug
+2025-08-29T12:59:52.147164Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Catppuccin Mocha
+2025-08-29T12:59:52.152342Z ERROR gothic_organizer_rs::app::handlers: src\app\handlers.rs:266: Validation error: Conflict { field1: "Theme", field2: "Theme", reason: "You chose a disgusting theme!" }
+2025-08-29T13:00:11.710357Z DEBUG gothic_organizer_rs::logger: src\logger.rs:47: Logger initialized with level: debug
+2025-08-29T13:00:14.615646Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Kanagawa Wave
+2025-08-29T13:00:14.632857Z ERROR gothic_organizer_rs::app::handlers: src\app\handlers.rs:266: Validation error: Conflict { field1: "Theme", field2: "Theme", reason: "You chose a disgusting theme!" }
+2025-08-29T13:00:37.276969Z DEBUG gothic_organizer_rs::logger: src\logger.rs:47: Logger initialized with level: debug
+2025-08-29T13:00:40.413399Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Catppuccin Frappé
+2025-08-29T13:00:40.418755Z ERROR gothic_organizer_rs::app::handlers: src\app\handlers.rs:266: Validation error: Conflict { field1: "Theme", field2: "Theme", reason: "You chose a disgusting theme!" }
+2025-08-29T13:01:09.076779Z DEBUG gothic_organizer_rs::logger: src\logger.rs:47: Logger initialized with level: debug
+2025-08-29T13:01:11.801562Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Tokyo Night
+2025-08-29T13:01:11.819093Z ERROR gothic_organizer_rs::app::handlers: src\app\handlers.rs:266: Validation error: Conflict { field1: "Theme", field2: "Theme", reason: "You chose a disgusting theme!" }
+2025-08-29T13:01:27.067131Z DEBUG gothic_organizer_rs::logger: src\logger.rs:47: Logger initialized with level: debug
+2025-08-29T13:01:34.097147Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Dark
+2025-08-29T13:01:34.101597Z ERROR gothic_organizer_rs::app::handlers: src\app\handlers.rs:266: Validation error: Conflict { field1: "Theme", field2: "Theme", reason: "You chose a disgusting theme!" }
+2025-08-29T13:02:13.495260Z DEBUG gothic_organizer_rs::logger: src\logger.rs:47: Logger initialized with level: debug
+2025-08-29T13:02:16.350364Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Gruvbox Light
+2025-08-29T13:02:16.354639Z ERROR gothic_organizer_rs::app::handlers: src\app\handlers.rs:266: Validation error: Conflict { field1: "Theme", field2: "Theme", reason: "You chose a disgusting theme!" }
+2025-08-29T13:02:38.284113Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Gruvbox Light
+2025-08-29T13:02:38.287605Z ERROR gothic_organizer_rs::app::handlers: src\app\handlers.rs:266: Validation error: Conflict { field1: "Theme", field2: "Theme", reason: "You chose a disgusting theme!" }
+2025-08-29T13:02:39.469985Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Tokyo Night Storm
+2025-08-29T13:02:39.489016Z ERROR gothic_organizer_rs::app::handlers: src\app\handlers.rs:266: Validation error: Conflict { field1: "Theme", field2: "Theme", reason: "You chose a disgusting theme!" }
+2025-08-29T13:03:58.142200Z DEBUG gothic_organizer_rs::logger: src\logger.rs:47: Logger initialized with level: debug
+2025-08-29T13:04:02.150052Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Nightfly
+2025-08-29T13:04:02.154413Z ERROR gothic_organizer_rs::app::handlers: src\app\handlers.rs:266: Validation error: Conflict { field1: "Theme", field2: "Theme", reason: "You chose a disgusting theme!" }
+2025-08-29T13:09:31.740443Z DEBUG gothic_organizer_rs::logger: src\logger.rs:47: Logger initialized with level: debug
+2025-08-29T13:09:36.061338Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Nord
+2025-08-29T13:09:36.081594Z ERROR gothic_organizer_rs::app::handlers: src\app\handlers.rs:266: Validation error: Conflict { field1: "Theme", field2: "Theme", reason: "You chose a disgusting theme!" }
+2025-08-29T13:13:04.926397Z DEBUG gothic_organizer_rs::logger: src\logger.rs:47: Logger initialized with level: debug
+2025-08-29T13:13:09.028609Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Kanagawa Dragon
+2025-08-29T13:13:09.032958Z ERROR gothic_organizer_rs::app::handlers: src\app\handlers.rs:266: Validation error: Conflict { field1: "Theme", field2: "Theme", reason: "You chose a disgusting theme!" }
+2025-08-29T13:14:26.035908Z DEBUG gothic_organizer_rs::logger: src\logger.rs:47: Logger initialized with level: debug
+2025-08-29T13:14:29.834508Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Dark
+2025-08-29T13:14:29.851656Z ERROR gothic_organizer_rs::app::handlers: src\app\handlers.rs:266: Validation error: Conflict { field1: "Theme", field2: "Theme", reason: "You chose a disgusting theme!" }
+2025-08-29T13:14:35.518452Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Kanagawa Wave
+2025-08-29T13:14:35.535876Z ERROR gothic_organizer_rs::app::handlers: src\app\handlers.rs:266: Validation error: Conflict { field1: "Theme", field2: "Theme", reason: "You chose a disgusting theme!" }
+2025-08-29T13:16:08.283794Z DEBUG gothic_organizer_rs::logger: src\logger.rs:47: Logger initialized with level: debug
+2025-08-29T13:16:13.711084Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Tokyo Night Light
+2025-08-29T13:16:13.717822Z ERROR gothic_organizer_rs::app::handlers: src\app\handlers.rs:266: Validation error: Conflict { field1: "Theme", field2: "Theme", reason: "You chose a disgusting theme!" }
+2025-08-29T13:17:02.360209Z DEBUG gothic_organizer_rs::logger: src\logger.rs:47: Logger initialized with level: debug
+2025-08-29T13:17:05.622149Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Catppuccin Latte
+2025-08-29T13:17:05.626233Z ERROR gothic_organizer_rs::app::handlers: src\app\handlers.rs:266: Validation error: Conflict { field1: "Theme", field2: "Theme", reason: "You chose a disgusting theme!" }
+2025-08-29T13:17:07.332439Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Solarized Dark
+2025-08-29T13:17:07.337036Z ERROR gothic_organizer_rs::app::handlers: src\app\handlers.rs:266: Validation error: Conflict { field1: "Theme", field2: "Theme", reason: "You chose a disgusting theme!" }
+2025-08-29T13:17:09.630556Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Gruvbox Dark
+2025-08-29T13:17:09.634779Z ERROR gothic_organizer_rs::app::handlers: src\app\handlers.rs:266: Validation error: Conflict { field1: "Theme", field2: "Theme", reason: "You chose a disgusting theme!" }
+2025-08-29T13:17:16.022277Z DEBUG gothic_organizer_rs::gui::logs: src\gui\logs.rs:7: []
+2025-08-29T13:17:19.697831Z DEBUG gothic_organizer_rs::gui::logs: src\gui\logs.rs:7: []
+2025-08-29T13:17:48.858065Z DEBUG gothic_organizer_rs::logger: src\logger.rs:47: Logger initialized with level: debug
+2025-08-29T13:17:52.005795Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Kanagawa Wave
+2025-08-29T13:17:52.009975Z ERROR gothic_organizer_rs::app::handlers: src\app\handlers.rs:266: Validation error: Conflict { field1: "Theme", field2: "Theme", reason: "You chose a disgusting theme!" }
+2025-08-29T13:17:52.010183Z DEBUG gothic_organizer_rs::app::handlers: src\app\handlers.rs:268: []
+2025-08-29T13:17:57.189711Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Nord
+2025-08-29T13:17:57.207379Z ERROR gothic_organizer_rs::app::handlers: src\app\handlers.rs:266: Validation error: Conflict { field1: "Theme", field2: "Theme", reason: "You chose a disgusting theme!" }
+2025-08-29T13:17:57.207565Z DEBUG gothic_organizer_rs::app::handlers: src\app\handlers.rs:268: []
+2025-08-29T13:19:38.849758Z DEBUG gothic_organizer_rs::logger: src\logger.rs:47: Logger initialized with level: debug
+2025-08-29T13:19:42.230632Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Catppuccin Mocha
+2025-08-29T13:19:42.241939Z DEBUG gothic_organizer_rs::app::state: src\app\state.rs:107: Trimming error history
+2025-08-29T13:19:42.242697Z DEBUG gothic_organizer_rs::app::handlers: src\app\handlers.rs:267: []
+2025-08-29T13:20:47.845983Z DEBUG gothic_organizer_rs::logger: src\logger.rs:47: Logger initialized with level: debug
+2025-08-29T13:20:52.166736Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Tokyo Night Storm
+2025-08-29T13:20:52.173585Z DEBUG gothic_organizer_rs::app::state: src\app\state.rs:107: history len: 1
+max_history_size: 0
+2025-08-29T13:20:52.173832Z DEBUG gothic_organizer_rs::app::handlers: src\app\handlers.rs:267: []
+2025-08-29T13:22:22.927138Z DEBUG gothic_organizer_rs::logger: src\logger.rs:47: Logger initialized with level: debug
+2025-08-29T13:22:27.097479Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Gruvbox Light
+2025-08-29T13:22:27.102751Z DEBUG gothic_organizer_rs::app::handlers: src\app\handlers.rs:267: [
+    ErrorContext {
+        error: Validation(
+            Conflict {
+                field1: "Theme",
+                field2: "Theme",
+                reason: "You chose a disgusting theme!",
+            },
+        ),
+        timestamp: ErrorTime {
+            minutes: 22,
+            hour: 17,
+            day: 29,
+            month: 8,
+            year: 2025,
+        },
+        user_message: "An unexpected error occurred",
+        technical_details: None,
+        suggested_action: Some(
+            "Please try the operation again",
+        ),
+    },
+]
+2025-08-29T13:22:36.008647Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Nord
+2025-08-29T13:22:36.016367Z DEBUG gothic_organizer_rs::app::handlers: src\app\handlers.rs:267: [
+    ErrorContext {
+        error: Validation(
+            Conflict {
+                field1: "Theme",
+                field2: "Theme",
+                reason: "You chose a disgusting theme!",
+            },
+        ),
+        timestamp: ErrorTime {
+            minutes: 22,
+            hour: 17,
+            day: 29,
+            month: 8,
+            year: 2025,
+        },
+        user_message: "An unexpected error occurred",
+        technical_details: None,
+        suggested_action: Some(
+            "Please try the operation again",
+        ),
+    },
+    ErrorContext {
+        error: Validation(
+            Conflict {
+                field1: "Theme",
+                field2: "Theme",
+                reason: "You chose a disgusting theme!",
+            },
+        ),
+        timestamp: ErrorTime {
+            minutes: 22,
+            hour: 17,
+            day: 29,
+            month: 8,
+            year: 2025,
+        },
+        user_message: "An unexpected error occurred",
+        technical_details: None,
+        suggested_action: Some(
+            "Please try the operation again",
+        ),
+    },
+]
+2025-08-29T14:45:19.297026Z DEBUG gothic_organizer_rs::logger: src\logger.rs:47: Logger initialized with level: debug
+2025-08-29T14:45:24.057574Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Dracula
+2025-08-29T14:46:15.794084Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Catppuccin Macchiato
+2025-08-29T14:53:20.187004Z DEBUG gothic_organizer_rs::logger: src\logger.rs:47: Logger initialized with level: debug
+2025-08-29T14:53:28.002364Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Kanagawa Dragon
+2025-08-29T14:53:45.730928Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Nightfly
+2025-08-29T14:54:43.285954Z DEBUG gothic_organizer_rs::logger: src\logger.rs:47: Logger initialized with level: debug
+2025-08-29T14:54:47.110575Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Nightfly
+2025-08-29T14:54:47.113598Z ERROR gothic_organizer_rs::app::handlers: src\app\handlers.rs:263: Error: 2025-08-29 18:54:47, UI Service: During "Set Theme" - This theme is disgusting!
+2025-08-29T14:55:08.389197Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Moonfly
+2025-08-29T14:55:08.393317Z ERROR gothic_organizer_rs::app::handlers: src\app\handlers.rs:263: Error: 2025-08-29 18:55:08, UI Service: During "Set Theme" - This theme is disgusting!
+2025-08-29T14:55:09.570122Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Light
+2025-08-29T14:55:09.573793Z ERROR gothic_organizer_rs::app::handlers: src\app\handlers.rs:263: Error: 2025-08-29 18:55:09, UI Service: During "Set Theme" - This theme is disgusting!
+2025-08-29T14:55:11.532502Z  INFO gothic_organizer_rs::app::handlers: src\app\handlers.rs:129: Setting theme to Light
+2025-08-29T14:55:11.535426Z ERROR gothic_organizer_rs::app::handlers: src\app\handlers.rs:263: Error: 2025-08-29 18:55:11, UI Service: During "Set Theme" - This theme is disgusting!

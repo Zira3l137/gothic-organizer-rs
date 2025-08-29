@@ -7,17 +7,16 @@ pub mod session;
 pub mod ui;
 
 pub trait Service {
-    fn context(&mut self) -> Result<context::Context, crate::error::AppError>;
+    fn context(&mut self) -> Result<context::Context, crate::error::Error>;
 }
 
-pub fn execute_cmd(cmd: &str, args: &[&str]) -> Result<String, crate::error::AppError> {
+pub fn execute_cmd(cmd: &str, args: &[&str]) -> Result<String, crate::error::Error> {
     let output = process::Command::new(cmd).args(args).output()?;
     if !output.stderr.is_empty() {
-        Err(crate::error::AppError::FileSystem {
-            source: String::from_utf8_lossy(&output.stderr).to_string(),
-            path: cmd.into(),
-            operation: "Execute command".to_string(),
-        })
+        Err(crate::error::Error::system(
+            String::from_utf8_lossy(&output.stderr).to_string(),
+            "Execute Command".to_string(),
+        ))
     } else if !output.stdout.is_empty() {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     } else {
@@ -25,7 +24,7 @@ pub fn execute_cmd(cmd: &str, args: &[&str]) -> Result<String, crate::error::App
     }
 }
 
-pub fn browser_open(url: &str) -> Result<String, crate::error::AppError> {
+pub fn browser_open(url: &str) -> Result<String, crate::error::Error> {
     #[cfg(target_os = "windows")]
     {
         execute_cmd("explorer", &[url])

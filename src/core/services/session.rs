@@ -93,6 +93,23 @@ impl<'a> SessionService<'a> {
         task.then(|_| Task::none())
     }
 
+    pub fn invoke_logs_window(&mut self) -> Task<message::Message> {
+        let (id, task) = iced::window::open(iced::window::Settings {
+            position: iced::window::Position::Centered,
+            size: iced::Size { width: 768.0, height: 460.0 },
+            icon: iced::window::icon::from_file("./resources/icon.ico").ok(),
+            exit_on_close_request: false,
+            ..Default::default()
+        });
+
+        self.state
+            .ui
+            .windows
+            .insert(Some(id), state::WindowInfo { name: "logs".to_owned(), is_closed: false });
+
+        task.then(|_| Task::none())
+    }
+
     pub fn load_default_themes() -> lookup::Lookup<String, iced::Theme> {
         [
             ("Light", iced::Theme::Light),
