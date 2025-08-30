@@ -64,8 +64,8 @@ impl ErrorContextBuilder {
         self
     }
 
-    pub fn suggested_action(mut self, suggested_action: String) -> ErrorContextBuilder {
-        self.suggested_action = Some(suggested_action);
+    pub fn suggested_action(mut self, suggested_action: &str) -> ErrorContextBuilder {
+        self.suggested_action = Some(suggested_action.to_owned());
         self
     }
 
@@ -167,6 +167,36 @@ impl Error {
 
     pub fn external<S: Into<String>>(msg: S, operation: S) -> Error {
         Error::External(ErrorData { msg: msg.into(), source: "External".into(), operation: operation.into() })
+    }
+
+    pub fn error_message(self) -> String {
+        match self {
+            Error::Service(info) => info.msg,
+            Error::FileSystem(info) => info.msg,
+            Error::System(info) => info.msg,
+            Error::External(info) => info.msg,
+            Error::Other(info) => info.msg,
+        }
+    }
+
+    pub fn error_source(self) -> String {
+        match self {
+            Error::Service(info) => info.source,
+            Error::FileSystem(info) => info.source,
+            Error::System(info) => info.source,
+            Error::External(info) => info.source,
+            Error::Other(info) => info.source,
+        }
+    }
+
+    pub fn error_operation(self) -> String {
+        match self {
+            Error::Service(info) => info.operation,
+            Error::FileSystem(info) => info.operation,
+            Error::System(info) => info.operation,
+            Error::External(info) => info.operation,
+            Error::Other(info) => info.operation,
+        }
     }
 }
 
