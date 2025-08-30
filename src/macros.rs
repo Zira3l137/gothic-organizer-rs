@@ -39,7 +39,7 @@ macro_rules! styled_button {
         $(, disabled_background = $disabled_background:expr)?
         $(,)?
     ) => {
-        $crate::core::helpers::styled_button(
+        $crate::gui::helpers::styled_button(
             $content,
             styled_container!(@some_opt $($border_width)?; f32),
             styled_container!(@some_opt $($border_color)?; iced::Color),
@@ -97,7 +97,7 @@ macro_rules! styled_container {
         $(, background = $background:expr)?
         $(,)?
     ) => {
-        $crate::core::helpers::styled_container(
+        $crate::gui::helpers::styled_container(
             $content,
             styled_container!(@some_opt $($border_width)?; f32),
             styled_container!(@some_opt $($border_color)?; iced::Color),
@@ -137,7 +137,7 @@ macro_rules! svg_with_color {
         $(, color_hovered = $color_hovered:expr)?
         $(,)?
     ) => {
-        $crate::core::helpers::svg_with_color(
+        $crate::gui::helpers::svg_with_color(
             $content,
             $crate::svg_with_color!(@some_opt $($color_idle)?; iced::Color),
             $crate::svg_with_color!(@some_opt $($color_hovered)?; iced::Color),
