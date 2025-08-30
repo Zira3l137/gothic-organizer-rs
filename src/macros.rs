@@ -1,3 +1,73 @@
+/// Creates a button with optional arguments for styling
+/// # Example
+/// ```rust
+/// let button = styled_button!(
+///     text("Hello"),
+///     border_width = 2.0,
+///     border_color = iced::Color::BLACK,
+///     border_radius = 4.0,
+///     shadow_blur_radius = 2.0,
+///     shadow_color = iced::Color::BLACK,
+///     shadow_offset = iced::Vector::new(2.0, 2.0),
+///     text_color = iced::Color::BLACK,
+///     hover_text_color = iced::Color::RED,
+///     pressed_text_color = iced::Color::GREEN,
+///     disabled_text_color = iced::Color::BLUE,
+///     background = iced::Background::Color(iced::Color::WHITE),
+///     hover_background = iced::Background::Color(iced::Color::GRAY),
+///     pressed_background = iced::Background::Color(iced::Color::BLACK),
+///     disabled_background = iced::Background::Color(iced::Color::RED),
+/// );
+///```
+#[macro_export]
+macro_rules! styled_button {
+    (
+        $content:expr
+        $(, border_width = $border_width:expr)?
+        $(, border_color = $border_color:expr)?
+        $(, border_radius = $border_radius:expr)?
+        $(, shadow_blur_radius = $shadow_blur_radius:expr)?
+        $(, shadow_color = $shadow_color:expr)?
+        $(, shadow_offset = $shadow_offset:expr)?
+        $(, text_color = $text_color:expr)?
+        $(, hover_text_color = $hover_text_color:expr)?
+        $(, pressed_text_color = $pressed_text_color:expr)?
+        $(, disabled_text_color = $disabled_text_color:expr)?
+        $(, background = $background:expr)?
+        $(, hover_background = $hover_background:expr)?
+        $(, pressed_background = $pressed_background:expr)?
+        $(, disabled_background = $disabled_background:expr)?
+        $(,)?
+    ) => {
+        $crate::core::helpers::styled_button(
+            $content,
+            styled_container!(@some_opt $($border_width)?; f32),
+            styled_container!(@some_opt $($border_color)?; iced::Color),
+            styled_container!(@some_opt $($border_radius)?; iced::border::Radius),
+            styled_container!(@some_opt $($shadow_blur_radius)?; f32),
+            styled_container!(@some_opt $($shadow_color)?; iced::Color),
+            styled_container!(@some_opt $($shadow_offset)?; iced::Vector<f32>),
+            styled_container!(@some_opt $($text_color)?; iced::Color),
+            styled_container!(@some_opt $($hover_text_color)?; iced::Color),
+            styled_container!(@some_opt $($pressed_text_color)?; iced::Color),
+            styled_container!(@some_opt $($disabled_text_color)?; iced::Color),
+            styled_container!(@some_opt $($background)?; iced::Background),
+            styled_container!(@some_opt $($hover_background)?; iced::Background),
+            styled_container!(@some_opt $($pressed_background)?; iced::Background),
+            styled_container!(@some_opt $($disabled_background)?; iced::Background),
+        )
+    };
+
+    // Helper to wrap with Some(...) or None::<Type>
+    (@some_opt $val:expr; $ty:ty) => {
+        Some($val)
+    };
+
+    (@some_opt ; $ty:ty) => {
+        None::<$ty>
+    };
+}
+
 /// Creates a container with optional arguments for styling
 /// # Example
 /// ```rust
@@ -144,17 +214,22 @@ macro_rules! load_profile {
 macro_rules! impl_service {
     ($service:ident) => {
         impl Service for $service<'_> {
+            /// Returns error if failed to get active profile or if active profile is invalid.
             fn context(&mut self) -> Result<$crate::core::services::context::Context, $crate::error::Error> {
                 let profile = self
                     .session
                     .active_profile
                     .as_mut()
-                    .and_then(|p| self.state.profile.profiles.get_mut(&p.clone()))
                     .ok_or_else(|| {
-                        $crate::error::Error::profile_service(
-                            "Failed to get active profile".to_string(),
-                            "Load".to_string(),
-                        )
+                        $crate::error::Error::profile_service("Failed to get active profile", "Get Context")
+                    })
+                    .and_then(|p| {
+                        self.state.profile.profiles.get_mut(&p.clone()).ok_or_else(|| {
+                            $crate::error::Error::profile_service(
+                                "Invalid active profile".to_string(),
+                                "Get Context".to_string(),
+                            )
+                        })
                     })?;
 
                 let instance_name = self.session.active_instance.clone().unwrap_or_default();
