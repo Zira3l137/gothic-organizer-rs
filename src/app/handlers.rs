@@ -201,9 +201,15 @@ pub fn handle_window_message(
         message::WindowMessage::Open(name) => {
             let mut session_service = services::session::SessionService::new(session, state);
             match name.as_str() {
-                "options" => session_service.invoke_options_window().map(message::Message::from),
-                "overwrites" => session_service.invoke_overwrites_window().map(message::Message::from),
-                "logs" => session_service.invoke_logs_window().map(message::Message::from),
+                "options" => session_service
+                    .invoke_window("options", None, Some(iced::Size { width: 768.0, height: 460.0 }))
+                    .map(message::Message::from),
+                "overwrites" => session_service
+                    .invoke_window("overwrites", None, Some(iced::Size { width: 460.0, height: 768.0 }))
+                    .map(message::Message::from),
+                "logs" => session_service
+                    .invoke_window("logs", None, Some(iced::Size { width: 768.0, height: 460.0 }))
+                    .map(message::Message::from),
                 _ => iced::Task::none(),
             }
         }
@@ -229,17 +235,23 @@ pub fn handle_system_message(
         }
 
         message::SystemMessage::ExitApplication => {
-            if state.ui.windows.iter().all(|(_, wnd_state)| wnd_state.is_closed) {
-                let mut profile_service = services::profile::ProfileService::new(session, state);
-                if let Err(err) = profile_service.commit_session_files() {
-                    tracing::warn!("Couldn't update instance cache: {err}");
-                }
-                let session_service = services::session::SessionService::new(session, state);
-                session_service.save_current_session();
-                iced::exit()
-            } else {
-                iced::Task::none()
+            let mut error_task: iced::Task<message::Message> = iced::Task::none();
+            let mut profile_service = services::profile::ProfileService::new(session, state);
+            if let Err(err) = profile_service.commit_session_files() {
+                tracing::error!("Failed to commit session files: {err}");
+                error_task = iced::Task::done(
+                    message::ErrorMessage::Handle(
+                        crate::error::ErrorContext::builder()
+                            .error(err)
+                            .suggested_action("Make sure the active profile is selected and valid")
+                            .build(),
+                    )
+                    .into(),
+                );
             }
+
+            let mut session_service = services::session::SessionService::new(session, state);
+            error_task.chain(session_service.exit_application())
         }
 
         message::SystemMessage::Idle => iced::Task::none(),

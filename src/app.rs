@@ -1,7 +1,5 @@
 use iced::widget::combo_box::State;
 
-use crate::core::lookup::Lookup;
-use crate::core::services;
 use crate::load_app_session;
 
 pub mod handlers;
@@ -37,7 +35,11 @@ impl GothicOrganizer {
         let zspy_level = session.active_zspy_config.get_or_insert_default().verbosity;
         let themes = crate::core::helpers::default_themes().map(|pair| pair.0.to_owned()).to_vec();
 
-        state.ui.themes = services::session::SessionService::load_default_themes();
+        state.ui.themes = crate::core::helpers::default_themes()
+            .into_iter()
+            .map(|(name, theme)| (name.to_owned(), theme))
+            .collect();
+
         state.profile.instance_choices = State::new(instance_names);
         state.settings.theme_choices = State::new(themes);
         state.settings.renderer_choices = State::new(renderers);
