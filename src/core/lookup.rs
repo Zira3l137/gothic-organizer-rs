@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use hashbrown::Equivalent;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -92,8 +93,7 @@ where
     /// was previously in the map. Keeps the allocated memory for reuse.
     pub fn remove<Q>(&mut self, key: &Q) -> Option<V>
     where
-        K: std::borrow::Borrow<Q>,
-        Q: std::hash::Hash + Eq + Sized,
+        Q: std::hash::Hash + Equivalent<K> + ?Sized,
     {
         self.access.remove(key)
     }
@@ -131,8 +131,7 @@ where
     K: std::hash::Hash + Eq + Sized,
 {
     fn from(value: hashbrown::HashMap<K, V>) -> Self {
-        let access =
-            hashbrown::HashMap::with_capacity_and_hasher(value.len(), ahash::RandomState::new());
+        let access = hashbrown::HashMap::with_capacity_and_hasher(value.len(), ahash::RandomState::new());
         Self { access }
     }
 }
@@ -142,8 +141,7 @@ where
     K: std::hash::Hash + Eq + Sized,
 {
     fn from(value: Vec<(K, V)>) -> Self {
-        let mut map =
-            hashbrown::HashMap::with_capacity_and_hasher(value.len(), ahash::RandomState::new());
+        let mut map = hashbrown::HashMap::with_capacity_and_hasher(value.len(), ahash::RandomState::new());
         for (key, value) in value {
             map.insert(key, value);
         }
@@ -158,8 +156,7 @@ where
     fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
         let iterator = iter.into_iter();
         let possible_size = iterator.size_hint().1.unwrap_or(10);
-        let mut map =
-            hashbrown::HashMap::with_capacity_and_hasher(possible_size, ahash::RandomState::new());
+        let mut map = hashbrown::HashMap::with_capacity_and_hasher(possible_size, ahash::RandomState::new());
         for (key, value) in iterator {
             map.insert(key, value);
         }
@@ -181,8 +178,7 @@ where
 
 impl From<Vec<crate::core::profile::Instance>> for Lookup<String, crate::core::profile::Instance> {
     fn from(value: Vec<crate::core::profile::Instance>) -> Self {
-        let mut map =
-            hashbrown::HashMap::with_capacity_and_hasher(value.len(), ahash::RandomState::new());
+        let mut map = hashbrown::HashMap::with_capacity_and_hasher(value.len(), ahash::RandomState::new());
         for instance in value {
             map.insert(instance.name.clone(), instance);
         }
