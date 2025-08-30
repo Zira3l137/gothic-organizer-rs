@@ -5,6 +5,7 @@ use iced::widget;
 use crate::app::message;
 use crate::clickable_text;
 use crate::core::profile;
+use crate::styled_button;
 use crate::styled_container;
 use crate::svg_with_color;
 
@@ -19,19 +20,32 @@ pub fn mods_menu<'a>(
 
     let icon_add = svg_with_color!(
         "./resources/add_mod.svg",
-        color_idle = palette_ext.success.base.color,
-        color_hovered = palette_ext.success.strong.color
+        color_idle = palette_ext.primary.strong.text,
+        color_hovered = palette_ext.primary.strong.text
     )
     .height(20)
     .width(20);
-    let icon_overwrites = widget::svg("./resources/overwrites.svg").height(20).width(20);
+    let icon_overwrites = svg_with_color!(
+        "./resources/overwrites.svg",
+        color_idle = palette_ext.primary.strong.text,
+        color_hovered = palette_ext.primary.strong.text
+    )
+    .height(20)
+    .width(20);
 
-    let button_add_mod = widget::button(icon_add).on_press(message::ModMessage::Add(None).into());
-    let button_overwrites = widget::button(icon_overwrites)
-        .on_press(message::WindowMessage::Open("overwrites".into()).into());
+    let button_add_mod = styled_button!(
+        icon_add,
+        background = palette_ext.success.base.color,
+        hover_background = palette_ext.success.strong.color,
+        pressed_background = palette_ext.success.base.color,
+        disabled_background = palette_ext.success.weak.color,
+    )
+    .on_press(message::ModMessage::Add(None).into());
+    let button_overwrites =
+        widget::button(icon_overwrites).on_press(message::WindowMessage::Open("overwrites".into()).into());
 
     let group_mod_controls = styled_container!(
-        widget::row!(button_add_mod, button_overwrites),
+        widget::row!(button_add_mod, button_overwrites).spacing(10),
         border_width = 1.0,
         border_radius = 4.0
     )

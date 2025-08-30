@@ -19,8 +19,8 @@ pub fn handle_profile_message(
 
         message::ProfileMessage::SetGameDir(path) => service.set_game_dir(path).map(message::Message::from),
 
-        message::ProfileMessage::AddInstance(profile_name) => {
-            service.add_instance_for_profile(&profile_name).map(message::Message::from)
+        message::ProfileMessage::AddInstance => {
+            service.add_instance_for_profile().map(message::Message::from)
         }
 
         message::ProfileMessage::SetActiveInstance(instance_name) => {
@@ -28,10 +28,7 @@ pub fn handle_profile_message(
             service.switch_instance(&instance_name)
         }
 
-        message::ProfileMessage::RemoveActiveInstance => {
-            service.remove_instance_from_profile();
-            iced::Task::none()
-        }
+        message::ProfileMessage::RemoveActiveInstance => service.remove_instance_from_profile(),
 
         message::ProfileMessage::UpdateInstanceNameField(input) => {
             state.profile.instance_name_field = input;
@@ -58,7 +55,7 @@ pub fn handle_mod_message(
 
         message::ModMessage::Toggle(name, new_state) => {
             let mut profile_service = services::profile::ProfileService::new(session, state);
-            if let Err(err) = profile_service.update_instance_from_cache() {
+            if let Err(err) = profile_service.commit_session_files() {
                 tracing::warn!("Couldn't update instance cache: {err}");
             }
 
@@ -97,7 +94,7 @@ pub fn handle_ui_message(
     match message {
         message::UiMessage::UpdateActiveDir(path) => {
             let mut profile_service = services::profile::ProfileService::new(session, state);
-            if let Err(err) = profile_service.update_instance_from_cache() {
+            if let Err(err) = profile_service.commit_session_files() {
                 tracing::warn!("Couldn't update instance cache: {err}");
             }
 
@@ -127,12 +124,8 @@ pub fn handle_ui_message(
 
         message::UiMessage::SetTheme(theme) => {
             tracing::info!("Setting theme to {theme}");
-            let test_error = crate::error::ErrorContext::builder()
-                .error(crate::error::Error::ui_service("This theme is disgusting!", "Set Theme"))
-                .suggested_action("Try a different theme".to_string())
-                .build();
             session.theme_selected = Some(theme);
-            iced::Task::done(message::Message::Error(message::ErrorMessage::Handle(test_error)))
+            iced::Task::none()
         }
 
         message::UiMessage::SetOptionsMenu(menu) => {
@@ -238,7 +231,7 @@ pub fn handle_system_message(
         message::SystemMessage::ExitApplication => {
             if state.ui.windows.iter().all(|(_, wnd_state)| wnd_state.is_closed) {
                 let mut profile_service = services::profile::ProfileService::new(session, state);
-                if let Err(err) = profile_service.update_instance_from_cache() {
+                if let Err(err) = profile_service.commit_session_files() {
                     tracing::warn!("Couldn't update instance cache: {err}");
                 }
                 let session_service = services::session::SessionService::new(session, state);
@@ -271,7 +264,7 @@ pub fn handle_error_message(
         }
 
         message::ErrorMessage::ShowDetails(_error_id) => {
-            // FIXME:  Could open a detailed error dialog
+            // TODO:  Could open a detailed error dialog
             iced::Task::none()
         }
 

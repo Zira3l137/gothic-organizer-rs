@@ -22,12 +22,18 @@ pub fn header<'a>(
 
     let title = widget::text!("{}", constants::app_title_full()).size(30);
 
-    let button_options_icon = widget::svg("./resources/options.svg").height(20).width(20);
+    let button_options_icon = svg_with_color!(
+        "./resources/options.svg",
+        color_idle = palette_ext.primary.strong.text,
+        color_hovered = palette_ext.primary.strong.text
+    )
+    .height(20)
+    .width(20);
     let button_options =
         widget::button(button_options_icon).on_press(message::WindowMessage::Open("options".into()).into());
 
     let (button_logs_color_idle, buton_logs_color_hovered) = match app.state.errors.active_errors.len() {
-        0 => (palette_ext.primary.strong.text, palette_ext.background.strong.text),
+        0 => (palette_ext.primary.strong.text, palette_ext.primary.strong.text),
         _ => (palette_ext.danger.strong.color, palette_ext.danger.strong.color),
     };
 

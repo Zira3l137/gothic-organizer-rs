@@ -24,10 +24,9 @@ pub fn overwrites_view(app: &crate::app::GothicOrganizer) -> iced::Element<messa
             .fold(column![], |col, (mod_name, file_data)| {
                 let overwritten_count = file_data.len();
 
-                let mod_info: iced::Element<message::Message> = iced::widget::text(format!(
-                    "Mod - {mod_name}: {overwritten_count} files overwritten"
-                ))
-                .into();
+                let mod_info: iced::Element<message::Message> =
+                    iced::widget::text(format!("Mod - {mod_name}: {overwritten_count} files overwritten"))
+                        .into();
 
                 let files = file_data
                     .iter()
@@ -36,13 +35,12 @@ pub fn overwrites_view(app: &crate::app::GothicOrganizer) -> iced::Element<messa
                             get_relative_path(replaces.source_path.clone()),
                             get_relative_path(replaced.source_path.clone()),
                         );
-                        let file_info: iced::Element<message::Message> =
-                            iced::widget::text(format!(
-                                "\"{}\" overwrites \"{}\"",
-                                active.display(),
-                                original.display(),
-                            ))
-                            .into();
+                        let file_info: iced::Element<message::Message> = iced::widget::text(format!(
+                            "\"{}\" overwrites \"{}\"",
+                            active.display(),
+                            original.display(),
+                        ))
+                        .into();
                         col.push(file_info)
                     })
                     .padding(10)

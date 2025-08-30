@@ -19,8 +19,7 @@ pub fn about_menu<'a>(palette_ext: &palette::Extended) -> iced::Element<'a, mess
 
     let title = widget::text!("{}", constants::app_title_full()).size(30);
 
-    let header =
-        widget::row!(logo, title).spacing(10).padding(10).align_y(alignment::Vertical::Center);
+    let header = widget::row!(logo, title).spacing(10).padding(10).align_y(alignment::Vertical::Center);
 
     let link = widget::row![
         widget::text!("Repository: "),

@@ -29,7 +29,7 @@ pub enum ProfileMessage {
     SetActive(String),
     SetActiveInstance(String),
     SetGameDir(Option<PathBuf>),
-    AddInstance(String),
+    AddInstance,
     RemoveActiveInstance,
     UpdateInstanceNameField(String),
     UpdateProfileDirField(String),
@@ -112,5 +112,11 @@ impl From<WindowMessage> for Message {
 impl From<SystemMessage> for Message {
     fn from(msg: SystemMessage) -> Self {
         Message::System(msg)
+    }
+}
+
+impl From<ErrorMessage> for Message {
+    fn from(msg: ErrorMessage) -> Self {
+        Message::Error(msg)
     }
 }

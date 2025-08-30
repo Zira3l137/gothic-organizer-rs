@@ -67,6 +67,7 @@ impl GothicOrganizer {
             message::Message::System(msg) => {
                 handlers::handle_system_message(&mut self.session, &mut self.state, msg)
             }
+
             message::Message::Error(msg) => {
                 handlers::handle_error_message(&mut self.session, &mut self.state, msg)
             }

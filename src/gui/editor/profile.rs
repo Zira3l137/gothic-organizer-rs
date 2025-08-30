@@ -2,6 +2,7 @@ use iced::widget;
 
 use crate::app::message;
 use crate::core::profile;
+use crate::styled_button;
 use crate::styled_container;
 
 pub fn profile_controls<'a>(
@@ -12,10 +13,9 @@ pub fn profile_controls<'a>(
     let mut container_bg_color = palette_ext.primary.weak.color;
     container_bg_color.a = 0.3;
 
-    let instance_controls = instance_controls(app, current_profile);
+    let instance_controls = instance_controls(app, current_profile, palette_ext);
 
-    let button_browse =
-        widget::button("Browse").on_press(message::ProfileMessage::SetGameDir(None).into());
+    let button_browse = widget::button("Browse").on_press(message::ProfileMessage::SetGameDir(None).into());
 
     let choice_profile = widget::combo_box(
         &app.state.profile.profile_choices,
@@ -47,6 +47,7 @@ pub fn profile_controls<'a>(
 pub fn instance_controls<'a>(
     app: &'a crate::app::GothicOrganizer,
     current_profile: Option<&profile::Profile>,
+    palette_ext: &iced::theme::palette::Extended,
 ) -> iced::Element<'a, message::Message> {
     let choice_instance = widget::combo_box(
         &app.state.profile.instance_choices,
@@ -60,7 +61,7 @@ pub fn instance_controls<'a>(
         if no_profile_path(p) {
             return None;
         };
-        Some(message::ProfileMessage::AddInstance(p.name.clone()).into())
+        Some(message::ProfileMessage::AddInstance.into())
     });
     let button_remove_message = current_profile.and_then(|p| {
         if no_profile_path(p) {
@@ -69,8 +70,22 @@ pub fn instance_controls<'a>(
         Some(message::ProfileMessage::RemoveActiveInstance.into())
     });
 
-    let button_add = widget::button("Add").on_press_maybe(button_add_message);
-    let button_remove = widget::button("Remove").on_press_maybe(button_remove_message);
+    let button_add = styled_button!(
+        "Add",
+        background = palette_ext.success.base.color,
+        hover_background = palette_ext.success.strong.color,
+        pressed_background = palette_ext.success.base.color,
+        disabled_background = palette_ext.success.weak.color,
+    )
+    .on_press_maybe(button_add_message);
+    let button_remove = styled_button!(
+        "Remove",
+        background = palette_ext.danger.base.color,
+        hover_background = palette_ext.danger.strong.color,
+        pressed_background = palette_ext.danger.base.color,
+        disabled_background = palette_ext.danger.weak.color,
+    )
+    .on_press_maybe(button_remove_message);
     widget::container(widget::row!(choice_instance, button_add, button_remove)).into()
 }
 

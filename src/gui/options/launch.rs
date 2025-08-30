@@ -6,9 +6,14 @@ use crate::core::lookup::Lookup;
 use crate::styled_container;
 
 fn parser_settings(
-    _app: &crate::app::GothicOrganizer,
+    app: &crate::app::GothicOrganizer,
     launch_options: Option<session::GameLaunchConfiguration>,
 ) -> iced::Element<message::Message> {
+    let theme = app.theme();
+    let palette_ext = theme.extended_palette();
+    let mut container_bg_color = palette_ext.primary.weak.color;
+    container_bg_color.a = 0.3;
+
     let mut parser_settings: Lookup<session::ParserCommand, bool> = Lookup::new();
     if let Some(launch_options) = launch_options {
         parser_settings = launch_options.parser_settings.commands.clone();
@@ -20,7 +25,8 @@ fn parser_settings(
                 styled_container!(
                     widget::text("Parser Settings"),
                     border_width = 2.0,
-                    border_radius = 4.0
+                    border_radius = 4.0,
+                    background = container_bg_color
                 )
                 .padding(10)
                 .align_left(iced::Length::Fill)
@@ -34,8 +40,7 @@ fn parser_settings(
                         *parser_settings.get(option).unwrap_or(&false),
                     )
                     .on_toggle(|new_state| {
-                        message::SettingsMessage::ToggleParserSetting(option.clone(), new_state)
-                            .into()
+                        message::SettingsMessage::ToggleParserSetting(option.clone(), new_state).into()
                     }),
                 )
             }
@@ -53,6 +58,11 @@ fn game_settings(
     app: &crate::app::GothicOrganizer,
     launch_options: Option<session::GameLaunchConfiguration>,
 ) -> iced::Element<message::Message> {
+    let theme = app.theme();
+    let palette_ext = theme.extended_palette();
+    let mut container_bg_color = palette_ext.primary.weak.color;
+    container_bg_color.a = 0.3;
+
     let mut game_settings = session::GameSettings::default();
     if let Some(launch_options) = launch_options {
         game_settings = launch_options.game_settings.clone();
@@ -85,14 +95,17 @@ fn game_settings(
     .into();
 
     let column = widget::column![
-        styled_container!(widget::text("Game Settings"), border_width = 2.0, border_radius = 4.0)
-            .padding(10)
-            .align_left(iced::Length::Fill),
+        styled_container!(
+            widget::text("Game Settings"),
+            border_width = 2.0,
+            border_radius = 4.0,
+            background = container_bg_color
+        )
+        .padding(10)
+        .align_left(iced::Length::Fill),
         renderer_switcher,
         widget::Checkbox::new("Enable MARVIN mode", game_settings.is_marvin_mode_enabled)
-            .on_toggle(|new_state| {
-                message::SettingsMessage::ToggleMarvinMode(new_state).into()
-            }),
+            .on_toggle(|new_state| { message::SettingsMessage::ToggleMarvinMode(new_state).into() }),
         widget::Checkbox::new("Enable zSpy", game_settings.zspy.is_enabled)
             .on_toggle(|new_state| { message::SettingsMessage::ToggleZSpyState(new_state).into() }),
         zspy_level_label,

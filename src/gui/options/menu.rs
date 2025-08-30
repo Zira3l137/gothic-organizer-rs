@@ -44,17 +44,12 @@ impl<'a, Message: 'a> From<OptionsMenu> for iced::Element<'a, Message> {
 
 pub fn menu_bar(app: &crate::app::GothicOrganizer) -> iced::Element<message::Message> {
     let current_menu = app.state.ui.active_options_menu;
-    widget::container(OptionsMenu::into_iter(OptionsMenu::default()).fold(
-        widget::row![],
-        |bar, menu| {
-            let menu_button = widget::button(menu)
-                .on_press_maybe(
-                    (current_menu != menu).as_some(message::UiMessage::SetOptionsMenu(menu).into()),
-                )
-                .width(iced::Length::Fill);
-            bar.push(menu_button)
-        },
-    ))
+    widget::container(OptionsMenu::into_iter(OptionsMenu::default()).fold(widget::row![], |bar, menu| {
+        let menu_button = widget::button(menu)
+            .on_press_maybe((current_menu != menu).as_some(message::UiMessage::SetOptionsMenu(menu).into()))
+            .width(iced::Length::Fill);
+        bar.push(menu_button)
+    }))
     .center_x(iced::Length::Fill)
     .into()
 }

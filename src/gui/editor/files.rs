@@ -32,8 +32,22 @@ pub fn file_view_controls<'a>(
     app: &'a crate::app::GothicOrganizer,
     current_profile: Option<&profile::Profile>,
 ) -> iced::Element<'a, message::Message> {
-    let icon_back = widget::svg("./resources/back.svg").height(20).width(20);
-    let icon_home = widget::svg("./resources/home.svg").height(20).width(20);
+    let theme = app.theme();
+    let palette_ext = theme.extended_palette();
+    let icon_back = svg_with_color!(
+        "./resources/back.svg",
+        color_idle = palette_ext.primary.strong.text,
+        color_hovered = palette_ext.primary.strong.text
+    )
+    .height(20)
+    .width(20);
+    let icon_home = svg_with_color!(
+        "./resources/home.svg",
+        color_idle = palette_ext.primary.strong.text,
+        color_hovered = palette_ext.primary.strong.text
+    )
+    .height(20)
+    .width(20);
     let button_back_message = current_profile.and_then(|profile| {
         if profile.path == app.state.ui.current_dir {
             return None;
