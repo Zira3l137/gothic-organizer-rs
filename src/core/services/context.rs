@@ -5,8 +5,7 @@ use std::path;
 use crate::core::lookup;
 use crate::core::profile;
 
-type Overwrites =
-    lookup::Lookup<String, lookup::Lookup<profile::FileMetadata, profile::FileMetadata>>;
+type Overwrites = lookup::Lookup<String, lookup::Lookup<profile::FileMetadata, profile::FileMetadata>>;
 type Mods = Vec<profile::ModInfo>;
 type Instances = lookup::Lookup<String, profile::Instance>;
 type InstanceFiles = lookup::Lookup<path::PathBuf, profile::FileMetadata>;
@@ -68,6 +67,18 @@ impl<'ctx> Context<'ctx> {
         self.active_profile.instances.as_mut()
     }
 
+    pub fn instances_empty(&self) -> bool {
+        self.instances().map(|i| i.is_empty()).unwrap_or(true)
+    }
+
+    pub fn instance_names(&self) -> Vec<String> {
+        self.active_profile
+            .instances
+            .as_ref()
+            .map(|instances| instances.keys().cloned().collect())
+            .unwrap_or_default()
+    }
+
     pub fn clear_instance_overwrites(&mut self) {
         if let Some(instance) = self.instance_mut(Some(&self.active_instance_name.clone())) {
             instance.overwrites = None;
@@ -104,11 +115,38 @@ impl<'ctx> Context<'ctx> {
         }
     }
 
+    pub fn contains_instance(&self, instance_name: &str) -> bool {
+        self.active_profile
+            .instances
+            .as_ref()
+            .map(|instances| instances.contains_key(instance_name))
+            .unwrap_or(false)
+    }
+
+    /// Inserts new instance into profile. If the instance already exists, it will be overwritten
+    /// and the old instance will be returned otherwise None will be returned.
+    pub fn insert_instance(&mut self, instance: profile::Instance) -> Option<profile::Instance> {
+        if let Some(instances) = self.instances_mut() {
+            instances.insert(instance.name.clone(), instance)
+        } else {
+            self.active_profile.instances = Some(Instances::new());
+            self.active_profile.instances.as_mut().map(|i| i.insert(instance.name.clone(), instance));
+            None
+        }
+    }
+
+    /// Removes an instance from the profile, returning it. Returns None if the instance does not
+    /// exist.
+    pub fn remove_instance(&mut self, instance_name: &str) -> Option<profile::Instance> {
+        if let Some(instances) = self.instances_mut() {
+            return instances.remove(instance_name);
+        }
+        None
+    }
+
     pub fn extend_instance_overwrites<T>(&mut self, overwrites: T)
     where
-        T: IntoIterator<
-            Item = (String, lookup::Lookup<profile::FileMetadata, profile::FileMetadata>),
-        >,
+        T: IntoIterator<Item = (String, lookup::Lookup<profile::FileMetadata, profile::FileMetadata>)>,
     {
         if let Some(instance) = self.instance_mut(Some(&self.active_instance_name.clone())) {
             if let Some(o) = instance.overwrites.as_mut() {
