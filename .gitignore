@@ -1,7 +1,7 @@
 target/
 mods/
 .cargo/
-.ps1
-.bat
-.log
+*.ps1
+*.bat
+*.log
 cargo.lock
