@@ -35,11 +35,11 @@ impl GothicOrganizer {
         let instance_names = instances.map(|i| i.keys().cloned().collect::<Vec<_>>()).unwrap_or_default();
         let renderers = session::RendererBackend::into_iter().cloned().collect::<Vec<_>>();
         let zspy_level = session.active_zspy_config.get_or_insert_default().verbosity;
-        let themes = |themes: &mut Lookup<String, iced::Theme>| themes.keys().cloned().collect::<Vec<_>>();
+        let themes = crate::core::helpers::default_themes().map(|pair| pair.0.to_owned()).to_vec();
 
         state.ui.themes = services::session::SessionService::load_default_themes();
         state.profile.instance_choices = State::new(instance_names);
-        state.settings.theme_choices = State::new(themes(&mut state.ui.themes));
+        state.settings.theme_choices = State::new(themes);
         state.settings.renderer_choices = State::new(renderers);
         state.settings.zspy_level_field = zspy_level.into();
     }
