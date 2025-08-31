@@ -48,7 +48,7 @@ pub enum ModMessage {
 #[derive(Debug, Clone)]
 pub enum UiMessage {
     UpdateActiveDir(PathBuf),
-    ToggleFileEntry(PathBuf),
+    ToggleFileEntry(bool, PathBuf),
     ToggleAllFileEntries,
     ReloadDirEntries,
     SetTheme(String),

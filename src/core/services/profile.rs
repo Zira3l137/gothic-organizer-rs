@@ -67,6 +67,10 @@ impl<'a> ProfileService<'a> {
     /// Extend session with file state from UI and write to instance.
     /// Returns error if failed to get context.
     pub fn commit_session_files(&mut self) -> Result<(), error::Error> {
+        if self.session.active_profile.is_none() {
+            return Ok(());
+        }
+
         tracing::info!("Updating Session with UI files.");
         self.session.files.extend(self.state.ui.dir_entries.iter().cloned());
 

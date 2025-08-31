@@ -85,6 +85,9 @@ pub fn file_view<'a>(
     app: &'a crate::app::GothicOrganizer,
     instance_selected: Option<&profile::Instance>,
 ) -> iced::Element<'a, message::Message> {
+    let theme = app.theme();
+    let palette_ext = theme.extended_palette();
+
     if instance_selected.is_none() {
         return widget::Column::new().into();
     };
@@ -110,11 +113,19 @@ pub fn file_view<'a>(
                 false => widget::text(file_name).into(),
             };
 
-            let icon: iced::Element<_> = svg_with_color!(icon_path).height(20).width(20).into();
+            let icon: iced::Element<_> = svg_with_color!(
+                icon_path,
+                color_idle = palette_ext.primary.base.color,
+                color_hovered = palette_ext.primary.strong.color
+            )
+            .height(20)
+            .width(20)
+            .into();
             let tooltip_body =
                 styled_container!(tooltip_text, border_width = 1.0, border_radius = 4.0).padding(5);
-            let checkbox = widget::checkbox("", info.enabled)
-                .on_toggle(|_| message::UiMessage::ToggleFileEntry(path.clone()).into());
+            let checkbox = widget::checkbox("", info.enabled).on_toggle(|entry_state| {
+                message::UiMessage::ToggleFileEntry(entry_state, path.clone()).into()
+            });
 
             let file_entry = widget::tooltip(
                 styled_container!(

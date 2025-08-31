@@ -85,7 +85,7 @@ impl<'a> SessionService<'a> {
     pub fn init_window(&mut self) -> Task<message::Message> {
         let wnd_size = crate::app::GothicOrganizer::WINDOW_SIZE;
         self.invoke_window("editor", None, Some(iced::Size { width: wnd_size.0, height: wnd_size.1 }))
-            .then(|_| Task::done(message::UiMessage::ReloadDirEntries.into()))
+            .chain(Task::done(message::UiMessage::ReloadDirEntries.into()))
     }
 
     /// Creates a new window with the given name, position and size.

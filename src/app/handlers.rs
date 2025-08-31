@@ -100,26 +100,24 @@ pub fn handle_ui_message(
 
             state.ui.current_dir = path.clone();
             let mut ui_service = services::ui::UiService::new(session, state);
-            ui_service.reload_displayed_directory(Some(path));
-            iced::Task::none()
+            ui_service.reload_displayed_directory(Some(path))
         }
 
-        message::UiMessage::ToggleFileEntry(path) => {
+        message::UiMessage::ToggleFileEntry(entry_sate, path) => {
             let mut service = services::ui::UiService::new(session, state);
-            service.toggle_state_recursive(Some(&path));
+            service.set_entry_state_with_children(Some(entry_sate), Some(&path));
             iced::Task::none()
         }
 
         message::UiMessage::ToggleAllFileEntries => {
             let mut service = services::ui::UiService::new(session, state);
-            service.toggle_state_recursive(None);
+            service.set_entry_state_with_children(None, None);
             iced::Task::none()
         }
 
         message::UiMessage::ReloadDirEntries => {
             let mut service = services::ui::UiService::new(session, state);
-            service.reload_displayed_directory(None);
-            iced::Task::none()
+            service.reload_displayed_directory(None)
         }
 
         message::UiMessage::SetTheme(theme) => {
@@ -199,7 +197,19 @@ pub fn handle_window_message(
         }
 
         message::WindowMessage::Open(name) => {
+            let open_windows = state
+                .ui
+                .windows
+                .iter()
+                .filter_map(|(id, info)| (!info.is_closed).then_some((info.name.clone(), id.unwrap())))
+                .collect::<crate::core::lookup::Lookup<_, _>>();
+
             let mut session_service = services::session::SessionService::new(session, state);
+
+            if let Some(open_window_id) = open_windows.get(&name) {
+                return iced::Task::done(message::WindowMessage::Close(*open_window_id).into());
+            }
+
             match name.as_str() {
                 "options" => session_service
                     .invoke_window("options", None, Some(iced::Size { width: 768.0, height: 460.0 }))
@@ -265,7 +275,6 @@ pub fn handle_error_message(
 ) -> iced::Task<message::Message> {
     match message {
         message::ErrorMessage::Handle(error_ctx) => {
-            tracing::error!("Error: {error_ctx}");
             state.errors.add_error(error_ctx);
             iced::Task::none()
         }

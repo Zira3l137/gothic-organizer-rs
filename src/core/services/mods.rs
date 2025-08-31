@@ -209,7 +209,7 @@ impl<'a> ModService<'a> {
             }
         }
 
-        Task::done(message::UiMessage::ReloadDirEntries.into())
+        Task::none()
     }
 
     pub fn is_valid_mod_source(mod_path: &path::Path) -> bool {
