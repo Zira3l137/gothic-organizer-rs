@@ -211,9 +211,9 @@ macro_rules! load_profile {
 }
 
 #[macro_export]
-macro_rules! impl_service {
+macro_rules! impl_app_context {
     ($service:ident) => {
-        impl Service for $service<'_> {
+        impl ApplicationContext for $service<'_> {
             /// Returns error if failed to get active profile or if active profile is invalid.
             fn context(&mut self) -> Result<$crate::core::services::context::Context, $crate::error::Error> {
                 let profile = self

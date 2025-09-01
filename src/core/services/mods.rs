@@ -1,4 +1,6 @@
 use std::path;
+use std::path::Path;
+use std::path::PathBuf;
 
 use iced::Task;
 
@@ -6,7 +8,7 @@ use crate::app::message;
 use crate::app::session;
 use crate::app::state;
 use crate::core;
-use crate::core::services::Service;
+use crate::core::services::ApplicationContext;
 use crate::error;
 
 pub struct ModService<'a> {
@@ -14,41 +16,85 @@ pub struct ModService<'a> {
     state: &'a mut state::ApplicationState,
 }
 
-crate::impl_service!(ModService);
+crate::impl_app_context!(ModService);
 
 impl<'a> ModService<'a> {
     pub fn new(session: &'a mut session::ApplicationSession, state: &'a mut state::ApplicationState) -> Self {
         Self { session, state }
     }
 
+    /// Adds a mod to the current instance. Mod files are copied to the instance's mod storage
+    /// directory. If the mod storage directory doesn't exist, it is created. Finally, reloads
+    /// UI files.
+    ///
+    /// Emits an error message in following cases:
+    ///     1. If no instance is active.
+    ///     2. If failed to get context.
+    ///     3. If mod with the same name already exists.
+    ///     4. If mod file is invalid.
+    ///     5. If failed to move mod to storage.
     pub fn add_mod(&mut self, mod_source_path: Option<path::PathBuf>) -> Task<message::Message> {
+        let current_mod_storage_dir = self
+            .session
+            .mod_storage_dir
+            .clone()
+            .unwrap_or(crate::core::constants::default_mod_storage_path());
+
+        let mut context = match self.context() {
+            Ok(ctx) => ctx,
+            Err(err) => {
+                tracing::error!("Failed to get context: {err}");
+                return Task::done(message::ErrorMessage::Handle(err.into()).into());
+            }
+        };
+
+        let profile_name = context.active_profile.name.clone();
+        let instance_name = context.active_instance_name.clone();
+        let profile_path = context.active_profile.path.clone();
+
+        let Some(instance) = context.instance_mut(None) else {
+            tracing::error!("No active instance");
+            return Task::done(
+                message::ErrorMessage::Handle(
+                    error::ErrorContext::builder()
+                        .error(error::Error::new("No active instance", "Mods Service", "Add"))
+                        .suggested_action("Select an instance and try again")
+                        .build(),
+                )
+                .into(),
+            );
+        };
+
         let Some(mod_source_path) = mod_source_path.or_else(|| {
             rfd::FileDialog::new()
                 .set_title("Select a zip archive with mod files")
                 .add_filter("Zip archive", &["zip"])
                 .pick_file()
         }) else {
+            tracing::warn!("No mod file selected");
             return Task::none();
         };
 
-        let mod_path = if Self::is_valid_mod_source(&mod_source_path) {
-            match self.move_mod_to_storage(&mod_source_path) {
-                Ok(path) => path,
-                Err(e) => {
-                    tracing::warn!("Failed to move mod to storage: {e}");
-                    return Task::none();
-                }
+        if let Some(msg) = Self::validate_mod(&mod_source_path) {
+            tracing::error!("Failed to add mod: {}", mod_source_path.display());
+            return Task::done(msg.into());
+        }
+
+        let mod_path = match Self::move_mod_to_storage(
+            &mod_source_path,
+            &current_mod_storage_dir,
+            &profile_name,
+            &instance_name,
+        ) {
+            Ok(path) => path,
+            Err(e) => {
+                tracing::error!("Failed to move mod to storage: {e}");
+                return Task::done(message::ErrorMessage::Handle(error::ErrorContext::from(e)).into());
             }
-        } else {
-            return Task::none();
         };
 
-        let Ok(mut context) = self.context() else {
-            return Task::none();
-        };
-
-        let profile_path = context.active_profile.path.clone();
-        let mod_name = mod_path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap();
+        let mod_name = mod_path.file_name().map(|name| name.to_string_lossy().to_string()).unwrap();
+        tracing::info!("Adding mod \"{mod_name}\"");
 
         let get_file_info = |path: &path::Path| {
             core::profile::FileMetadata::default()
@@ -60,14 +106,9 @@ impl<'a> ModService<'a> {
         let mod_files = ignore::WalkBuilder::new(mod_path.clone())
             .ignore(false)
             .build()
-            .filter_map(|e| {
-                let entry = e.clone().ok();
-                if let Some(entry) = entry
-                    && entry.path() == mod_path
-                {
-                    return None;
-                };
-                e.ok().map(|e| (e.path().to_path_buf(), get_file_info(e.path())))
+            .filter_map(|entry| match entry {
+                Ok(e) if e.path() != mod_path => Some((e.path().to_path_buf(), get_file_info(e.path()))),
+                _ => None,
             })
             .collect::<core::lookup::Lookup<path::PathBuf, core::profile::FileMetadata>>();
 
@@ -77,160 +118,201 @@ impl<'a> ModService<'a> {
             .with_path(&mod_path)
             .with_files(mod_files);
 
-        if let Some(instance) = context.instance_mut(None) {
-            Self::apply_mod_files(instance, &new_mod_info, &profile_path);
-            instance.mods.get_or_insert_default().push(new_mod_info.clone());
-        } else {
-            tracing::error!("No active instance");
-            return Task::none();
-        }
+        Self::toggle_mod_files(instance, &profile_path, &new_mod_info, true);
+        instance.mods.get_or_insert_default().push(new_mod_info.clone());
 
         Task::done(message::UiMessage::ReloadDirEntries.into())
     }
 
+    /// Removes a mod from the instance and its storage directory. Also removes it from the
+    /// overwrites list if it exists. Finally, reloads UI files.
+    ///
+    /// Emits an error message in following cases:
+    ///    1. Could not get context.
+    ///    2. Failed to remove mod directory.
     pub fn remove_mod(&mut self, mod_name: String) -> Task<message::Message> {
-        self.toggle_mod(mod_name.clone(), false);
-        let Ok(mut context) = self.context() else {
-            return Task::none();
+        let mut tasks: Vec<Task<message::Message>> = vec![self.toggle_mod(mod_name.clone(), false)];
+        let mut context = match self.context() {
+            Ok(ctx) => ctx,
+            Err(err) => {
+                tracing::error!("Failed to get context: {err}");
+                tasks.push(Task::done(message::ErrorMessage::Handle(err.into()).into()));
+                return Task::batch(tasks);
+            }
         };
 
         let mods = context.instance_mods_mut();
-
         if let Some(mods) = mods
             && let Some(mod_info) = mods.iter().find(|info| info.name == mod_name)
         {
+            tracing::info!("Removing \"{mod_name}\"");
             if let Err(e) = std::fs::remove_dir_all(&mod_info.path) {
                 tracing::error!("Failed to remove mod directory: {e}");
-                return Task::none();
+                tasks.push(Task::done(message::ErrorMessage::Handle(error::ErrorContext::from(e)).into()));
+                return Task::batch(tasks);
             };
 
             mods.retain(|info| info.name != mod_name);
-
             if let Some(overwrites) = context.instance_overwrites_mut() {
                 overwrites.remove(&mod_name);
             }
 
-            return Task::done(message::UiMessage::ReloadDirEntries.into());
+            return Task::batch(tasks);
         }
-        Task::none()
+
+        tracing::warn!("Mod \"{mod_name}\" not found");
+        Task::batch(tasks)
     }
 
-    pub fn toggle_mod(&mut self, mod_name: String, enabled: bool) {
-        let Ok(mut context) = self.context() else {
-            return;
-        };
-        let profile_path = context.active_profile.path.clone();
-        let mods = context.instance_mods().cloned();
-        let Some(instance) = context.instance_mut(None) else {
-            tracing::error!("No active instance");
-            return;
+    /// Enables or disables a mod. Adding or removing it from the instance's mods list, as well as
+    /// its files and overwrites. Finally, reloads UI files.
+    ///
+    /// Emits an error message if failed to get context.
+    pub fn toggle_mod(&mut self, mod_name: String, enabled: bool) -> Task<message::Message> {
+        let mut context = match self.context() {
+            Ok(ctx) => ctx,
+            Err(err) => {
+                tracing::error!("Failed to get context: {err}");
+                return Task::done(message::ErrorMessage::Handle(err.into()).into());
+            }
         };
 
+        let profile_path = context.active_profile.path.clone();
+        let mods = context.instance_mods().cloned();
+
+        let Some(instance) = context.instance_mut(None) else { return Task::none() };
         if let Some(mut mods) = mods
             && let Some(mod_info) = mods.iter_mut().find(|info| info.name == mod_name)
         {
-            if mod_info.enabled == enabled {
-                return;
-            }
-
-            if enabled {
-                tracing::info!("Enabling \"{mod_name}\"");
-                Self::apply_mod_files(instance, mod_info, &profile_path);
-            } else {
-                tracing::info!("Disabling \"{mod_name}\"");
-                Self::unapply_mod_files(instance, mod_info, &profile_path);
-            }
+            tracing::info!("{} mod \"{mod_name}\"", if enabled { "Enabling" } else { "Disabling" });
+            Self::toggle_mod_files(instance, &profile_path, mod_info, enabled);
 
             mod_info.enabled = enabled;
             context.set_instance_mods(mods);
+
+            tracing::info!("Reloading UI files");
+            return Task::done(message::Message::UI(message::UiMessage::ReloadDirEntries));
         }
+
+        tracing::warn!("Mod \"{mod_name}\" not found");
+        Task::none()
     }
 
-    fn apply_mod_files(
+    /// Adds or removes mod files from the instance's files list, as well as its overwrites.
+    pub fn toggle_mod_files(
         instance: &mut core::profile::Instance,
-        mod_info: &core::profile::ModInfo,
         profile_path: &path::Path,
+        mod_info: &core::profile::ModInfo,
+        mod_enabled: bool,
     ) {
+        if mod_enabled {
+            tracing::info!("Adding mod \"{}\"", mod_info.name);
+        } else {
+            tracing::info!("Removing mod \"{}\"", mod_info.name);
+        };
+
         let instance_files = instance.files.get_or_insert_with(core::lookup::Lookup::new);
         mod_info.files.iter().for_each(|(path, info)| {
-            if let Ok(relative_path) = path.strip_prefix(&mod_info.path) {
-                let dst_path = profile_path.join(relative_path);
-                if let Some(existing_file) =
-                    instance_files.insert(dst_path.clone(), info.clone().with_target_path(&dst_path))
-                {
-                    instance
-                        .overwrites
-                        .get_or_insert_with(core::lookup::Lookup::new)
-                        .access
-                        .entry(mod_info.name.clone())
-                        .or_default()
-                        .insert(info.clone(), existing_file);
-                }
-            }
-        });
-    }
+            let Ok(relative_path) = path.strip_prefix(&mod_info.path) else { return };
+            let dst_path = profile_path.join(relative_path);
 
-    fn unapply_mod_files(
-        instance: &mut core::profile::Instance,
-        mod_info: &core::profile::ModInfo,
-        profile_path: &path::Path,
-    ) {
-        let Some(instance_files) = instance.files.as_mut() else {
-            return;
-        };
-        mod_info.files.iter().for_each(|(path, info)| {
-            if let Ok(relative_path) = path.strip_prefix(&mod_info.path) {
-                let dst_path = profile_path.join(relative_path);
+            if mod_enabled {
+                let new_info = info.clone().with_target_path(&dst_path);
+                let Some(existing_file) = instance_files.insert(dst_path.clone(), new_info) else {
+                    return;
+                };
+
+                tracing::warn!("{} already exists, overwriting", dst_path.display());
+                instance
+                    .overwrites
+                    .get_or_insert_with(core::lookup::Lookup::new)
+                    .access
+                    .entry(mod_info.name.clone())
+                    .or_default()
+                    .insert(info.clone(), existing_file);
+            } else {
                 instance_files.remove(&dst_path);
-                if let Some(mod_overwrites) =
+
+                let Some(mod_overwrites) =
                     instance.overwrites.as_mut().and_then(|o| o.get_mut(&mod_info.name))
-                    && let Some(original_file) = mod_overwrites.remove(info)
-                {
-                    instance_files.insert(dst_path, original_file);
-                }
+                else {
+                    return;
+                };
+
+                let Some(original_file) = mod_overwrites.remove(info) else {
+                    return;
+                };
+
+                tracing::info!("Restoring original {}", dst_path.display());
+                instance_files.insert(dst_path, original_file);
             }
         });
     }
 
+    /// Reloads mods by clearing the instance's overwrites list and reloading the UI files.
+    ///
+    /// Emits an error message if failed to get context or no active instance.
     pub fn reload_mods(&mut self) -> Task<message::Message> {
-        let Ok(mut context) = self.context() else {
-            return Task::none();
+        let mut context = match self.context() {
+            Ok(ctx) => ctx,
+            Err(err) => {
+                tracing::error!("Failed to get context: {err}");
+                return Task::done(message::ErrorMessage::Handle(err.into()).into());
+            }
         };
 
         let profile_path = context.active_profile.path.clone();
         let current_instance_mods = context.instance_mods().cloned();
 
-        if let Some(mods) = current_instance_mods {
-            context.clear_instance_overwrites();
-            for mod_info in mods.iter().filter(|m| m.enabled) {
-                if let Some(instance) = context.instance_mut(None) {
-                    Self::apply_mod_files(instance, mod_info, &profile_path);
-                }
-            }
+        let Some(mods) = current_instance_mods else {
+            tracing::warn!("No mods found");
+            return Task::none();
+        };
+
+        context.clear_instance_overwrites();
+        let Some(instance) = context.instance_mut(None) else {
+            tracing::error!("No active instance");
+            return Task::done(
+                message::ErrorMessage::Handle(
+                    error::ErrorContext::builder()
+                        .error(error::Error::new("No active instance", "Mods Service", "Reload"))
+                        .suggested_action("Select an instance and try again")
+                        .build(),
+                )
+                .into(),
+            );
+        };
+
+        tracing::info!("Reloading mods");
+        for mod_info in mods.iter().filter(|m| m.enabled) {
+            Self::toggle_mod_files(instance, &profile_path, mod_info, true);
         }
 
         Task::none()
     }
 
+    /// Checks if a mod file is valid. Returns `false` if mod file doesn't exist or is not a
+    /// directory or a zip archive.
     pub fn is_valid_mod_source(mod_path: &path::Path) -> bool {
         mod_path.exists()
             && (mod_path.is_dir() || mod_path.extension().and_then(|e| e.to_str()) == Some("zip"))
     }
 
-    pub fn move_mod_to_storage(&mut self, mod_path: &path::Path) -> Result<path::PathBuf, error::Error> {
-        let storage_dir =
-            self.session.mod_storage_dir.clone().unwrap_or_else(core::constants::default_mod_storage_path);
-
-        let context = self.context()?;
-        let profile_name = context.active_profile.name.clone();
-        let instance_name = context.active_instance_name.clone();
-
-        let storage_dir = storage_dir.join(profile_name).join(instance_name);
-
+    /// Moves a mod file to the storage directory. Returns the path to the mod in the storage
+    /// directory. Storage directory is created if it doesn't exist. If it wasn't provided by user
+    /// via UI, default location is used.
+    ///
+    /// Returns error if mod with the same name already exists
+    pub fn move_mod_to_storage(
+        mod_path: &path::Path,
+        mod_storage_dir: &Path,
+        profile_name: &str,
+        instance_name: &str,
+    ) -> Result<path::PathBuf, error::Error> {
+        let storage_dir = Self::get_current_storage_dir(mod_storage_dir, profile_name, instance_name);
         let mod_name = mod_path
             .file_name()
-            .and_then(|n| n.to_str())
-            .map(|s| s.strip_suffix(".zip").unwrap_or(s))
+            .and_then(|name| name.to_str().map(|s| s.strip_suffix(".zip").unwrap_or(s)))
             .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "Failed to get mod name"))?;
 
         let dst_dir = storage_dir.join(mod_name);
@@ -244,11 +326,38 @@ impl<'a> ModService<'a> {
         std::fs::create_dir_all(&dst_dir)?;
 
         if mod_path.is_dir() {
+            tracing::info!("Copying mod files to {}", dst_dir.display());
             core::utils::copy_recursive(mod_path, &dst_dir)?;
         } else {
+            tracing::info!("Extracting mod archive to {}", dst_dir.display());
             core::utils::extract_zip(mod_path, &dst_dir)?;
         }
 
         Ok(dst_dir)
+    }
+
+    /// Returns current instance's mod storage directory for the current profile.
+    pub fn get_current_storage_dir(
+        mod_storage_dir: &Path,
+        profile_name: &str,
+        instance_name: &str,
+    ) -> PathBuf {
+        mod_storage_dir.to_path_buf().join(profile_name).join(instance_name)
+    }
+
+    /// Checks if mod source is valid and returns error message if not.
+    pub fn validate_mod(mod_path: &path::Path) -> Option<message::ErrorMessage> {
+        if !Self::is_valid_mod_source(mod_path) {
+            return Some(message::ErrorMessage::Handle(
+                error::ErrorContext::builder()
+                    .error(error::Error::new("Invalid mod file", "Mods Service", "Add"))
+                    .suggested_action(
+                        "Select a valid mod file. It should be either a directory or a zip archive.",
+                    )
+                    .build(),
+            ));
+        };
+
+        None
     }
 }

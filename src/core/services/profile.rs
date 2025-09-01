@@ -8,7 +8,7 @@ use crate::app::state;
 use crate::core;
 use crate::core::lookup;
 use crate::core::profile;
-use crate::core::services::Service;
+use crate::core::services::ApplicationContext;
 use crate::core::services::context;
 use crate::error;
 
@@ -17,7 +17,7 @@ pub struct ProfileService<'a> {
     state: &'a mut state::ApplicationState,
 }
 
-crate::impl_service!(ProfileService);
+crate::impl_app_context!(ProfileService);
 
 impl<'a> ProfileService<'a> {
     pub fn new(

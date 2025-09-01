@@ -6,7 +6,7 @@ pub mod profile;
 pub mod session;
 pub mod ui;
 
-pub trait Service {
+pub trait ApplicationContext {
     fn context(&mut self) -> Result<context::Context, crate::error::Error>;
 }
 

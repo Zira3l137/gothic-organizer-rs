@@ -16,6 +16,12 @@ impl std::fmt::Display for ErrorContext {
     }
 }
 
+impl<T: std::error::Error> From<T> for ErrorContext {
+    fn from(value: T) -> Self {
+        ErrorContext::from(Error::from(value))
+    }
+}
+
 impl From<Error> for ErrorContext {
     fn from(value: Error) -> Self {
         ErrorContext { error: value, timestamp: Local::now(), suggested_action: "N/A".to_string() }
@@ -87,15 +93,15 @@ pub enum Error {
     Other(ErrorData),
 }
 
-impl From<ErrorData> for Error {
-    fn from(info: ErrorData) -> Self {
-        Error::new(info.msg, info.source, info.operation)
+impl<T: std::error::Error> From<T> for Error {
+    fn from(value: T) -> Self {
+        Error::other(value.to_string(), "N/A".to_owned())
     }
 }
 
-impl From<std::io::Error> for Error {
-    fn from(err: std::io::Error) -> Self {
-        Error::file_system(err.to_string(), err.kind().to_string())
+impl From<ErrorData> for Error {
+    fn from(info: ErrorData) -> Self {
+        Error::new(info.msg, info.source, info.operation)
     }
 }
 

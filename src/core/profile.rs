@@ -65,11 +65,7 @@ pub struct Instance {
 }
 
 impl Instance {
-    pub fn new(
-        name: &str,
-        files: Option<Lookup<PathBuf, FileMetadata>>,
-        mods: Option<Vec<ModInfo>>,
-    ) -> Self {
+    pub fn new(name: &str, files: Option<Lookup<PathBuf, FileMetadata>>, mods: Option<Vec<ModInfo>>) -> Self {
         Self { name: name.to_owned(), files, overwrites: None, mods }
     }
 
@@ -106,12 +102,7 @@ pub struct ModInfo {
 }
 
 impl ModInfo {
-    pub fn new(
-        enabled: bool,
-        name: &str,
-        path: &Path,
-        files: Lookup<PathBuf, FileMetadata>,
-    ) -> Self {
+    pub fn new(enabled: bool, name: &str, path: &Path, files: Lookup<PathBuf, FileMetadata>) -> Self {
         Self { enabled, name: name.to_owned(), path: path.to_owned(), files }
     }
 
@@ -145,12 +136,7 @@ pub struct FileMetadata {
 }
 
 impl FileMetadata {
-    pub fn new(
-        enabled: bool,
-        source_path: &Path,
-        target_path: &Path,
-        parent_name: Option<String>,
-    ) -> Self {
+    pub fn new(enabled: bool, source_path: &Path, target_path: &Path, parent_name: Option<String>) -> Self {
         Self {
             enabled,
             source_path: source_path.to_owned(),

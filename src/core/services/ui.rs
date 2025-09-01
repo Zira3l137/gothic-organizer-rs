@@ -6,14 +6,14 @@ use crate::app::message;
 use crate::app::session;
 use crate::app::state;
 use crate::core;
-use crate::core::services::Service;
+use crate::core::services::ApplicationContext;
 
 pub struct UiService<'a> {
     session: &'a mut session::ApplicationSession,
     state: &'a mut state::ApplicationState,
 }
 
-crate::impl_service!(UiService);
+crate::impl_app_context!(UiService);
 
 impl<'a> UiService<'a> {
     pub fn new(session: &'a mut session::ApplicationSession, state: &'a mut state::ApplicationState) -> Self {
@@ -25,6 +25,10 @@ impl<'a> UiService<'a> {
     ///
     /// Emits an error message if the context could not be obtained.
     pub fn reload_displayed_directory(&mut self, root: Option<path::PathBuf>) -> Task<message::Message> {
+        if self.session.active_profile.is_none() {
+            return Task::none();
+        }
+
         let context = match self.context() {
             Ok(ctx) => ctx,
             Err(err) => {

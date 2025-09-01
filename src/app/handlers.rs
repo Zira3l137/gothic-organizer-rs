@@ -60,8 +60,7 @@ pub fn handle_mod_message(
             }
 
             let mut service = services::mods::ModService::new(session, state);
-            service.toggle_mod(name, new_state);
-            iced::Task::done(message::Message::UI(message::UiMessage::ReloadDirEntries))
+            service.toggle_mod(name, new_state)
         }
 
         message::ModMessage::Uninstall(name) => {
