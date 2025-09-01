@@ -153,10 +153,6 @@ impl<'a> ModService<'a> {
             };
 
             mods.retain(|info| info.name != mod_name);
-            if let Some(overwrites) = context.instance_overwrites_mut() {
-                overwrites.remove(&mod_name);
-            }
-
             return Task::batch(tasks);
         }
 
@@ -203,43 +199,37 @@ impl<'a> ModService<'a> {
         instance: &mut core::profile::Instance,
         profile_path: &path::Path,
         mod_info: &core::profile::ModInfo,
-        mod_enabled: bool,
+        enable: bool,
     ) {
-        if mod_enabled {
+        if enable {
             tracing::info!("Adding mod \"{}\"", mod_info.name);
         } else {
             tracing::info!("Removing mod \"{}\"", mod_info.name);
         };
 
         let instance_files = instance.files.get_or_insert_with(core::lookup::Lookup::new);
-        mod_info.files.iter().for_each(|(path, info)| {
+        mod_info.files.iter().for_each(|(path, file_info)| {
             let Ok(relative_path) = path.strip_prefix(&mod_info.path) else { return };
             let dst_path = profile_path.join(relative_path);
+            let instance_overwrites = instance.overridden_files.get_or_insert_with(Default::default);
 
-            if mod_enabled {
-                let new_info = info.clone().with_target_path(&dst_path);
-                let Some(existing_file) = instance_files.insert(dst_path.clone(), new_info) else {
+            if enable {
+                let new_info = file_info.clone().with_target_path(&dst_path);
+                let Some(existing_file) = instance_files.insert(dst_path.clone(), new_info.clone()) else {
                     return;
                 };
 
                 tracing::warn!("{} already exists, overwriting", dst_path.display());
-                instance
-                    .overwrites
-                    .get_or_insert_with(core::lookup::Lookup::new)
-                    .access
-                    .entry(mod_info.name.clone())
-                    .or_default()
-                    .insert(info.clone(), existing_file);
+                let override_list = instance_overwrites.entries.access.entry(dst_path.clone()).or_default();
+                if !override_list.contains(&existing_file) {
+                    override_list.push(existing_file);
+                }
+                override_list.push(new_info);
             } else {
                 instance_files.remove(&dst_path);
 
-                let Some(mod_overwrites) =
-                    instance.overwrites.as_mut().and_then(|o| o.get_mut(&mod_info.name))
-                else {
-                    return;
-                };
-
-                let Some(original_file) = mod_overwrites.remove(info) else {
+                let override_list = instance_overwrites.entries.access.entry(dst_path.clone()).or_default();
+                let Some(original_file) = override_list.pop() else {
                     return;
                 };
 

@@ -60,13 +60,13 @@ impl Profile {
 pub struct Instance {
     pub name: String,
     pub files: Option<Lookup<PathBuf, FileMetadata>>,
-    pub overwrites: Option<Lookup<String, Lookup<FileMetadata, FileMetadata>>>,
+    pub overridden_files: Option<OverriddenFiles>,
     pub mods: Option<Vec<ModInfo>>,
 }
 
 impl Instance {
     pub fn new(name: &str, files: Option<Lookup<PathBuf, FileMetadata>>, mods: Option<Vec<ModInfo>>) -> Self {
-        Self { name: name.to_owned(), files, overwrites: None, mods }
+        Self { name: name.to_owned(), files, overridden_files: None, mods }
     }
 
     pub fn with_name(mut self, name: &str) -> Self {
@@ -84,12 +84,35 @@ impl Instance {
         self
     }
 
-    pub fn with_overwrites(
-        mut self,
-        overwrites: Option<Lookup<String, Lookup<FileMetadata, FileMetadata>>>,
-    ) -> Self {
-        self.overwrites = overwrites;
+    pub fn with_overridden_files(mut self, overridden_files: Option<OverriddenFiles>) -> Self {
+        self.overridden_files = overridden_files;
         self
+    }
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct OverriddenFiles {
+    pub entries: Lookup<PathBuf, Vec<FileMetadata>>,
+}
+
+impl OverriddenFiles {
+    pub fn new<T>(entries: T) -> Self
+    where
+        T: Into<Lookup<PathBuf, Vec<FileMetadata>>>,
+    {
+        Self { entries: entries.into() }
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&PathBuf, &Vec<FileMetadata>)> {
+        self.entries.iter()
+    }
+
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = (&PathBuf, &mut Vec<FileMetadata>)> {
+        self.entries.iter_mut()
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
     }
 }
 

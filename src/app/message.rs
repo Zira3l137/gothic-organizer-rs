@@ -20,7 +20,6 @@ pub enum Message {
 pub enum ErrorMessage {
     Handle(crate::error::ErrorContext),
     Dismiss(uuid::Uuid),
-    ShowDetails(uuid::Uuid),
     ClearAll,
 }
 

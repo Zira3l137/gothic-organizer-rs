@@ -105,7 +105,6 @@ impl GothicOrganizer {
         if let Some((_, wnd_state)) = self.state.ui.windows.iter().find(|(wnd_id, _)| **wnd_id == Some(id)) {
             match wnd_state.name.as_str() {
                 "options" => crate::gui::options::options_view(self),
-                "overwrites" => crate::gui::overwrites::overwrites_view(self),
                 "logs" => crate::gui::logs::logs_view(self),
                 _ => crate::gui::editor::editor_view(self),
             }

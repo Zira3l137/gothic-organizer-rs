@@ -213,9 +213,6 @@ pub fn handle_window_message(
                 "options" => session_service
                     .invoke_window("options", None, Some(iced::Size { width: 768.0, height: 460.0 }))
                     .map(message::Message::from),
-                "overwrites" => session_service
-                    .invoke_window("overwrites", None, Some(iced::Size { width: 460.0, height: 768.0 }))
-                    .map(message::Message::from),
                 "logs" => session_service
                     .invoke_window("logs", None, Some(iced::Size { width: 768.0, height: 460.0 }))
                     .map(message::Message::from),
@@ -280,11 +277,6 @@ pub fn handle_error_message(
 
         message::ErrorMessage::Dismiss(error_id) => {
             state.errors.dismiss_error(error_id);
-            iced::Task::none()
-        }
-
-        message::ErrorMessage::ShowDetails(_error_id) => {
-            // TODO:  Could open a detailed error dialog
             iced::Task::none()
         }
 

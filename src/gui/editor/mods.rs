@@ -25,13 +25,6 @@ pub fn mods_menu<'a>(
     )
     .height(20)
     .width(20);
-    let icon_overwrites = svg_with_color!(
-        "./resources/overwrites.svg",
-        color_idle = palette_ext.primary.strong.text,
-        color_hovered = palette_ext.primary.strong.text
-    )
-    .height(20)
-    .width(20);
 
     let button_add_mod = styled_button!(
         icon_add,
@@ -41,16 +34,11 @@ pub fn mods_menu<'a>(
         disabled_background = palette_ext.success.weak.color,
     )
     .on_press(message::ModMessage::Add(None).into());
-    let button_overwrites =
-        widget::button(icon_overwrites).on_press(message::WindowMessage::Open("overwrites".into()).into());
 
-    let group_mod_controls = styled_container!(
-        widget::row!(button_add_mod, button_overwrites).spacing(10),
-        border_width = 1.0,
-        border_radius = 4.0
-    )
-    .padding(10)
-    .align_left(iced::Length::Fill);
+    let group_mod_controls =
+        styled_container!(widget::row!(button_add_mod).spacing(10), border_width = 1.0, border_radius = 4.0)
+            .padding(10)
+            .align_left(iced::Length::Fill);
 
     styled_container!(
         widget::column!(group_mod_controls, widget::scrollable(mods_view)),

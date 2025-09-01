@@ -43,14 +43,6 @@ impl<'ctx> Context<'ctx> {
         self.instance_mut(Some(&self.active_instance_name.clone()))?.mods.as_mut()
     }
 
-    pub fn instance_overwrites(&self) -> Option<&Overwrites> {
-        self.instance(Some(&self.active_instance_name))?.overwrites.as_ref()
-    }
-
-    pub fn instance_overwrites_mut(&mut self) -> Option<&mut Overwrites> {
-        self.instance_mut(Some(&self.active_instance_name.clone()))?.overwrites.as_mut()
-    }
-
     pub fn instance_files(&self) -> Option<&InstanceFiles> {
         self.instance(Some(&self.active_instance_name))?.files.as_ref()
     }
@@ -81,7 +73,7 @@ impl<'ctx> Context<'ctx> {
 
     pub fn clear_instance_overwrites(&mut self) {
         if let Some(instance) = self.instance_mut(Some(&self.active_instance_name.clone())) {
-            instance.overwrites = None;
+            instance.overridden_files = None;
         }
     }
 
@@ -94,12 +86,6 @@ impl<'ctx> Context<'ctx> {
     pub fn clear_instance_files(&mut self) {
         if let Some(instance) = self.instance_mut(Some(&self.active_instance_name.clone())) {
             instance.files = None;
-        }
-    }
-
-    pub fn set_instance_overwrites(&mut self, overwrites: Overwrites) {
-        if let Some(instance) = self.instance_mut(Some(&self.active_instance_name.clone())) {
-            instance.overwrites = Some(overwrites);
         }
     }
 
@@ -142,17 +128,6 @@ impl<'ctx> Context<'ctx> {
             return instances.remove(instance_name);
         }
         None
-    }
-
-    pub fn extend_instance_overwrites<T>(&mut self, overwrites: T)
-    where
-        T: IntoIterator<Item = (String, lookup::Lookup<profile::FileMetadata, profile::FileMetadata>)>,
-    {
-        if let Some(instance) = self.instance_mut(Some(&self.active_instance_name.clone())) {
-            if let Some(o) = instance.overwrites.as_mut() {
-                o.extend(overwrites)
-            }
-        }
     }
 
     pub fn extend_instance_mods<T>(&mut self, mods: T)
