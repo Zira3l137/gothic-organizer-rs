@@ -13,9 +13,7 @@ pub fn app_title_full() -> String {
 }
 
 pub fn app_info() -> String {
-    format!(
-        "{APP_TITLE}\nVersion: {APP_VERSION}\nAuthors: {APP_AUTHORS}\nRepository: {APP_REPOSITORY}"
-    )
+    format!("{APP_TITLE}\nVersion: {APP_VERSION}\nAuthors: {APP_AUTHORS}\nRepository: {APP_REPOSITORY}")
 }
 
 pub fn local_app_data_path() -> PathBuf {
@@ -32,12 +30,6 @@ pub fn local_app_data_path() -> PathBuf {
 
 pub fn local_profiles_path() -> PathBuf {
     local_app_data_path().join(APP_NAME)
-}
-
-pub fn default_mod_storage_path() -> PathBuf {
-    let exe_path = std::env::current_exe().unwrap();
-    let exe_dir = exe_path.parent().unwrap();
-    exe_dir.join("mods")
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

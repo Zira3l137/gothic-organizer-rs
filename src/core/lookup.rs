@@ -49,6 +49,29 @@ where
         self.access.is_empty()
     }
 
+    /// Gets the given key's corresponding entry in the underlying map for in-place manipulation.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use lookup::Lookup;
+    ///
+    /// let mut letters = Lookup::new();
+    ///
+    /// "a wrapper around hashbrown, because why not".chars().for_each(|ch| {
+    ///     let counter = letters.entry(ch).or_insert(0);
+    ///     *counter += 1;
+    /// });
+    ///
+    /// assert_eq!(letters[&'s'], 2);
+    /// assert_eq!(letters[&'t'], 3);
+    /// assert_eq!(letters[&'u'], 1);
+    /// assert_eq!(letters.get(&'y'), None);
+    /// ```
+    pub fn entry(&mut self, key: K) -> hashbrown::hash_map::Entry<K, V, ahash::RandomState> {
+        self.access.entry(key)
+    }
+
     /// Inserts a key-value pair into internal map.
     ///
     /// If the map did not have this key present, [`None`] is returned.

@@ -40,7 +40,9 @@ impl<'a> UiService<'a> {
         let profile_path = context.active_profile.path.clone();
         let instance_files = context.instance_files().cloned();
 
-        let root_dir = root.unwrap_or_else(|| profile_path.clone());
+        tracing::info!("PROFILE_PATH: \"{}\"", profile_path.display());
+        tracing::info!("ROOT: {:?}", root);
+        let root_dir = root.unwrap_or(profile_path.clone());
         let mut current_directory_entries: Vec<(path::PathBuf, core::profile::FileMetadata)>;
 
         if let Some(instance_files) = instance_files {
@@ -59,7 +61,7 @@ impl<'a> UiService<'a> {
 
         current_directory_entries.sort_unstable_by_key(|(path, _)| !path.is_dir());
 
-        tracing::info!("Reloading directory entries for UI");
+        tracing::info!("Reloading entries for UI from: \"{}\"", root_dir.display());
         self.state.ui.current_dir = root_dir.clone();
         self.state.ui.dir_entries = current_directory_entries;
 

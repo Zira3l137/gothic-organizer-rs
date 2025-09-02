@@ -112,7 +112,10 @@ impl<'a> ProfileService<'a> {
             .filter_map(|e| match e {
                 Ok(e) if e.path() != profile_path => Some((
                     e.path().to_path_buf(),
-                    profile::FileMetadata::default().with_source_path(e.path()).with_enabled(true),
+                    profile::FileMetadata::default()
+                        .with_source_path(e.path())
+                        .with_target_path(e.path())
+                        .with_enabled(true),
                 )),
                 _ => None,
             })
