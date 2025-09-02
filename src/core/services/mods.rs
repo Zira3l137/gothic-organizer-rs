@@ -34,11 +34,7 @@ impl<'a> ModService<'a> {
     ///     4. If mod file is invalid.
     ///     5. If failed to move mod to storage.
     pub fn add_mod(&mut self, mod_source_path: Option<path::PathBuf>) -> Task<message::Message> {
-        let current_mod_storage_dir = self
-            .session
-            .mod_storage_dir
-            .clone()
-            .unwrap_or(crate::core::constants::default_mod_storage_path());
+        let mut current_mod_storage_dir = self.session.mod_storage_dir.clone().unwrap_or_default();
 
         let mut context = match self.context() {
             Ok(ctx) => ctx,
@@ -47,6 +43,18 @@ impl<'a> ModService<'a> {
                 return Task::done(message::ErrorMessage::Handle(err.into()).into());
             }
         };
+
+        if !current_mod_storage_dir.exists() {
+            let default_path =
+                crate::core::constants::local_profiles_path().join(&context.active_profile.name).join("mods");
+            if !default_path.exists() {
+                if let Err(e) = std::fs::create_dir_all(&default_path) {
+                    tracing::error!("Failed to create default mod storage directory: {e}");
+                    return Task::done(message::ErrorMessage::Handle(e.into()).into());
+                }
+                current_mod_storage_dir = default_path;
+            }
+        }
 
         let profile_name = context.active_profile.name.clone();
         let instance_name = context.active_instance_name.clone();
@@ -201,37 +209,42 @@ impl<'a> ModService<'a> {
         mod_info: &core::profile::ModInfo,
         enable: bool,
     ) {
-        if enable {
-            tracing::info!("Adding mod \"{}\"", mod_info.name);
-        } else {
-            tracing::info!("Removing mod \"{}\"", mod_info.name);
-        };
-
         let instance_files = instance.files.get_or_insert_with(core::lookup::Lookup::new);
-        mod_info.files.iter().for_each(|(path, file_info)| {
+        mod_info.files.iter().for_each(|(path, mod_file_info)| {
+            let instance_overwrites = instance.overridden_files.get_or_insert_with(Default::default);
             let Ok(relative_path) = path.strip_prefix(&mod_info.path) else { return };
             let dst_path = profile_path.join(relative_path);
-            let instance_overwrites = instance.overridden_files.get_or_insert_with(Default::default);
 
             if enable {
-                let new_info = file_info.clone().with_target_path(&dst_path);
-                let Some(existing_file) = instance_files.insert(dst_path.clone(), new_info.clone()) else {
+                let target_file_info = mod_file_info.clone().with_target_path(&dst_path);
+                let Some(existing_file_info) =
+                    instance_files.insert(dst_path.clone(), target_file_info.clone())
+                else {
                     return;
                 };
 
                 tracing::warn!("{} already exists, overwriting", dst_path.display());
-                let override_list = instance_overwrites.entries.access.entry(dst_path.clone()).or_default();
-                if !override_list.contains(&existing_file) {
-                    override_list.push(existing_file);
+                let override_list = instance_overwrites.entries.entry(dst_path.clone()).or_default();
+                if !override_list.contains(&existing_file_info) {
+                    override_list.push(existing_file_info);
                 }
-                override_list.push(new_info);
+                override_list.push(target_file_info);
             } else {
-                instance_files.remove(&dst_path);
+                let override_list = instance_overwrites.entries.entry(dst_path.clone()).or_default();
 
-                let override_list = instance_overwrites.entries.access.entry(dst_path.clone()).or_default();
+                let Some(removed_file_info) = instance_files.remove(&dst_path) else {
+                    tracing::warn!("{} not found in instance", mod_info.path.join(relative_path).display());
+                    return;
+                };
+
+                override_list.retain(|f| f != &removed_file_info);
                 let Some(original_file) = override_list.pop() else {
                     return;
                 };
+
+                if override_list.is_empty() {
+                    instance_overwrites.entries.remove(&dst_path);
+                }
 
                 tracing::info!("Restoring original {}", dst_path.display());
                 instance_files.insert(dst_path, original_file);
@@ -307,10 +320,7 @@ impl<'a> ModService<'a> {
 
         let dst_dir = storage_dir.join(mod_name);
         if dst_dir.exists() {
-            return Err(error::Error::from(std::io::Error::new(
-                std::io::ErrorKind::AlreadyExists,
-                "Mod already exists",
-            )));
+            return Err(error::Error::new("Mod already exists", "Mods Service", "Move Mod to Storage"));
         }
 
         std::fs::create_dir_all(&dst_dir)?;
@@ -332,7 +342,11 @@ impl<'a> ModService<'a> {
         profile_name: &str,
         instance_name: &str,
     ) -> PathBuf {
-        mod_storage_dir.to_path_buf().join(profile_name).join(instance_name)
+        let mut base_path = mod_storage_dir.to_path_buf();
+        if !base_path.components().any(|c| c.as_os_str() == profile_name) {
+            base_path = base_path.join(profile_name);
+        }
+        base_path.join(instance_name)
     }
 
     /// Checks if mod source is valid and returns error message if not.
