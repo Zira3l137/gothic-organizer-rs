@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::app::session;
 use crate::core::constants;
-use crate::core::lookup::Lookup;
 use crate::core::profile;
+use crate::core::profile::Lookup;
 use crate::error;
 use crate::gui::options;
 use crate::load_profile;
@@ -92,7 +92,7 @@ pub struct ErrorState {
 impl std::default::Default for ErrorState {
     fn default() -> Self {
         Self {
-            active_errors: Lookup::new(),
+            active_errors: Lookup::default(),
             error_history: Vec::new(),
             notifications_enabled: true,
             max_history_size: 100,

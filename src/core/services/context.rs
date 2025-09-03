@@ -2,13 +2,13 @@
 
 use std::path;
 
-use crate::core::lookup;
 use crate::core::profile;
+use crate::core::profile::Lookup;
 
-type Overwrites = lookup::Lookup<String, lookup::Lookup<profile::FileMetadata, profile::FileMetadata>>;
+type Overwrites = Lookup<String, Lookup<profile::FileMetadata, profile::FileMetadata>>;
 type Mods = Vec<profile::ModInfo>;
-type Instances = lookup::Lookup<String, profile::Instance>;
-type InstanceFiles = lookup::Lookup<path::PathBuf, profile::FileMetadata>;
+type Instances = Lookup<String, profile::Instance>;
+type InstanceFiles = Lookup<path::PathBuf, profile::FileMetadata>;
 
 #[derive(Debug)]
 pub struct Context<'ctx> {
@@ -115,7 +115,7 @@ impl<'ctx> Context<'ctx> {
         if let Some(instances) = self.instances_mut() {
             instances.insert(instance.name.clone(), instance)
         } else {
-            self.active_profile.instances = Some(Instances::new());
+            self.active_profile.instances = Some(Instances::default());
             self.active_profile.instances.as_mut().map(|i| i.insert(instance.name.clone(), instance));
             None
         }

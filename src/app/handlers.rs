@@ -2,6 +2,7 @@ use crate::app::message;
 use crate::app::session;
 use crate::app::state;
 use crate::core::constants;
+use crate::core::profile::Lookup;
 use crate::core::services;
 use crate::lookup;
 
@@ -201,7 +202,7 @@ pub fn handle_window_message(
                 .windows
                 .iter()
                 .filter_map(|(id, info)| (!info.is_closed).then_some((info.name.clone(), id.unwrap())))
-                .collect::<crate::core::lookup::Lookup<_, _>>();
+                .collect::<Lookup<_, _>>();
 
             let mut session_service = services::session::SessionService::new(session, state);
 

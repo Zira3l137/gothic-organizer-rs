@@ -2,8 +2,8 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use crate::core::lookup;
 use crate::core::profile;
+use crate::core::profile::Lookup;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ApplicationSession {
@@ -13,7 +13,7 @@ pub struct ApplicationSession {
     pub active_zspy_config: Option<ZspyConfig>,
     pub mod_storage_dir: Option<PathBuf>,
     pub theme_selected: Option<String>,
-    pub files: lookup::Lookup<PathBuf, profile::FileMetadata>,
+    pub files: Lookup<PathBuf, profile::FileMetadata>,
     pub launch_options: Option<GameLaunchConfiguration>,
     pub error_notifications_enabled: bool,
 }
@@ -49,7 +49,7 @@ pub struct GameSettings {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct ParserSettings {
-    pub commands: lookup::Lookup<ParserCommand, bool>,
+    pub commands: Lookup<ParserCommand, bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]

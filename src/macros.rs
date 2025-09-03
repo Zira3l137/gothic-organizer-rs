@@ -244,7 +244,7 @@ macro_rules! impl_app_context {
 macro_rules! lookup {
     [($($key: expr => $value: expr),*)] => {
         {
-            let mut lookup = $crate::core::lookup::Lookup::new();
+            let mut lookup = $crate::core::profile::Lookup::default();
             $(
                 lookup.insert($key, $value);
             )*

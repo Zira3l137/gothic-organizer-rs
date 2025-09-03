@@ -8,6 +8,7 @@ use crate::app::message;
 use crate::app::session;
 use crate::app::state;
 use crate::core;
+use crate::core::profile::Lookup;
 use crate::core::services::ApplicationContext;
 use crate::error;
 
@@ -118,7 +119,7 @@ impl<'a> ModService<'a> {
                 Ok(e) if e.path() != mod_path => Some((e.path().to_path_buf(), get_file_info(e.path()))),
                 _ => None,
             })
-            .collect::<core::lookup::Lookup<path::PathBuf, core::profile::FileMetadata>>();
+            .collect::<Lookup<path::PathBuf, core::profile::FileMetadata>>();
 
         let new_mod_info = core::profile::ModInfo::default()
             .with_enabled(true)
@@ -209,9 +210,9 @@ impl<'a> ModService<'a> {
         mod_info: &core::profile::ModInfo,
         enable: bool,
     ) {
-        let instance_files = instance.files.get_or_insert_with(core::lookup::Lookup::new);
+        let instance_files = instance.files.get_or_insert_default();
         mod_info.files.iter().for_each(|(path, mod_file_info)| {
-            let instance_overwrites = instance.overridden_files.get_or_insert_with(Default::default);
+            let instance_overwrites = instance.overridden_files.get_or_insert_default();
             let Ok(relative_path) = path.strip_prefix(&mod_info.path) else { return };
             let dst_path = profile_path.join(relative_path);
 

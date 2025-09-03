@@ -6,8 +6,8 @@ use crate::app::message;
 use crate::app::session;
 use crate::app::state;
 use crate::core;
-use crate::core::lookup;
 use crate::core::profile;
+use crate::core::profile::Lookup;
 use crate::core::services::ApplicationContext;
 use crate::core::services::context;
 use crate::error;
@@ -119,7 +119,7 @@ impl<'a> ProfileService<'a> {
                 )),
                 _ => None,
             })
-            .collect::<lookup::Lookup<path::PathBuf, profile::FileMetadata>>();
+            .collect::<Lookup<path::PathBuf, profile::FileMetadata>>();
 
         let new_instance =
             core::profile::Instance::default().with_name(&instance_name).with_files(Some(base_files));

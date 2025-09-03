@@ -2,7 +2,7 @@ use iced::Task;
 
 use crate::app::message;
 use crate::app::state;
-use crate::core::lookup;
+use crate::core::profile::Lookup;
 use crate::error;
 use crate::save_app_session;
 use crate::save_profile;
@@ -57,7 +57,7 @@ impl<'a> SessionService<'a> {
             .windows
             .iter()
             .map(|(_, wnd_state)| (wnd_state.name.as_str(), wnd_state))
-            .collect::<lookup::Lookup<_, _>>();
+            .collect::<Lookup<_, _>>();
         if windows.iter().all(|(_, wnd_state)| wnd_state.is_closed)
             || windows.get("editor").unwrap().is_closed
         {

@@ -3,7 +3,7 @@
 use std::path::Path;
 use std::path::PathBuf;
 
-use crate::core::lookup::Lookup;
+pub type Lookup<K, V> = hashbrown::HashMap<K, V, ahash::RandomState>;
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Profile {
@@ -34,7 +34,7 @@ impl Profile {
 
     pub fn add_instance(&mut self, instance: Instance) {
         if let Some(instances) = self.instances.as_mut() {
-            match instances.access.entry(instance.name.clone()) {
+            match instances.entry(instance.name.clone()) {
                 hashbrown::hash_map::Entry::Occupied(mut entry) => {
                     let mut_value = entry.get_mut();
                     mut_value.name = instance.name;
@@ -45,13 +45,13 @@ impl Profile {
                 }
             }
         } else {
-            self.instances = Some(Lookup::from(vec![(instance.name.clone(), instance)]));
+            self.instances = Some(std::iter::once((instance.name.clone(), instance)).collect());
         }
     }
 
     pub fn remove_instance(&mut self, instance_name: &str) {
         if let Some(instances) = self.instances.as_mut() {
-            instances.access.remove(instance_name);
+            instances.remove(instance_name);
         }
     }
 }

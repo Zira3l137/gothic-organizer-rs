@@ -2,7 +2,7 @@ use iced::widget;
 
 use crate::app::message;
 use crate::app::session;
-use crate::core::lookup::Lookup;
+use crate::core::profile::Lookup;
 use crate::styled_container;
 
 fn parser_settings(
@@ -14,7 +14,7 @@ fn parser_settings(
     let mut container_bg_color = palette_ext.primary.weak.color;
     container_bg_color.a = 0.3;
 
-    let mut parser_settings: Lookup<session::ParserCommand, bool> = Lookup::new();
+    let mut parser_settings: Lookup<session::ParserCommand, bool> = Lookup::default();
     if let Some(launch_options) = launch_options {
         parser_settings = launch_options.parser_settings.commands.clone();
     }
