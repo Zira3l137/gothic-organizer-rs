@@ -18,6 +18,8 @@ struct CliArgs {
     verbosity: Option<LevelFilter>,
     #[clap(short, long, default_value = None)]
     log_file: Option<PathBuf>,
+    #[clap(short, long, default_value = None)]
+    user_data_dir: Option<PathBuf>,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -27,6 +29,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     daemon(app::GothicOrganizer::WINDOW_TITLE, app::GothicOrganizer::update, app::GothicOrganizer::view)
         .theme(|state, _| app::GothicOrganizer::theme(state))
         .subscription(app::GothicOrganizer::subscription)
-        .run_with(app::GothicOrganizer::new)?;
+        .run_with(move || app::GothicOrganizer::new(args.user_data_dir))?;
     Ok(())
 }

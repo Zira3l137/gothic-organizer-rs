@@ -23,6 +23,18 @@ pub struct ApplicationState {
     pub errors: ErrorState,
 }
 
+impl ApplicationState {
+    pub fn new(user_data_dir: PathBuf) -> Self {
+        Self {
+            ui: UiState::default(),
+            profile: ProfileState::new(user_data_dir),
+            mod_management: ModState::default(),
+            settings: SettingsState::default(),
+            errors: ErrorState::default(),
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct UiState {
     pub current_dir: PathBuf,
@@ -41,10 +53,32 @@ pub struct ProfileState {
     pub instance_choices: combo_box::State<String>,
 }
 
+impl ProfileState {
+    pub fn new(user_data_dir: PathBuf) -> Self {
+        Self {
+            profiles: constants::DefaultProfile::into_iter()
+                .map(|profile_name| {
+                    let name_str = (*profile_name).to_string();
+                    let profile = load_profile!(&name_str, Some(&user_data_dir))
+                        .unwrap_or_else(|| profile::Profile::default().with_name(&name_str));
+                    (name_str, profile)
+                })
+                .collect(),
+
+            profile_choices: iced::widget::combo_box::State::new(
+                constants::DefaultProfile::into_iter().map(|p| p.to_string()).collect(),
+            ),
+            instance_choices: Default::default(),
+            instance_name_field: String::new(),
+            profile_dir_field: String::new(),
+        }
+    }
+}
+
 impl std::default::Default for ProfileState {
     fn default() -> Self {
         Self {
-            profiles: constants::Profile::into_iter()
+            profiles: constants::DefaultProfile::into_iter()
                 .map(|profile_name| {
                     let name_str = (*profile_name).to_string();
                     let profile = load_profile!(&name_str)
@@ -54,7 +88,7 @@ impl std::default::Default for ProfileState {
                 .collect(),
 
             profile_choices: iced::widget::combo_box::State::new(
-                constants::Profile::into_iter().map(|p| p.to_string()).collect(),
+                constants::DefaultProfile::into_iter().map(|p| p.to_string()).collect(),
             ),
             instance_choices: Default::default(),
             instance_name_field: String::new(),

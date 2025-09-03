@@ -23,13 +23,13 @@ impl<'a> SessionService<'a> {
     /// Attempts to serialize and save all profile states and the current application session.
     ///
     /// Emits error messages for each failed save operation.
-    pub fn save_current_session(&self) -> Task<message::Message> {
+    pub fn save_current_session(&self, user_data_dir: Option<&std::path::Path>) -> Task<message::Message> {
         let mut profile_saving_error_tasks: Vec<Task<message::Message>> = vec![Task::none()];
         let mut session_save_error_task: Task<message::Message> = Task::none();
 
         self.state.profile.profiles.values().for_each(|p| {
             tracing::info!("Saving profile: {}", p.name);
-            if let Err(e) = save_profile!(p) {
+            if let Err(e) = save_profile!(p, user_data_dir) {
                 tracing::error!("Failed saving {} profile: {e}", p.name);
                 profile_saving_error_tasks.push(Task::done(
                     message::ErrorMessage::Handle(error::ErrorContext::from(error::Error::from(e))).into(),
@@ -38,7 +38,7 @@ impl<'a> SessionService<'a> {
         });
 
         tracing::info!("Saving session");
-        if let Err(e) = save_app_session!(self.session) {
+        if let Err(e) = save_app_session!(self.session, self.session.custom_user_data_path.as_deref()) {
             tracing::error!("Failed saving session: {e}");
             session_save_error_task = Task::done(
                 message::ErrorMessage::Handle(error::ErrorContext::from(error::Error::from(e))).into(),
@@ -62,7 +62,8 @@ impl<'a> SessionService<'a> {
             || windows.get("editor").unwrap().is_closed
         {
             tracing::info!("Exiting application");
-            return self.save_current_session().chain(iced::exit());
+            let custom_path = self.session.custom_user_data_path.as_deref();
+            return self.save_current_session(custom_path).chain(iced::exit());
         }
 
         iced::Task::none()

@@ -17,9 +17,14 @@ impl GothicOrganizer {
     pub const WINDOW_TITLE: &str = "Gothic Organizer";
     pub const WINDOW_SIZE: (f32, f32) = (768.0, 768.0);
 
-    pub fn new() -> (Self, iced::Task<message::Message>) {
-        let mut state = state::ApplicationState::default();
-        let mut session = load_app_session!().unwrap_or_default();
+    pub fn new(user_data_dir: Option<std::path::PathBuf>) -> (Self, iced::Task<message::Message>) {
+        let mut state = match user_data_dir.clone() {
+            Some(path) => state::ApplicationState::new(path),
+            None => state::ApplicationState::default(),
+        };
+
+        let mut session = load_app_session!(user_data_dir.as_deref()).unwrap_or_default();
+        session.custom_user_data_path = user_data_dir;
         Self::initialize_state(&mut session, &mut state);
 
         let app = Self { session, state };

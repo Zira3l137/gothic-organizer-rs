@@ -3,7 +3,10 @@ use iced::widget;
 use crate::app::message;
 use crate::svg_with_color;
 
-#[derive(Default, Debug, Clone, Copy, PartialEq)]
+use derive_more::Display;
+
+#[derive(Default, Debug, Clone, Copy, PartialEq, Display)]
+#[display("{}", _variant)]
 pub enum OptionsMenu {
     #[default]
     Config,
@@ -17,16 +20,6 @@ impl IntoIterator for OptionsMenu {
 
     fn into_iter(self) -> Self::IntoIter {
         [OptionsMenu::Config, OptionsMenu::Launch, OptionsMenu::About].into_iter()
-    }
-}
-
-impl std::fmt::Display for OptionsMenu {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            OptionsMenu::Config => write!(f, "Config"),
-            OptionsMenu::Launch => write!(f, "Launch"),
-            OptionsMenu::About => write!(f, "About"),
-        }
     }
 }
 

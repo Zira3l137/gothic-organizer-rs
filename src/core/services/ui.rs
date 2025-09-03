@@ -40,8 +40,6 @@ impl<'a> UiService<'a> {
         let profile_path = context.active_profile.path.clone();
         let instance_files = context.instance_files().cloned();
 
-        tracing::info!("PROFILE_PATH: \"{}\"", profile_path.display());
-        tracing::info!("ROOT: {:?}", root);
         let root_dir = root.unwrap_or(profile_path.clone());
         let mut current_directory_entries: Vec<(path::PathBuf, core::profile::FileMetadata)>;
 

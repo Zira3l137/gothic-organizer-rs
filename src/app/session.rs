@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use derive_more::Display;
 use serde::{Deserialize, Serialize};
 
 use crate::core::profile;
@@ -7,6 +8,7 @@ use crate::core::profile::Lookup;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ApplicationSession {
+    pub custom_user_data_path: Option<PathBuf>,
     pub active_profile: Option<String>,
     pub active_instance: Option<String>,
     pub active_renderer_backend: Option<RendererBackend>,
@@ -21,6 +23,7 @@ pub struct ApplicationSession {
 impl std::default::Default for ApplicationSession {
     fn default() -> Self {
         Self {
+            custom_user_data_path: None,
             active_profile: None,
             active_instance: None,
             active_renderer_backend: None,
@@ -58,7 +61,8 @@ pub struct ZspyConfig {
     pub verbosity: ZSpyVerbosity,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, Display)]
+#[display("{}", _variant)]
 pub enum ZSpyVerbosity {
     #[default]
     Off,
@@ -93,32 +97,12 @@ impl From<u8> for ZSpyVerbosity {
     }
 }
 
-impl std::fmt::Display for ZSpyVerbosity {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ZSpyVerbosity::Off => write!(f, "Off"),
-            ZSpyVerbosity::Low => write!(f, "Low"),
-            ZSpyVerbosity::Medium => write!(f, "Medium"),
-            ZSpyVerbosity::High => write!(f, "High"),
-            ZSpyVerbosity::All => write!(f, "All"),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default, Display)]
+#[display("{}", _variant)]
 pub enum RendererBackend {
     #[default]
     D3D8,
     D3D11,
-}
-
-impl std::fmt::Display for RendererBackend {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            RendererBackend::D3D8 => write!(f, "D3D8"),
-            RendererBackend::D3D11 => write!(f, "D3D11"),
-        }
-    }
 }
 
 impl RendererBackend {
@@ -128,7 +112,8 @@ impl RendererBackend {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default, Hash, Display)]
+#[display("{}", _variant)]
 pub enum ParserCommand {
     #[default]
     Game,
@@ -139,21 +124,6 @@ pub enum ParserCommand {
     Camera,
     Menu,
     Music,
-}
-
-impl std::fmt::Display for ParserCommand {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ParserCommand::Game => write!(f, "Game"),
-            ParserCommand::Ou => write!(f, "Ou"),
-            ParserCommand::Sfx => write!(f, "Sfx"),
-            ParserCommand::Pfx => write!(f, "Pfx"),
-            ParserCommand::Vfx => write!(f, "Vfx"),
-            ParserCommand::Camera => write!(f, "Camera"),
-            ParserCommand::Menu => write!(f, "Menu"),
-            ParserCommand::Music => write!(f, "Music"),
-        }
-    }
 }
 
 impl ParserCommand {

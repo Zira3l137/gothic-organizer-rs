@@ -1,19 +1,15 @@
 #![allow(dead_code)]
 use chrono::DateTime;
 use chrono::Local;
+use derive_more::Display;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Display)]
+#[display("{}, {}", timestamp.format("%Y-%m-%d %H:%M:%S"), error)]
 pub struct ErrorContext {
     pub error: Error,
     pub timestamp: DateTime<Local>,
     pub suggested_action: String,
-}
-
-impl std::fmt::Display for ErrorContext {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}, {}", self.timestamp.format("%Y-%m-%d %H:%M:%S"), self.error)
-    }
 }
 
 impl<T: std::error::Error> From<T> for ErrorContext {
@@ -84,7 +80,8 @@ impl ErrorContextBuilder {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Display)]
+#[display("{}, During \"{}\" - {}", _0.source, _0.operation, _0.msg)]
 pub enum Error {
     Service(ErrorData),
     FileSystem(ErrorData),
@@ -102,19 +99,6 @@ impl<T: std::error::Error> From<T> for Error {
 impl From<ErrorData> for Error {
     fn from(info: ErrorData) -> Self {
         Error::new(info.msg, info.source, info.operation)
-    }
-}
-
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let format_error = |e: &ErrorData| format!("{}: During \"{}\" - {}", e.source, e.operation, e.msg);
-        match self {
-            Error::Service(info) => write!(f, "{}", format_error(info)),
-            Error::FileSystem(info) => write!(f, "{}", format_error(info)),
-            Error::System(info) => write!(f, "{}", format_error(info)),
-            Error::External(info) => write!(f, "{}", format_error(info)),
-            Error::Other(info) => write!(f, "{}", format_error(info)),
-        }
     }
 }
 
@@ -206,7 +190,8 @@ impl Error {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Display)]
+#[display("{}, {}, {}", msg, source, operation)]
 pub struct ErrorData {
     pub msg: String,
     pub source: String,
