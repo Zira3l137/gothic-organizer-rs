@@ -123,7 +123,7 @@ impl<'a> ProfileService<'a> {
     }
 
     fn try_remove_instance(&mut self) -> Result<(), ErrorContext> {
-        self.validate_context("Remove Instance")?;
+        self.validate_context("Remove Instance", false)?;
         let active_profile_name = &self.session.active_profile.clone().unwrap();
         let active_profile = self.state.profile.profiles.get_mut(active_profile_name).unwrap();
         let active_profile_instances = active_profile.instances.get_or_insert_default();
@@ -152,7 +152,7 @@ impl<'a> ProfileService<'a> {
     }
 
     fn try_switch_profile(&mut self, profile_name: &str) -> Result<(), ErrorContext> {
-        if self.session.active_profile.is_some() {
+        if self.session.active_instance.is_some() {
             self.try_commit_changes()?;
         }
 
@@ -168,12 +168,14 @@ impl<'a> ProfileService<'a> {
             if !next_profile.path.as_os_str().is_empty() {
                 tracing::warn!("Active profile has no path.");
             }
-        }
 
-        Err(ErrorContext::builder()
-            .error(error::Error::new("Profile not found", "Mods Service", "Switch"))
-            .suggested_action("Make sure to select a valid profile")
-            .build())
+            Ok(())
+        } else {
+            Err(ErrorContext::builder()
+                .error(error::Error::new("Profile not found", "Profile Service", "Switch"))
+                .suggested_action("Make sure to select a valid profile")
+                .build())
+        }
     }
 
     fn try_switch_instance(&mut self, instance_name: &str) -> Result<(), ErrorContext> {
@@ -187,7 +189,7 @@ impl<'a> ProfileService<'a> {
     }
 
     fn try_commit_changes(&mut self) -> Result<(), ErrorContext> {
-        self.validate_context("Commit Changes")?;
+        self.validate_context("Commit Changes", false)?;
         let active_profile_name = &self.session.active_profile.clone().unwrap();
         let active_profile = self.state.profile.profiles.get_mut(active_profile_name).unwrap();
         let active_instance_name = &self.session.active_instance.clone().unwrap();
@@ -226,7 +228,25 @@ impl<'a> ProfileService<'a> {
                 _ => None,
             }
         }));
-        self.try_commit_changes()?;
+
+        if self.session.active_instance.is_some() {
+            self.try_commit_changes()?;
+        }
+
+        Ok(())
+    }
+
+    fn try_set_mods_dir(&mut self, path: &Path) -> Result<(), ErrorContext> {
+        self.validate_context("Set Mods Dir", false)?;
+
+        tracing::info!("Setting mod storage directory to: {}", path.display());
+        self.session.mod_storage_dir = Some(path.to_path_buf());
+        std::fs::create_dir_all(path).map_err(|err| {
+            error::ErrorContext::builder()
+                .error(err.into())
+                .suggested_action("Check directory write permissions")
+                .build()
+        })?;
 
         Ok(())
     }
@@ -250,32 +270,17 @@ impl<'a> ProfileService<'a> {
         core::profile::Instance::default().with_name(name).with_files(Some(base_files))
     }
 
-    fn try_set_mods_dir(&mut self, path: &Path) -> Result<(), ErrorContext> {
-        self.validate_context("Set Mods Dir")?;
-
-        tracing::info!("Setting mod storage directory to: {}", path.display());
-        self.session.mod_storage_dir = Some(path.to_path_buf());
-        std::fs::create_dir_all(path).map_err(|err| {
-            error::ErrorContext::builder()
-                .error(err.into())
-                .suggested_action("Check directory write permissions")
-                .build()
-        })?;
-
-        Ok(())
-    }
-
-    fn validate_context(&self, operation: &str) -> Result<(), ErrorContext> {
+    fn validate_context(&self, operation: &str, ignore_instance: bool) -> Result<(), ErrorContext> {
         if self.session.active_profile.is_none() {
             Err(ErrorContext::builder()
                 .error(error::Error::new("No active profile", "Profile Service", operation))
                 .suggested_action("Select a profile and try again")
                 .build())
-        } else if self.session.active_instance.is_none() {
-            return Err(ErrorContext::builder()
+        } else if !ignore_instance && self.session.active_instance.is_none() {
+            Err(ErrorContext::builder()
                 .error(error::Error::new("No active instance", "Profile Service", operation))
                 .suggested_action("Select an instance and try again")
-                .build());
+                .build())
         } else {
             Ok(())
         }

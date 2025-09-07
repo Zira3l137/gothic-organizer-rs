@@ -63,6 +63,7 @@ pub fn instance_controls<'a>(
         };
         Some(message::ProfileMessage::AddInstance.into())
     });
+
     let button_remove_message = current_profile.and_then(|p| {
         if no_profile_path(p) {
             return None;

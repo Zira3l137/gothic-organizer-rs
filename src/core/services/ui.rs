@@ -27,9 +27,10 @@ impl<'a> UiService<'a> {
     }
 
     fn try_reload_displayed_directory(&mut self, root: Option<&Path>) -> Result<(), ErrorContext> {
-        if self.session.active_profile.is_none() {
+        if self.session.active_profile.is_none() || self.session.active_instance.is_none() {
             return Ok(());
         }
+
         let active_profile_name = &self.session.active_profile.clone().unwrap();
         let active_profile = self.state.profile.profiles.get_mut(active_profile_name).unwrap();
         let active_instance_name = &self.session.active_instance.clone().unwrap();

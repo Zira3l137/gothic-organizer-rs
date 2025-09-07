@@ -64,15 +64,13 @@ impl<'a> ModService<'a> {
     }
 
     fn try_add_mod(&mut self, mod_path: &Path) -> Result<(), ErrorContext> {
-        self.validate_context("Add")?;
+        self.validate_context("Add", false)?;
         Self::validate_mod(mod_path)?;
 
-        let mod_storage_dir = self.get_mod_storage_dir();
         let mod_name = Self::get_mod_name(mod_path)?;
-        tracing::info!("Installing mod \"{}\"", mod_name);
-
+        let mod_storage_dir = self.get_mod_storage_dir();
         let mod_dst_path = mod_storage_dir.join(&mod_name);
-        Self::install_mod(mod_path, &mod_dst_path)?;
+        tracing::info!("Installing mod \"{}\"", mod_name);
 
         let mod_info = self.get_mod_info(&mod_dst_path, &mod_name)?;
         let active_profile_name = self.session.active_profile.clone().unwrap();
@@ -81,7 +79,14 @@ impl<'a> ModService<'a> {
         let active_profile_path = active_profile.path.clone();
         let active_instance =
             active_profile.instances.as_mut().unwrap().get_mut(&active_instance_name).unwrap();
+        let active_instance_mods = active_instance.mods.get_or_insert_default();
 
+        if active_instance_mods.iter().any(|m| m.name == mod_name) {
+            tracing::warn!("Mod \"{}\" is already installed", mod_name);
+            return Ok(());
+        }
+
+        Self::install_mod(mod_path, &mod_dst_path)?;
         Self::apply_mod_files(
             active_instance.files.get_or_insert_default(),
             active_instance.conflicts.get_or_insert_default(),
@@ -94,7 +99,7 @@ impl<'a> ModService<'a> {
     }
 
     fn try_remove_mod(&mut self, index: usize) -> Result<(), ErrorContext> {
-        self.validate_context("Remove")?;
+        self.validate_context("Remove", false)?;
         let active_profile_name = &self.session.active_profile.clone().unwrap();
         let active_profile = self.state.profile.profiles.get_mut(active_profile_name).unwrap();
         let active_instance_name = &self.session.active_instance.clone().unwrap();
@@ -136,7 +141,7 @@ impl<'a> ModService<'a> {
     }
 
     fn try_toggle_mod(&mut self, mod_index: usize, enabled: bool) -> Result<(), ErrorContext> {
-        self.validate_context("Toggle")?;
+        self.validate_context("Toggle", false)?;
         let active_profile_name = &self.session.active_profile.clone().unwrap();
         let active_profile = self.state.profile.profiles.get_mut(active_profile_name).unwrap();
         let active_instance_name = &self.session.active_instance.clone().unwrap();
@@ -160,13 +165,16 @@ impl<'a> ModService<'a> {
     }
 
     fn try_reload_mods(&mut self) -> Result<(), ErrorContext> {
-        self.validate_context("Reload")?;
+        if self.session.active_profile.is_none() || self.session.active_instance.is_none() {
+            return Ok(());
+        }
+
         let active_profile_name = self.session.active_profile.clone().unwrap();
         let active_instance_name = self.session.active_instance.clone().unwrap();
         let active_profile = self.state.profile.profiles.get_mut(&active_profile_name).unwrap();
         let active_instance =
             active_profile.instances.as_mut().unwrap().get_mut(&active_instance_name).unwrap();
-        let active_instance_mods = active_instance.mods.as_mut().unwrap();
+        let active_instance_mods = active_instance.mods.get_or_insert_default();
         let profile_path = active_profile.path.clone();
 
         for mod_info in active_instance_mods.iter().filter(|m| m.enabled) {
@@ -332,13 +340,13 @@ impl<'a> ModService<'a> {
         Ok(())
     }
 
-    fn validate_context(&self, operation: &str) -> Result<(), ErrorContext> {
+    fn validate_context(&self, operation: &str, ignore_instance: bool) -> Result<(), ErrorContext> {
         if self.session.active_profile.is_none() {
             Err(ErrorContext::builder()
                 .error(error::Error::new("No active profile", "Mods Service", operation))
                 .suggested_action("Select a profile and try again")
                 .build())
-        } else if self.session.active_instance.is_none() {
+        } else if !ignore_instance && self.session.active_instance.is_none() {
             return Err(ErrorContext::builder()
                 .error(error::Error::new("No active instance", "Mods Service", operation))
                 .suggested_action("Select an instance and try again")
