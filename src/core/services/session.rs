@@ -1,8 +1,8 @@
 use iced::Task;
 
 use crate::app::message;
-use crate::app::state;
-use crate::core::profile::Lookup;
+use crate::app::window::ApplicationWindow;
+use crate::app::window::WindowInfo;
 use crate::error;
 use crate::save_app_session;
 use crate::save_profile;
@@ -51,16 +51,19 @@ impl<'a> SessionService<'a> {
     /// Exits the application if all windows are closed or if the editor window is closed otherwise
     /// does nothing.
     pub fn exit_application(&mut self) -> Task<message::Message> {
-        let windows = self
-            .state
-            .ui
-            .windows
-            .iter()
-            .map(|(_, wnd_state)| (wnd_state.name.as_str(), wnd_state))
-            .collect::<Lookup<_, _>>();
-        if windows.iter().all(|(_, wnd_state)| wnd_state.is_closed)
-            || windows.get("editor").unwrap().is_closed
-        {
+        let mut main_window_closed = true;
+        let mut all_closed = true;
+
+        self.state.ui.windows.iter().for_each(|(_, wnd_info)| {
+            if !wnd_info.is_closed {
+                if let ApplicationWindow::Editor = wnd_info.window_type {
+                    main_window_closed = false;
+                }
+                all_closed = false;
+            }
+        });
+
+        if all_closed || main_window_closed {
             tracing::info!("Exiting application");
             let custom_path = self.session.custom_user_data_path.as_deref();
             return self.save_current_session(custom_path).chain(iced::exit());
@@ -71,9 +74,9 @@ impl<'a> SessionService<'a> {
 
     /// Closes the window with the given id. Exits the application if all windows are closed.
     pub fn close_window(&mut self, wnd_id: &iced::window::Id) -> Task<message::Message> {
-        if let Some(wnd_state) = self.state.ui.windows.get_mut(&Some(*wnd_id)) {
-            tracing::info!("Closing window: {}", wnd_state.name);
-            wnd_state.is_closed = true;
+        if let Some(wnd_info) = self.state.ui.windows.get_mut(wnd_id) {
+            tracing::info!("Closing window: {}", wnd_info.window_type);
+            wnd_info.is_closed = true;
         }
 
         iced::Task::chain(
@@ -83,29 +86,23 @@ impl<'a> SessionService<'a> {
     }
 
     /// Initializes the editor window. Reloads the directory entries for UI upon completion.
-    pub fn init_window(&mut self) -> Task<message::Message> {
-        let wnd_size = crate::app::GothicOrganizer::WINDOW_SIZE;
-        self.invoke_window("editor", None, Some(iced::Size { width: wnd_size.0, height: wnd_size.1 }))
+    pub fn init_main_window(&mut self) -> Task<message::Message> {
+        self.invoke_window(&ApplicationWindow::Editor)
             .chain(Task::done(message::UiMessage::ReloadDirEntries.into()))
     }
 
     /// Creates a new window with the given name, position and size.
-    pub fn invoke_window(
-        &mut self,
-        name: &str,
-        position: Option<iced::window::Position>,
-        size: Option<iced::Size>,
-    ) -> Task<message::Message> {
+    pub fn invoke_window(&mut self, window: &ApplicationWindow) -> Task<message::Message> {
         let (id, task) = iced::window::open(iced::window::Settings {
-            position: position.unwrap_or(iced::window::Position::Centered),
-            size: size.unwrap_or(iced::Size { width: 512.0, height: 512.0 }),
+            position: window.default_position(),
+            size: window.default_size(),
             icon: iced::window::icon::from_file("./resources/icon.ico").ok(),
             exit_on_close_request: false,
             ..Default::default()
         });
 
-        tracing::info!("Opening window: {name}");
-        self.state.ui.windows.insert(Some(id), state::WindowInfo { name: name.to_owned(), is_closed: false });
+        tracing::info!("Opening window: {}", window.name());
+        self.state.ui.windows.insert(id, WindowInfo { window_type: *window, is_closed: false });
         task.then(|_| Task::none())
     }
 }

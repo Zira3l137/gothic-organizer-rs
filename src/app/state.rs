@@ -4,7 +4,6 @@ use std::path::PathBuf;
 
 use iced::widget::combo_box;
 use iced::window::Id;
-use serde::{Deserialize, Serialize};
 
 use crate::app::session;
 use crate::core::constants;
@@ -13,6 +12,8 @@ use crate::core::profile::Lookup;
 use crate::error;
 use crate::gui::options;
 use crate::load_profile;
+
+use super::window::WindowInfo;
 
 #[derive(Debug, Default)]
 pub struct ApplicationState {
@@ -41,7 +42,7 @@ pub struct UiState {
     pub dir_entries: Vec<(PathBuf, profile::FileMetadata)>,
     pub themes: Lookup<String, iced::Theme>,
     pub active_options_menu: options::menu::OptionsMenu,
-    pub windows: Lookup<Option<Id>, WindowInfo>,
+    pub windows: Lookup<Id, WindowInfo>,
 }
 
 #[derive(Debug)]
@@ -107,12 +108,6 @@ pub struct SettingsState {
     pub zspy_level_field: u8,
     pub theme_choices: combo_box::State<String>,
     pub renderer_choices: combo_box::State<session::RendererBackend>,
-}
-
-#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct WindowInfo {
-    pub name: String,
-    pub is_closed: bool,
 }
 
 #[derive(Debug)]

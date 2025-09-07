@@ -6,6 +6,7 @@ pub mod handlers;
 pub mod message;
 pub mod session;
 pub mod state;
+pub mod window;
 
 #[derive(Debug, Default)]
 pub struct GothicOrganizer {
@@ -14,9 +15,6 @@ pub struct GothicOrganizer {
 }
 
 impl GothicOrganizer {
-    pub const WINDOW_TITLE: &str = "Gothic Organizer";
-    pub const WINDOW_SIZE: (f32, f32) = (768.0, 768.0);
-
     pub fn new(user_data_dir: Option<std::path::PathBuf>) -> (Self, iced::Task<message::Message>) {
         let mut state = match user_data_dir.clone() {
             Some(path) => state::ApplicationState::new(path),
@@ -107,12 +105,8 @@ impl GothicOrganizer {
     }
 
     pub fn view(&self, id: iced::window::Id) -> iced::Element<message::Message> {
-        if let Some((_, wnd_state)) = self.state.ui.windows.iter().find(|(wnd_id, _)| **wnd_id == Some(id)) {
-            match wnd_state.name.as_str() {
-                "options" => crate::gui::options::options_view(self),
-                "logs" => crate::gui::logs::logs_view(self),
-                _ => crate::gui::editor::editor_view(self),
-            }
+        if let Some((_, wnd_state)) = self.state.ui.windows.iter().find(|(wnd_id, _)| **wnd_id == id) {
+            wnd_state.window_type.view(self)
         } else {
             iced::widget::container(iced::widget::text("Window not found")).into()
         }

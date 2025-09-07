@@ -202,34 +202,25 @@ pub fn handle_window_message(
             session_service.close_window(&wnd_id).map(message::Message::from)
         }
 
-        message::WindowMessage::Open(name) => {
+        message::WindowMessage::Open(window) => {
             let open_windows = state
                 .ui
                 .windows
                 .iter()
-                .filter_map(|(id, info)| (!info.is_closed).then_some((info.name.clone(), id.unwrap())))
+                .filter_map(|(id, info)| (!info.is_closed).then_some((info.window_type, *id)))
                 .collect::<Lookup<_, _>>();
 
             let mut session_service = services::session::SessionService::new(session, state);
-
-            if let Some(open_window_id) = open_windows.get(&name) {
+            if let Some(open_window_id) = open_windows.get(&window) {
                 return iced::Task::done(message::WindowMessage::Close(*open_window_id).into());
             }
 
-            match name.as_str() {
-                "options" => session_service
-                    .invoke_window("options", None, Some(iced::Size { width: 768.0, height: 460.0 }))
-                    .map(message::Message::from),
-                "logs" => session_service
-                    .invoke_window("logs", None, Some(iced::Size { width: 768.0, height: 460.0 }))
-                    .map(message::Message::from),
-                _ => iced::Task::none(),
-            }
+            session_service.invoke_window(&window).map(message::Message::from)
         }
 
         message::WindowMessage::Initialize => {
             let mut session_service = services::session::SessionService::new(session, state);
-            session_service.init_window().map(message::Message::from)
+            session_service.init_main_window().map(message::Message::from)
         }
     }
 }

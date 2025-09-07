@@ -2,6 +2,7 @@ use iced::alignment;
 use iced::widget;
 
 use crate::app::message;
+use crate::app::window::ApplicationWindow;
 use crate::core::constants;
 use crate::styled_container;
 use crate::svg_with_color;
@@ -29,8 +30,8 @@ pub fn header<'a>(
     )
     .height(20)
     .width(20);
-    let button_options =
-        widget::button(button_options_icon).on_press(message::WindowMessage::Open("options".into()).into());
+    let button_options = widget::button(button_options_icon)
+        .on_press(message::WindowMessage::Open(ApplicationWindow::Options).into());
 
     let (button_logs_color_idle, buton_logs_color_hovered) = match app.state.errors.active_errors.len() {
         0 => (palette_ext.primary.strong.text, palette_ext.primary.strong.text),
@@ -45,8 +46,8 @@ pub fn header<'a>(
     .height(20)
     .width(20);
 
-    let button_logs =
-        widget::button(button_logs_icon).on_press(message::WindowMessage::Open("logs".into()).into());
+    let button_logs = widget::button(button_logs_icon)
+        .on_press(message::WindowMessage::Open(ApplicationWindow::Logs).into());
 
     let header = widget::row!(title, widget::horizontal_space(), button_logs, button_options)
         .spacing(10)

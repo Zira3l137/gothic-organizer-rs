@@ -26,7 +26,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = CliArgs::parse();
     logger::setup_logger(args.verbosity.unwrap_or(LevelFilter::ERROR), args.log_file.as_deref())?;
 
-    daemon(app::GothicOrganizer::WINDOW_TITLE, app::GothicOrganizer::update, app::GothicOrganizer::view)
+    daemon(core::constants::APP_TITLE, app::GothicOrganizer::update, app::GothicOrganizer::view)
         .theme(|state, _| app::GothicOrganizer::theme(state))
         .subscription(app::GothicOrganizer::subscription)
         .run_with(move || app::GothicOrganizer::new(args.user_data_dir))?;

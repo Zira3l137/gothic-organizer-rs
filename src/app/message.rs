@@ -5,6 +5,8 @@ use std::path::PathBuf;
 use crate::app::session;
 use crate::gui::options;
 
+use super::window::ApplicationWindow;
+
 #[derive(Debug, Clone)]
 pub enum Message {
     Profile(ProfileMessage),
@@ -68,7 +70,7 @@ pub enum SettingsMessage {
 #[derive(Debug, Clone)]
 pub enum WindowMessage {
     Close(iced::window::Id),
-    Open(String),
+    Open(ApplicationWindow),
     Initialize,
 }
 
