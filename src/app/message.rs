@@ -37,11 +37,12 @@ pub enum ProfileMessage {
 #[derive(Debug, Clone)]
 pub enum ModMessage {
     Add(Option<PathBuf>),
-    Toggle(String, bool),
-    Uninstall(String),
-    Reload,
     SetModsDir(Option<PathBuf>),
+    Toggle(usize, bool),
+    ToggleSelection(usize),
+    Uninstall(usize),
     UpdateModsDirField(String),
+    Reload,
 }
 
 #[derive(Debug, Clone)]
@@ -73,7 +74,7 @@ pub enum WindowMessage {
 
 #[derive(Debug, Clone)]
 pub enum SystemMessage {
-    OpenRepository,
+    ExecuteCommand(String, Vec<String>),
     ExitApplication,
     Idle,
 }

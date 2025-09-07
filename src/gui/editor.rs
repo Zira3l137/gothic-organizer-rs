@@ -24,7 +24,7 @@ pub fn editor_view(app: &crate::app::GothicOrganizer) -> iced::Element<message::
     let header = header::header(app, palette_ext);
     let profile_controls = profile::profile_controls(app, palette_ext, current_profile);
     let files_menu = files::files_menu(app, palette_ext, current_profile, instance_selected);
-    let mods_menu = mods::mods_menu(palette_ext, instance_selected);
+    let mods_menu = mods::mods_menu(app, palette_ext, instance_selected);
     let workspace = container(row!(mods_menu, files_menu).spacing(10)).align_top(iced::Length::Fill);
 
     column![header, profile_controls, workspace].spacing(10).padding(10).into()

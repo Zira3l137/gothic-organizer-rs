@@ -60,13 +60,13 @@ impl Profile {
 pub struct Instance {
     pub name: String,
     pub files: Option<Lookup<PathBuf, FileMetadata>>,
-    pub overridden_files: Option<OverriddenFiles>,
+    pub conflicts: Option<Conflicts>,
     pub mods: Option<Vec<ModInfo>>,
 }
 
 impl Instance {
     pub fn new(name: &str, files: Option<Lookup<PathBuf, FileMetadata>>, mods: Option<Vec<ModInfo>>) -> Self {
-        Self { name: name.to_owned(), files, overridden_files: None, mods }
+        Self { name: name.to_owned(), files, conflicts: None, mods }
     }
 
     pub fn with_name(mut self, name: &str) -> Self {
@@ -84,18 +84,18 @@ impl Instance {
         self
     }
 
-    pub fn with_overridden_files(mut self, overridden_files: Option<OverriddenFiles>) -> Self {
-        self.overridden_files = overridden_files;
+    pub fn with_conflicts_files(mut self, conflicts_files: Option<Conflicts>) -> Self {
+        self.conflicts = conflicts_files;
         self
     }
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct OverriddenFiles {
+pub struct Conflicts {
     pub entries: Lookup<PathBuf, Vec<FileMetadata>>,
 }
 
-impl OverriddenFiles {
+impl Conflicts {
     pub fn new<T>(entries: T) -> Self
     where
         T: Into<Lookup<PathBuf, Vec<FileMetadata>>>,

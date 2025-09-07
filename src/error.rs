@@ -92,26 +92,30 @@ pub enum Error {
 
 impl<T: std::error::Error> From<T> for Error {
     fn from(value: T) -> Self {
-        Error::other(value.to_string(), "N/A".to_owned())
+        Error::other(value.to_string(), "N/A")
     }
 }
 
 impl From<ErrorData> for Error {
     fn from(info: ErrorData) -> Self {
-        Error::new(info.msg, info.source, info.operation)
+        Error::new(info.msg, &info.source, &info.operation)
     }
 }
 
 impl Error {
-    pub fn new<S: Into<String>>(msg: S, source: S, operation: S) -> Error {
-        Error::Other(ErrorData { msg: msg.into(), source: source.into(), operation: operation.into() })
+    pub fn new<S: Into<String>>(msg: S, source: &str, operation: &str) -> Error {
+        Error::Other(ErrorData {
+            msg: msg.into(),
+            source: source.to_owned(),
+            operation: operation.to_owned(),
+        })
     }
 
-    pub fn other<S: Into<String>>(msg: S, operation: S) -> Error {
+    pub fn other<S: Into<String>>(msg: S, operation: &str) -> Error {
         Error::Other(ErrorData { msg: msg.into(), source: "Unknown".into(), operation: operation.into() })
     }
 
-    pub fn mods_service<S: Into<String>>(msg: S, operation: S) -> Error {
+    pub fn mods_service<S: Into<String>>(msg: S, operation: &str) -> Error {
         Error::Service(ErrorData {
             msg: msg.into(),
             source: "Mods Service".into(),
@@ -119,7 +123,7 @@ impl Error {
         })
     }
 
-    pub fn profile_service<S: Into<String>>(msg: S, operation: S) -> Error {
+    pub fn profile_service<S: Into<String>>(msg: S, operation: &str) -> Error {
         Error::Service(ErrorData {
             msg: msg.into(),
             source: "Profile Service".into(),
@@ -127,7 +131,7 @@ impl Error {
         })
     }
 
-    pub fn session_service<S: Into<String>>(msg: S, operation: S) -> Error {
+    pub fn session_service<S: Into<String>>(msg: S, operation: &str) -> Error {
         Error::Service(ErrorData {
             msg: msg.into(),
             source: "Session Service".into(),
@@ -135,7 +139,7 @@ impl Error {
         })
     }
 
-    pub fn ui_service<S: Into<String>>(msg: S, operation: S) -> Error {
+    pub fn ui_service<S: Into<String>>(msg: S, operation: &str) -> Error {
         Error::Service(ErrorData {
             msg: msg.into(),
             source: "UI Service".into(),
@@ -143,7 +147,7 @@ impl Error {
         })
     }
 
-    pub fn file_system<S: Into<String>>(msg: S, operation: S) -> Error {
+    pub fn file_system<S: Into<String>>(msg: S, operation: &str) -> Error {
         Error::FileSystem(ErrorData {
             msg: msg.into(),
             source: "File System".into(),
@@ -151,11 +155,11 @@ impl Error {
         })
     }
 
-    pub fn system<S: Into<String>>(msg: S, operation: S) -> Error {
+    pub fn system<S: Into<String>>(msg: S, operation: &str) -> Error {
         Error::System(ErrorData { msg: msg.into(), source: "System".into(), operation: operation.into() })
     }
 
-    pub fn external<S: Into<String>>(msg: S, operation: S) -> Error {
+    pub fn external<S: Into<String>>(msg: S, operation: &str) -> Error {
         Error::External(ErrorData { msg: msg.into(), source: "External".into(), operation: operation.into() })
     }
 

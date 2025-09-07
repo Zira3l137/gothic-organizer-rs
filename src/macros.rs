@@ -211,36 +211,6 @@ macro_rules! load_profile {
 }
 
 #[macro_export]
-macro_rules! impl_app_context {
-    ($service:ident) => {
-        impl ApplicationContext for $service<'_> {
-            /// Returns error if failed to get active profile or if active profile is invalid.
-            fn context(&mut self) -> Result<$crate::core::services::context::Context, $crate::error::Error> {
-                let profile = self
-                    .session
-                    .active_profile
-                    .as_mut()
-                    .ok_or_else(|| {
-                        $crate::error::Error::profile_service("Failed to get active profile", "Get Context")
-                    })
-                    .and_then(|p| {
-                        self.state.profile.profiles.get_mut(&p.clone()).ok_or_else(|| {
-                            $crate::error::Error::profile_service(
-                                "Invalid active profile".to_string(),
-                                "Get Context".to_string(),
-                            )
-                        })
-                    })?;
-
-                let instance_name = self.session.active_instance.clone().unwrap_or_default();
-
-                Ok($crate::core::services::context::Context::new(profile, &instance_name))
-            }
-        }
-    };
-}
-
-#[macro_export]
 macro_rules! lookup {
     [($($key: expr => $value: expr),*)] => {
         {

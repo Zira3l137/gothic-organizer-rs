@@ -9,6 +9,12 @@ pub const APP_AUTHORS: &str = env!("CARGO_PKG_AUTHORS");
 pub const APP_REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
 pub const APP_TITLE: &str = "Gothic Organizer";
 
+#[cfg(target_os = "windows")]
+pub const OPEN_PATH_COMMAND: &str = "explorer";
+
+#[cfg(target_os = "linux")]
+pub const OPEN_PATH_COMMAND: &str = "xdg-open";
+
 pub fn app_title_full() -> String {
     format!("{APP_TITLE} v{APP_VERSION}")
 }
@@ -27,10 +33,6 @@ pub fn local_app_data_path() -> PathBuf {
     {
         PathBuf::from(std::env::var("XDG_DATA_HOME").unwrap_or(String::from("~/.local/share")))
     }
-}
-
-pub fn local_profiles_path() -> PathBuf {
-    local_app_data_path().join(APP_NAME)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Display)]

@@ -8,13 +8,14 @@ use crate::core::profile::Lookup;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ApplicationSession {
-    pub custom_user_data_path: Option<PathBuf>,
     pub active_profile: Option<String>,
     pub active_instance: Option<String>,
     pub active_renderer_backend: Option<RendererBackend>,
     pub active_zspy_config: Option<ZspyConfig>,
-    pub mod_storage_dir: Option<PathBuf>,
+    pub mod_selected: Option<usize>,
     pub theme_selected: Option<String>,
+    pub custom_user_data_path: Option<PathBuf>,
+    pub mod_storage_dir: Option<PathBuf>,
     pub files: Lookup<PathBuf, profile::FileMetadata>,
     pub launch_options: Option<GameLaunchConfiguration>,
     pub error_notifications_enabled: bool,
@@ -23,13 +24,14 @@ pub struct ApplicationSession {
 impl std::default::Default for ApplicationSession {
     fn default() -> Self {
         Self {
-            custom_user_data_path: None,
             active_profile: None,
             active_instance: None,
             active_renderer_backend: None,
             active_zspy_config: None,
-            mod_storage_dir: None,
+            mod_selected: None,
             theme_selected: None,
+            custom_user_data_path: None,
+            mod_storage_dir: None,
             files: Default::default(),
             launch_options: None,
             error_notifications_enabled: true,

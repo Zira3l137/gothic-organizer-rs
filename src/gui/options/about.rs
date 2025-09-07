@@ -5,6 +5,7 @@ use iced::widget;
 use crate::app::message;
 use crate::clickable_text;
 use crate::core::constants;
+use crate::core::constants::OPEN_PATH_COMMAND;
 use crate::styled_container;
 use crate::svg_with_color;
 
@@ -24,7 +25,13 @@ pub fn about_menu<'a>(palette_ext: &palette::Extended) -> iced::Element<'a, mess
     let link = widget::row![
         widget::text!("Repository: "),
         clickable_text!("{}", constants::APP_REPOSITORY)
-            .on_press(message::SystemMessage::OpenRepository.into())
+            .on_press(
+                message::SystemMessage::ExecuteCommand(
+                    OPEN_PATH_COMMAND.to_owned(),
+                    vec![constants::APP_REPOSITORY.to_owned()]
+                )
+                .into()
+            )
             .color(palette_ext.primary.base.color)
             .color_hovered(palette_ext.primary.strong.color)
     ];

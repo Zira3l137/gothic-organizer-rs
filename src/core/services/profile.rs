@@ -1,4 +1,5 @@
 use std::path;
+use std::path::Path;
 
 use iced::Task;
 
@@ -8,16 +9,13 @@ use crate::app::state;
 use crate::core;
 use crate::core::profile;
 use crate::core::profile::Lookup;
-use crate::core::services::ApplicationContext;
-use crate::core::services::context;
 use crate::error;
+use crate::error::ErrorContext;
 
 pub struct ProfileService<'a> {
     session: &'a mut session::ApplicationSession,
     state: &'a mut state::ApplicationState,
 }
-
-crate::impl_app_context!(ProfileService);
 
 impl<'a> ProfileService<'a> {
     pub fn new(
@@ -27,22 +25,135 @@ impl<'a> ProfileService<'a> {
         Self { session, state: app_state }
     }
 
-    /// Switch profile to `profile_name` after comitting session files for the current one.
-    ///
-    /// Emits error message if failed to commit session files.
+    pub fn add_instance(&mut self) -> Task<message::Message> {
+        let new_instance_name = self.state.profile.instance_name_field.clone();
+        match self.try_add_instance(&new_instance_name) {
+            Ok(()) => self.switch_instance(&new_instance_name),
+            Err(err) => Task::done(message::ErrorMessage::Handle(err).into()),
+        }
+    }
+
+    pub fn remove_instance(&mut self) -> Task<message::Message> {
+        match self.try_remove_instance() {
+            Ok(()) => Task::none(),
+            Err(err) => Task::done(message::ErrorMessage::Handle(err).into()),
+        }
+    }
+
     pub fn switch_profile(&mut self, profile_name: &str) -> Task<message::Message> {
-        let mut tasks: Vec<iced::Task<message::Message>> = Vec::new();
-        if let Err(err) = self.commit_session_files() {
-            tracing::error!("Failed to commit session files: {err}");
-            tasks.push(Task::done(
-                message::ErrorMessage::Handle(
-                    error::ErrorContext::builder()
-                        .error(err)
-                        .suggested_action("Make sure the active profile is selected and valid")
-                        .build(),
-                )
-                .into(),
-            ));
+        match self.try_switch_profile(profile_name) {
+            Ok(()) => Task::done(message::UiMessage::ReloadDirEntries.into()),
+            Err(err) => Task::done(message::ErrorMessage::Handle(err).into()),
+        }
+    }
+
+    pub fn switch_instance(&mut self, instance_name: &str) -> Task<message::Message> {
+        match self.try_switch_instance(instance_name) {
+            Ok(()) => Task::done(message::UiMessage::ReloadDirEntries.into()),
+            Err(err) => Task::done(message::ErrorMessage::Handle(err).into()),
+        }
+    }
+
+    pub fn commit_session_files(&mut self) -> Task<message::Message> {
+        match self.try_commit_changes() {
+            Ok(()) => Task::none(),
+            Err(err) => Task::done(message::ErrorMessage::Handle(err).into()),
+        }
+    }
+
+    pub fn set_game_dir(&mut self, path: Option<path::PathBuf>) -> Task<message::Message> {
+        let Some(path) =
+            path.or_else(|| rfd::FileDialog::new().set_title("Select game directory").pick_folder())
+        else {
+            tracing::warn!("No path selected");
+            return Task::none();
+        };
+
+        match self.try_set_game_dir(&path) {
+            Ok(_) => Task::batch(vec![
+                Task::done(message::ModMessage::Reload.into()),
+                Task::done(message::UiMessage::ReloadDirEntries.into()),
+                Task::done(message::ProfileMessage::UpdateProfileDirField(path.display().to_string()).into()),
+            ]),
+            Err(err) => Task::done(message::ErrorMessage::Handle(err).into()),
+        }
+    }
+
+    pub fn set_mods_dir(&mut self, path: Option<path::PathBuf>) -> Task<message::Message> {
+        let Some(path) =
+            path.or_else(|| rfd::FileDialog::new().set_title("Select mod storage directory").pick_folder())
+        else {
+            tracing::warn!("No path selected");
+            return Task::none();
+        };
+
+        match self.try_set_mods_dir(&path) {
+            Ok(_) => Task::batch([
+                Task::done(message::UiMessage::ReloadDirEntries.into()),
+                Task::done(message::ModMessage::UpdateModsDirField(path.display().to_string()).into()),
+            ]),
+            Err(err) => Task::done(message::ErrorMessage::Handle(err).into()),
+        }
+    }
+
+    fn try_add_instance(&mut self, instance_name: &str) -> Result<(), ErrorContext> {
+        if self.session.active_profile.is_none() {
+            tracing::warn!("No active profile");
+            return Ok(());
+        }
+
+        let active_profile_name = &self.session.active_profile.clone().unwrap();
+        let active_profile = self.state.profile.profiles.get_mut(active_profile_name).unwrap();
+        let active_profile_instances = active_profile.instances.get_or_insert_default();
+        let profile_path = active_profile.path.clone();
+
+        if active_profile_instances.contains_key(instance_name) {
+            tracing::warn!("Instance already exists: {instance_name}");
+            return Ok(());
+        }
+
+        let new_instance = Self::create_new_instance(instance_name, &profile_path);
+        tracing::info!("Adding instance: {instance_name}");
+        active_profile_instances.insert(instance_name.to_owned(), new_instance);
+        let instance_names = active_profile_instances.keys().cloned().collect();
+        self.state.profile.instance_choices = iced::widget::combo_box::State::new(instance_names);
+        self.state.profile.instance_name_field.clear();
+
+        Ok(())
+    }
+
+    fn try_remove_instance(&mut self) -> Result<(), ErrorContext> {
+        self.validate_context("Remove Instance")?;
+        let active_profile_name = &self.session.active_profile.clone().unwrap();
+        let active_profile = self.state.profile.profiles.get_mut(active_profile_name).unwrap();
+        let active_profile_instances = active_profile.instances.get_or_insert_default();
+        let active_instance_name = &self.session.active_instance.clone().unwrap();
+
+        tracing::info!("Removing instance: {active_instance_name}",);
+        let instance_names: Option<Vec<String>>;
+        if active_profile_instances.remove(active_instance_name).is_none() {
+            tracing::warn!("Tried to remove instance that does not exist: {active_instance_name}");
+            return Ok(());
+        };
+
+        if active_profile_instances.is_empty() {
+            active_profile.instances = None;
+            instance_names = None;
+        } else {
+            instance_names = Some(active_profile_instances.keys().cloned().collect::<Vec<String>>());
+        }
+
+        self.state.profile.instance_choices =
+            iced::widget::combo_box::State::new(instance_names.unwrap_or_default());
+        self.state.profile.instance_name_field.clear();
+        self.session.active_instance = None;
+
+        Ok(())
+    }
+
+    fn try_switch_profile(&mut self, profile_name: &str) -> Result<(), ErrorContext> {
+        if self.session.active_profile.is_some() {
+            self.try_commit_changes()?;
         }
 
         if let Some(next_profile) = self.state.profile.profiles.get(profile_name) {
@@ -54,63 +165,78 @@ impl<'a> ProfileService<'a> {
                 next_profile.instances.as_ref().map(|i| i.keys().cloned().collect()).unwrap_or_default();
 
             self.state.profile.instance_choices = iced::widget::combo_box::State::new(instances);
-
             if !next_profile.path.as_os_str().is_empty() {
-                tracing::info!("Reloading UI files.");
-                tasks.push(Task::done(message::UiMessage::ReloadDirEntries.into()));
+                tracing::warn!("Active profile has no path.");
             }
         }
 
-        Task::batch(tasks)
+        Err(ErrorContext::builder()
+            .error(error::Error::new("Profile not found", "Mods Service", "Switch"))
+            .suggested_action("Make sure to select a valid profile")
+            .build())
     }
 
-    /// Extend session with file state from UI and write to instance.
-    /// Returns error if failed to get context.
-    pub fn commit_session_files(&mut self) -> Result<(), error::Error> {
-        if self.session.active_profile.is_none() {
-            return Ok(());
+    fn try_switch_instance(&mut self, instance_name: &str) -> Result<(), ErrorContext> {
+        if self.session.active_instance.is_some() {
+            self.try_commit_changes()?;
         }
 
-        tracing::info!("Updating Session with UI files.");
-        self.session.files.extend(self.state.ui.dir_entries.iter().cloned());
-
-        let cached_files = self.session.files.clone();
-        let mut context = self.context()?;
-
-        tracing::info!("Updating Instance with Session files.");
-        context.set_instance_files(Some(cached_files));
+        tracing::info!("Switching to instance: {instance_name}");
+        self.session.active_instance = Some(instance_name.to_owned());
         Ok(())
     }
 
-    /// Add new instance for active profile and populate it with base files from profile path.
-    /// Does nothing if instance name is empty, instance with that name already exists or profile
-    /// is invalid.
-    ///
-    /// After adding instance, switch to it.
-    ///
-    /// Emits error message if failed to get context.
-    pub fn add_instance_for_profile(&mut self) -> Task<message::Message> {
-        let instance_name = self.state.profile.instance_name_field.clone();
-        let mut context: context::Context;
-        match self.context() {
-            Ok(ctx) => context = ctx,
-            Err(err) => {
-                tracing::error!("Failed to get context: {err}");
-                return Task::done(message::ErrorMessage::Handle(err.into()).into());
+    fn try_commit_changes(&mut self) -> Result<(), ErrorContext> {
+        self.validate_context("Commit Changes")?;
+        let active_profile_name = &self.session.active_profile.clone().unwrap();
+        let active_profile = self.state.profile.profiles.get_mut(active_profile_name).unwrap();
+        let active_instance_name = &self.session.active_instance.clone().unwrap();
+        let active_instance =
+            active_profile.instances.as_mut().unwrap().get_mut(active_instance_name).unwrap();
+
+        tracing::info!("Updating Session with UI files.");
+        self.session.files.extend(self.state.ui.dir_entries.iter().cloned());
+        let cached_files = self.session.files.clone();
+
+        tracing::info!("Updating Instance with Session files.");
+        active_instance.files = Some(cached_files);
+        Ok(())
+    }
+
+    fn try_set_game_dir(&mut self, path: &Path) -> Result<(), ErrorContext> {
+        if self.session.active_profile.is_none() {
+            tracing::warn!("No active profile");
+            return Ok(());
+        }
+
+        tracing::info!("Setting game directory to: {}", path.display());
+        let active_profile_name = &self.session.active_profile.clone().unwrap();
+        let active_profile = self.state.profile.profiles.get_mut(active_profile_name).unwrap();
+
+        active_profile.path = path.to_path_buf();
+        self.state.ui.current_dir = path.to_path_buf();
+        self.session.files.clear();
+
+        self.session.files.extend(ignore::WalkBuilder::new(path).ignore(false).build().filter_map(|entry| {
+            match entry {
+                Ok(e) if e.path() != path => Some((
+                    e.path().to_path_buf(),
+                    core::profile::FileMetadata::default().with_source_path(e.path()).with_enabled(true),
+                )),
+                _ => None,
             }
-        }
+        }));
+        self.try_commit_changes()?;
 
-        let profile_path = context.active_profile.path.clone();
-        if instance_name.is_empty() {
-            tracing::warn!("Instance name is empty");
-            return Task::none();
-        }
+        Ok(())
+    }
 
-        let base_files = ignore::WalkBuilder::new(&profile_path)
+    fn create_new_instance(name: &str, base_path: &Path) -> core::profile::Instance {
+        let base_files = ignore::WalkBuilder::new(base_path)
             .ignore(false)
             .build()
             .filter_map(|e| match e {
-                Ok(e) if e.path() != profile_path => Some((
+                Ok(e) if e.path() != base_path => Some((
                     e.path().to_path_buf(),
                     profile::FileMetadata::default()
                         .with_source_path(e.path())
@@ -121,173 +247,37 @@ impl<'a> ProfileService<'a> {
             })
             .collect::<Lookup<path::PathBuf, profile::FileMetadata>>();
 
-        let new_instance =
-            core::profile::Instance::default().with_name(&instance_name).with_files(Some(base_files));
-
-        if context.contains_instance(&instance_name) {
-            tracing::warn!("Instance name already exists");
-            return Task::none();
-        }
-
-        tracing::info!("Adding instance: {instance_name}");
-        context.insert_instance(new_instance);
-        self.state.profile.instance_choices = iced::widget::combo_box::State::new(context.instance_names());
-        self.state.profile.instance_name_field.clear();
-
-        self.switch_instance(&instance_name)
+        core::profile::Instance::default().with_name(name).with_files(Some(base_files))
     }
 
-    /// Remove instance from profile if it exists, clear active instance choice and update UI. Does nothing if instance does not exist.
-    ///
-    /// Emits error message if failed to get context.
-    pub fn remove_instance_from_profile(&mut self) -> Task<message::Message> {
-        let mut context: context::Context;
-        match self.context() {
-            Ok(ctx) => context = ctx,
-            Err(err) => {
-                tracing::error!("Failed to get context: {err}");
-                return Task::done(message::ErrorMessage::Handle(err.into()).into());
-            }
-        }
-
-        let active_instance_name = context.active_instance_name.clone();
-        tracing::info!("Removing instance: {active_instance_name}",);
-
-        if context.remove_instance(&active_instance_name).is_none() {
-            tracing::warn!("Tried to remove instance that does not exist: {active_instance_name}");
-            return Task::none();
-        };
-        if context.instances_empty() {
-            context.active_profile.instances = None;
-        }
-
-        self.state.profile.instance_choices = iced::widget::combo_box::State::new(context.instance_names());
-        self.state.profile.instance_name_field.clear();
-        self.session.active_instance = None;
-        Task::none()
-    }
-
-    /// Switch active instance to `instance_name` after comitting session files for the current one.
-    ///
-    /// Emits error message if failed to commit session files.
-    pub fn switch_instance(&mut self, instance_name: &str) -> Task<message::Message> {
-        if let Err(err) = self.commit_session_files() {
-            tracing::error!("Failed to commit session files: {err}");
-            return Task::done(
-                message::ErrorMessage::Handle(
-                    error::ErrorContext::builder()
-                        .error(err)
-                        .suggested_action("Make sure the active profile is selected and valid")
-                        .build(),
-                )
-                .into(),
-            );
-        }
-
-        tracing::info!("Switching to instance: {instance_name}");
-        self.session.active_instance = Some(instance_name.to_owned());
-        tracing::info!("Reloading UI files.");
-        Task::done(message::UiMessage::ReloadDirEntries.into())
-    }
-
-    /// Set game directory for active profile and reload mods and UI files. Does nothing if path is
-    /// empty.
-    ///
-    /// Emits error message if failed to get context or failed to commit session files.
-    pub fn set_game_dir(&mut self, path: Option<path::PathBuf>) -> Task<message::Message> {
-        let mut tasks: Vec<iced::Task<message::Message>> = Vec::new();
-        let mut context: context::Context;
-        match self.context() {
-            Ok(ctx) => context = ctx,
-            Err(err) => {
-                tracing::error!("Failed to get context: {err}");
-                return Task::done(message::ErrorMessage::Handle(err.into()).into());
-            }
-        }
-
-        let Some(path) = path.or_else(|| {
-            rfd::FileDialog::new()
-                .set_title(format!("Select {} directory", &context.active_profile.name))
-                .pick_folder()
-        }) else {
-            tracing::warn!("No path selected");
-            return Task::none();
-        };
-
-        tracing::info!("Setting game directory to: {}", path.display());
-        context.active_profile.path = path.clone();
-        context.set_instance_files(None);
-        self.state.ui.current_dir = path.clone();
-
-        self.session.files.clear();
-        self.session.files.extend(ignore::WalkBuilder::new(&path).ignore(false).build().filter_map(
-            |entry| match entry {
-                Ok(e) if e.path() != path => Some((
-                    e.path().to_path_buf(),
-                    core::profile::FileMetadata::default().with_source_path(e.path()).with_enabled(true),
-                )),
-                _ => None,
-            },
-        ));
-
-        if let Err(err) = self.commit_session_files() {
-            tracing::error!("Failed to commit session files: {err}");
-            tasks.push(Task::done(
-                message::ErrorMessage::Handle(
-                    error::ErrorContext::builder()
-                        .error(err)
-                        .suggested_action("Make sure the active profile is selected and valid")
-                        .build(),
-                )
-                .into(),
-            ));
-        }
-
-        tracing::info!("Reloading mods");
-        tracing::info!("Reloading UI files.");
-        tasks.extend(vec![
-            Task::done(message::ModMessage::Reload.into()),
-            Task::done(message::UiMessage::ReloadDirEntries.into()),
-        ]);
-
-        Task::batch(tasks)
-    }
-
-    /// Set mod storage directory for active profile and reload UI files. Does nothing if path is
-    /// empty.
-    ///
-    /// Emits error message if failed to get context.
-    pub fn set_mods_dir(&mut self, path: Option<path::PathBuf>) -> Task<message::Message> {
-        let context = match self.context() {
-            Ok(ctx) => ctx,
-            Err(err) => {
-                tracing::error!("Failed to get context: {err}");
-                return Task::done(message::ErrorMessage::Handle(err.into()).into());
-            }
-        };
-
-        let Some(path) = path.or_else(|| {
-            rfd::FileDialog::new()
-                .set_title(format!("Select mod storage directory for {}", &context.active_profile.name))
-                .pick_folder()
-        }) else {
-            tracing::warn!("No path selected");
-            return Task::none();
-        };
+    fn try_set_mods_dir(&mut self, path: &Path) -> Result<(), ErrorContext> {
+        self.validate_context("Set Mods Dir")?;
 
         tracing::info!("Setting mod storage directory to: {}", path.display());
-        self.session.mod_storage_dir = Some(path.clone());
+        self.session.mod_storage_dir = Some(path.to_path_buf());
+        std::fs::create_dir_all(path).map_err(|err| {
+            error::ErrorContext::builder()
+                .error(err.into())
+                .suggested_action("Check directory write permissions")
+                .build()
+        })?;
 
-        match std::fs::create_dir_all(&path).map_err(|err| error::ErrorContext::from(error::Error::from(err)))
-        {
-            Ok(_) => {
-                tracing::info!("Reloading UI files.");
-                Task::done(message::UiMessage::ReloadDirEntries.into())
-            }
-            Err(err) => {
-                tracing::error!("Failed to create mod storage directory: {err}");
-                Task::done(message::ErrorMessage::Handle(err).into())
-            }
+        Ok(())
+    }
+
+    fn validate_context(&self, operation: &str) -> Result<(), ErrorContext> {
+        if self.session.active_profile.is_none() {
+            Err(ErrorContext::builder()
+                .error(error::Error::new("No active profile", "Profile Service", operation))
+                .suggested_action("Select a profile and try again")
+                .build())
+        } else if self.session.active_instance.is_none() {
+            return Err(ErrorContext::builder()
+                .error(error::Error::new("No active instance", "Profile Service", operation))
+                .suggested_action("Select an instance and try again")
+                .build());
+        } else {
+            Ok(())
         }
     }
 }

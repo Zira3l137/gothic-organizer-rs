@@ -1,4 +1,5 @@
 use std::path;
+use std::path::Path;
 
 use iced::Task;
 
@@ -6,44 +7,41 @@ use crate::app::message;
 use crate::app::session;
 use crate::app::state;
 use crate::core;
-use crate::core::services::ApplicationContext;
+use crate::error::ErrorContext;
 
 pub struct UiService<'a> {
     session: &'a mut session::ApplicationSession,
     state: &'a mut state::ApplicationState,
 }
 
-crate::impl_app_context!(UiService);
-
 impl<'a> UiService<'a> {
     pub fn new(session: &'a mut session::ApplicationSession, state: &'a mut state::ApplicationState) -> Self {
         Self { session, state }
     }
 
-    /// Reloads the directory displayed in the UI from the active profile directory.
-    /// If root is provided, it will be used instead.
-    ///
-    /// Emits an error message if the context could not be obtained.
-    pub fn reload_displayed_directory(&mut self, root: Option<path::PathBuf>) -> Task<message::Message> {
-        if self.session.active_profile.is_none() {
-            return Task::none();
+    pub fn reload_displayed_directory(&mut self, root: Option<&Path>) -> Task<message::Message> {
+        match self.try_reload_displayed_directory(root) {
+            Ok(()) => Task::none(),
+            Err(err) => Task::done(message::ErrorMessage::Handle(err).into()),
         }
+    }
 
-        let context = match self.context() {
-            Ok(ctx) => ctx,
-            Err(err) => {
-                tracing::error!("Failed to get context: {err}");
-                return Task::done(message::ErrorMessage::Handle(err.into()).into());
-            }
-        };
+    fn try_reload_displayed_directory(&mut self, root: Option<&Path>) -> Result<(), ErrorContext> {
+        if self.session.active_profile.is_none() {
+            return Ok(());
+        }
+        let active_profile_name = &self.session.active_profile.clone().unwrap();
+        let active_profile = self.state.profile.profiles.get_mut(active_profile_name).unwrap();
+        let active_instance_name = &self.session.active_instance.clone().unwrap();
+        let active_instance =
+            active_profile.instances.as_mut().unwrap().get_mut(active_instance_name).unwrap();
+        let active_instance_files = active_instance.files.as_ref();
+        let profile_path = active_profile.path.clone();
 
-        let profile_path = context.active_profile.path.clone();
-        let instance_files = context.instance_files().cloned();
-
-        let root_dir = root.unwrap_or(profile_path.clone());
+        let root_dir = root.unwrap_or(&profile_path);
         let mut current_directory_entries: Vec<(path::PathBuf, core::profile::FileMetadata)>;
 
-        if let Some(instance_files) = instance_files {
+        if let Some(instance_files) = active_instance_files.cloned() {
             self.session.files.clear();
             self.session.files.extend(instance_files);
         }
@@ -53,21 +51,19 @@ impl<'a> UiService<'a> {
             .files
             .iter()
             .filter_map(|(path, info)| {
-                (path.parent() == Some(&root_dir)).then_some((path.clone(), info.clone()))
+                (path.parent() == Some(root_dir)).then_some((path.clone(), info.clone()))
             })
             .collect::<Vec<(path::PathBuf, core::profile::FileMetadata)>>();
 
         current_directory_entries.sort_unstable_by_key(|(path, _)| !path.is_dir());
 
         tracing::info!("Reloading entries for UI from: \"{}\"", root_dir.display());
-        self.state.ui.current_dir = root_dir.clone();
+        self.state.ui.current_dir = root_dir.to_path_buf();
         self.state.ui.dir_entries = current_directory_entries;
 
-        Task::none()
+        Ok(())
     }
 
-    /// Sets the enabled state of a directory entry and its children to `state`. If a `path` is provided, it will be toggled
-    /// otherwise, all directory entries will be toggled.
     pub fn set_entry_state_with_children(&mut self, state: Option<bool>, path: Option<&path::Path>) {
         let paths_to_toggle: Vec<path::PathBuf> = path
             .map(|p| vec![p.to_path_buf()])

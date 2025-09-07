@@ -1,7 +1,8 @@
+use iced::Task;
+
 use crate::app::message;
 use crate::app::session;
 use crate::app::state;
-use crate::core::constants;
 use crate::core::profile::Lookup;
 use crate::core::services;
 use crate::lookup;
@@ -20,16 +21,14 @@ pub fn handle_profile_message(
 
         message::ProfileMessage::SetGameDir(path) => service.set_game_dir(path).map(message::Message::from),
 
-        message::ProfileMessage::AddInstance => {
-            service.add_instance_for_profile().map(message::Message::from)
-        }
+        message::ProfileMessage::AddInstance => service.add_instance().map(message::Message::from),
 
         message::ProfileMessage::SetActiveInstance(instance_name) => {
             let mut service = services::profile::ProfileService::new(session, state);
             service.switch_instance(&instance_name)
         }
 
-        message::ProfileMessage::RemoveActiveInstance => service.remove_instance_from_profile(),
+        message::ProfileMessage::RemoveActiveInstance => service.remove_instance(),
 
         message::ProfileMessage::UpdateInstanceNameField(input) => {
             state.profile.instance_name_field = input;
@@ -54,19 +53,28 @@ pub fn handle_mod_message(
             service.add_mod(path).map(message::Message::from)
         }
 
-        message::ModMessage::Toggle(name, new_state) => {
+        message::ModMessage::Toggle(index, new_state) => {
             let mut profile_service = services::profile::ProfileService::new(session, state);
-            if let Err(err) = profile_service.commit_session_files() {
-                tracing::warn!("Couldn't update instance cache: {err}");
-            }
-
-            let mut service = services::mods::ModService::new(session, state);
-            service.toggle_mod(name, new_state)
+            let commit_changes = profile_service.commit_session_files();
+            let mut mod_service = services::mods::ModService::new(session, state);
+            let toggle_mod = mod_service.toggle_mod(index, new_state);
+            commit_changes.chain(toggle_mod)
         }
 
-        message::ModMessage::Uninstall(name) => {
+        message::ModMessage::ToggleSelection(index) => {
+            if let Some(selected) = session.mod_selected
+                && selected == index
+            {
+                session.mod_selected = None;
+            } else {
+                session.mod_selected = Some(index);
+            }
+            Task::none()
+        }
+
+        message::ModMessage::Uninstall(index) => {
             let mut service = services::mods::ModService::new(session, state);
-            service.remove_mod(name).map(message::Message::from)
+            service.remove_mod(index).map(message::Message::from)
         }
 
         message::ModMessage::Reload => {
@@ -94,13 +102,11 @@ pub fn handle_ui_message(
     match message {
         message::UiMessage::UpdateActiveDir(path) => {
             let mut profile_service = services::profile::ProfileService::new(session, state);
-            if let Err(err) = profile_service.commit_session_files() {
-                tracing::warn!("Couldn't update instance cache: {err}");
-            }
-
+            let commit_changes = profile_service.commit_session_files();
             state.ui.current_dir = path.clone();
             let mut ui_service = services::ui::UiService::new(session, state);
-            ui_service.reload_displayed_directory(Some(path))
+            let reload_ui = ui_service.reload_displayed_directory(Some(&path));
+            commit_changes.chain(reload_ui)
         }
 
         message::UiMessage::ToggleFileEntry(entry_sate, path) => {
@@ -234,31 +240,21 @@ pub fn handle_system_message(
     message: message::SystemMessage,
 ) -> iced::Task<message::Message> {
     match message {
-        message::SystemMessage::OpenRepository => {
-            if let Err(err) = services::browser_open(constants::APP_REPOSITORY) {
-                tracing::error!("Error opening repository: {err}");
+        message::SystemMessage::ExecuteCommand(cmd, args) => {
+            tracing::info!("Executing command: {cmd} {}", args.join(" "));
+            let cmd_args = args.iter().map(String::as_str).collect::<Vec<_>>();
+            if let Err(err) = services::execute_cmd(&cmd, &cmd_args) {
+                tracing::error!("Error executing command: {err}");
             }
             iced::Task::none()
         }
 
         message::SystemMessage::ExitApplication => {
-            let mut error_task: iced::Task<message::Message> = iced::Task::none();
             let mut profile_service = services::profile::ProfileService::new(session, state);
-            if let Err(err) = profile_service.commit_session_files() {
-                tracing::error!("Failed to commit session files: {err}");
-                error_task = iced::Task::done(
-                    message::ErrorMessage::Handle(
-                        crate::error::ErrorContext::builder()
-                            .error(err)
-                            .suggested_action("Make sure the active profile is selected and valid")
-                            .build(),
-                    )
-                    .into(),
-                );
-            }
-
+            let commit_changes = profile_service.commit_session_files();
             let mut session_service = services::session::SessionService::new(session, state);
-            error_task.chain(session_service.exit_application())
+
+            commit_changes.chain(session_service.exit_application())
         }
 
         message::SystemMessage::Idle => iced::Task::none(),
