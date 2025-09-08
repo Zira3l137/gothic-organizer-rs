@@ -201,7 +201,7 @@ impl<'a> ProfileService<'a> {
         let cached_files = self.session.files.clone();
 
         tracing::info!("Updating Instance with Session files.");
-        active_instance.files = Some(cached_files);
+        active_instance.files = cached_files;
         Ok(())
     }
 
@@ -267,7 +267,7 @@ impl<'a> ProfileService<'a> {
             })
             .collect::<Lookup<path::PathBuf, profile::FileMetadata>>();
 
-        core::profile::Instance::default().with_name(name).with_files(Some(base_files))
+        core::profile::Instance::default().with_name(name).with_files(base_files)
     }
 
     fn validate_context(&self, operation: &str, ignore_instance: bool) -> Result<(), ErrorContext> {

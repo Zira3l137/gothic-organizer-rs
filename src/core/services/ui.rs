@@ -36,15 +36,14 @@ impl<'a> UiService<'a> {
         let active_instance_name = &self.session.active_instance.clone().unwrap();
         let active_instance =
             active_profile.instances.as_mut().unwrap().get_mut(active_instance_name).unwrap();
-        let active_instance_files = active_instance.files.as_ref();
         let profile_path = active_profile.path.clone();
 
         let root_dir = root.unwrap_or(&profile_path);
         let mut current_directory_entries: Vec<(path::PathBuf, core::profile::FileMetadata)>;
 
-        if let Some(instance_files) = active_instance_files.cloned() {
+        if !active_instance.files.is_empty() {
             self.session.files.clear();
-            self.session.files.extend(instance_files);
+            self.session.files.extend(active_instance.files.clone());
         }
 
         current_directory_entries = self

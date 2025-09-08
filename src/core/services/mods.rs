@@ -72,28 +72,32 @@ impl<'a> ModService<'a> {
         let mod_dst_path = mod_storage_dir.join(&mod_name);
         tracing::info!("Installing mod \"{}\"", mod_name);
 
-        let mod_info = self.get_mod_info(&mod_dst_path, &mod_name)?;
         let active_profile_name = self.session.active_profile.clone().unwrap();
         let active_instance_name = self.session.active_instance.clone().unwrap();
         let active_profile = self.state.profile.profiles.get_mut(&active_profile_name).unwrap();
         let active_profile_path = active_profile.path.clone();
         let active_instance =
             active_profile.instances.as_mut().unwrap().get_mut(&active_instance_name).unwrap();
-        let active_instance_mods = active_instance.mods.get_or_insert_default();
 
-        if active_instance_mods.iter().any(|m| m.name == mod_name) {
+        if active_instance.mods.iter().any(|m| m.name == mod_name) {
             tracing::warn!("Mod \"{}\" is already installed", mod_name);
             return Ok(());
         }
 
         Self::install_mod(mod_path, &mod_dst_path)?;
+        let mod_info = Self::get_mod_info(&mod_dst_path, &mod_name)?;
         Self::apply_mod_files(
-            active_instance.files.get_or_insert_default(),
-            active_instance.conflicts.get_or_insert_default(),
+            &mut active_instance.files,
+            &mut active_instance.conflicts,
+            &mut active_instance.load_order,
             &active_profile_path,
             &mod_info,
         );
-        active_instance.mods.get_or_insert_default().push(mod_info.clone());
+
+        active_instance.mods.push(mod_info.clone());
+        active_instance
+            .load_order
+            .insert(mod_info.name.clone(), active_instance.mods.len().saturating_sub(1));
 
         Ok(())
     }
@@ -105,18 +109,29 @@ impl<'a> ModService<'a> {
         let active_instance_name = &self.session.active_instance.clone().unwrap();
         let active_instance =
             active_profile.instances.as_mut().unwrap().get_mut(active_instance_name).unwrap();
-        let active_instance_files = active_instance.files.get_or_insert_default();
-        let instance_conflicts = active_instance.conflicts.get_or_insert_default();
+        let mut mods_snapshot = active_instance.mods.clone();
 
-        let removed_mod_info = active_instance.mods.as_mut().unwrap().remove(index);
+        let Some(target_mod_info) = active_instance.mods.get(index) else {
+            tracing::warn!("Mod with index {} not found", index);
+            return Ok(());
+        };
+        let target_mod_files = target_mod_info.files.clone();
+        let target_mod_path = target_mod_info.path.clone();
+        let target_mod_name = target_mod_info.name.clone();
+
         Self::undo_mod_files(
-            active_instance_files,
-            instance_conflicts,
+            &mut mods_snapshot,
+            &mut active_instance.files,
+            &mut active_instance.conflicts,
+            &mut active_instance.load_order,
             &active_profile.path,
-            &removed_mod_info,
+            target_mod_info,
         );
 
-        let mut errors: usize = removed_mod_info.files.iter().fold(0, |mut errors, (path, _)| {
+        active_instance.mods.remove(index);
+        active_instance.load_order.remove(&target_mod_name);
+
+        let mut errors: usize = target_mod_files.iter().fold(0, |mut errors, (path, _)| {
             let remove = if path.is_dir() { std::fs::remove_dir_all } else { std::fs::remove_file };
             if remove(path).is_err() {
                 errors += 1;
@@ -124,7 +139,7 @@ impl<'a> ModService<'a> {
             errors
         });
 
-        if std::fs::remove_dir_all(removed_mod_info.path).is_err() {
+        if std::fs::remove_dir_all(&target_mod_path).is_err() {
             errors += 1;
         }
 
@@ -147,19 +162,30 @@ impl<'a> ModService<'a> {
         let active_instance_name = &self.session.active_instance.clone().unwrap();
         let active_instance =
             active_profile.instances.as_mut().unwrap().get_mut(active_instance_name).unwrap();
-        let active_instance_mods = active_instance.mods.as_mut().unwrap();
         let profile_path = active_profile.path.clone();
-        let mod_info = active_instance_mods.get_mut(mod_index).unwrap();
+        let mut mods_snapshot = active_instance.mods.clone();
+        let mod_info = active_instance.mods.get_mut(mod_index).unwrap();
 
         tracing::info!("{} mod \"{}\"", mod_info.name, if enabled { "Enabling" } else { "Disabling" });
         mod_info.enabled = enabled;
-        let action = if enabled { Self::apply_mod_files } else { Self::undo_mod_files };
-        action(
-            active_instance.files.get_or_insert_default(),
-            active_instance.conflicts.get_or_insert_default(),
-            &profile_path,
-            mod_info,
-        );
+        if enabled {
+            Self::apply_mod_files(
+                &mut active_instance.files,
+                &mut active_instance.conflicts,
+                &mut active_instance.load_order,
+                &profile_path,
+                mod_info,
+            );
+        } else {
+            Self::undo_mod_files(
+                &mut mods_snapshot,
+                &mut active_instance.files,
+                &mut active_instance.conflicts,
+                &mut active_instance.load_order,
+                &profile_path,
+                mod_info,
+            );
+        }
 
         Ok(())
     }
@@ -174,13 +200,13 @@ impl<'a> ModService<'a> {
         let active_profile = self.state.profile.profiles.get_mut(&active_profile_name).unwrap();
         let active_instance =
             active_profile.instances.as_mut().unwrap().get_mut(&active_instance_name).unwrap();
-        let active_instance_mods = active_instance.mods.get_or_insert_default();
         let profile_path = active_profile.path.clone();
 
-        for mod_info in active_instance_mods.iter().filter(|m| m.enabled) {
+        for mod_info in active_instance.mods.iter().filter(|m| m.enabled) {
             Self::apply_mod_files(
-                active_instance.files.get_or_insert_default(),
-                active_instance.conflicts.get_or_insert_default(),
+                &mut active_instance.files,
+                &mut active_instance.conflicts,
+                &mut active_instance.load_order,
                 &profile_path,
                 mod_info,
             );
@@ -190,37 +216,10 @@ impl<'a> ModService<'a> {
     }
 
     fn undo_mod_files(
+        instance_mods: &mut [core::profile::ModInfo],
         instance_files: &mut Lookup<PathBuf, FileMetadata>,
         instance_conflicts: &mut Conflicts,
-        profile_path: &path::Path,
-        mod_info: &core::profile::ModInfo,
-    ) {
-        mod_info.files.iter().for_each(|(path, _)| {
-            let Ok(relative_path) = path.strip_prefix(&mod_info.path) else { return };
-            let dst_path = profile_path.join(relative_path);
-            let conflict_list = instance_conflicts.entries.entry(dst_path.clone()).or_default();
-
-            let Some(removed_file_info) = instance_files.remove(&dst_path) else {
-                return;
-            };
-
-            conflict_list.retain(|f| f != &removed_file_info);
-            let Some(original_file) = conflict_list.pop() else {
-                return;
-            };
-
-            if conflict_list.is_empty() {
-                instance_conflicts.entries.remove(&dst_path);
-            }
-
-            tracing::info!("Restoring original {}", dst_path.display());
-            instance_files.insert(dst_path, original_file);
-        });
-    }
-
-    fn apply_mod_files(
-        instance_files: &mut Lookup<PathBuf, FileMetadata>,
-        instance_conflicts: &mut Conflicts,
+        load_order: &mut Lookup<String, usize>,
         profile_path: &path::Path,
         mod_info: &core::profile::ModInfo,
     ) {
@@ -229,26 +228,132 @@ impl<'a> ModService<'a> {
             let dst_path = profile_path.join(relative_path);
             let target_file_info = mod_file_info.clone().with_target_path(&dst_path);
 
-            let Some(existing_file_info) = instance_files.insert(dst_path.clone(), target_file_info.clone())
-            else {
+            let Some(conflict_list) = instance_conflicts.entries.get_mut(&dst_path) else {
+                if let Some(current_file) = instance_files.get(&dst_path) {
+                    if current_file.parent_name == mod_file_info.parent_name {
+                        instance_files.remove(&dst_path);
+                    }
+                }
                 return;
             };
 
-            tracing::warn!("{} already exists, overwriting", dst_path.display());
-            let conflict_list = instance_conflicts.entries.entry(dst_path.clone()).or_default();
-            if !conflict_list.contains(&existing_file_info) {
-                conflict_list.push(existing_file_info);
+            let Some(existing_file_info) = instance_files.get(&dst_path) else {
+                return;
+            };
+
+            let Some(existing_file_priority) = load_order.get(&existing_file_info.parent_name) else {
+                tracing::warn!("Could not find file priority for {}, skipping", dst_path.display());
+                return;
+            };
+
+            let Some(target_file_priority) = load_order.get(&target_file_info.parent_name) else {
+                tracing::warn!("Could not find file priority for {}, skipping", dst_path.display());
+                return;
+            };
+
+            let existing_file_parent_active = {
+                tracing::debug!("{instance_mods:?}");
+                let existing_file_parent_mod = instance_mods.get(*existing_file_priority).unwrap();
+                existing_file_parent_mod.enabled
+            };
+
+            match existing_file_priority.cmp(target_file_priority) {
+                std::cmp::Ordering::Less => {
+                    // Target mod has higher priority but isn't active - just remove from conflicts
+                    conflict_list.remove(target_file_priority);
+                }
+
+                std::cmp::Ordering::Greater => {
+                    // Target mod has lower priority than current - just remove from conflicts
+                    conflict_list.remove(target_file_priority);
+                }
+
+                std::cmp::Ordering::Equal => {
+                    // This mod's file is currently active - remove it and find replacement
+                    instance_files.remove(&dst_path).unwrap();
+                    conflict_list.remove(existing_file_priority);
+
+                    if existing_file_parent_active {
+                        if let Some((_, original_file)) =
+                            conflict_list.iter().max_by_key(|(priority, _)| *priority)
+                        {
+                            tracing::info!("Restoring previous version of {}", dst_path.display());
+                            instance_files.insert(dst_path.clone(), original_file.clone());
+                        }
+                    }
+                }
             }
-            conflict_list.push(target_file_info);
+
+            // Clean up conflict lists with 1 or 0 entries (no actual conflict)
+            if conflict_list.len() <= 1 {
+                instance_conflicts.entries.remove(&dst_path);
+            }
         });
     }
 
-    fn get_mod_info(&self, mod_path: &Path, mod_name: &str) -> Result<core::profile::ModInfo, ErrorContext> {
+    fn apply_mod_files(
+        instance_files: &mut Lookup<PathBuf, FileMetadata>,
+        instance_conflicts: &mut Conflicts,
+        load_order: &mut Lookup<String, usize>,
+        profile_path: &path::Path,
+        mod_info: &core::profile::ModInfo,
+    ) {
+        mod_info.files.iter().for_each(|(path, mod_file_info)| {
+            let Ok(relative_path) = path.strip_prefix(&mod_info.path) else { return };
+            let dst_path = profile_path.join(relative_path);
+            let target_file_info = mod_file_info.clone().with_target_path(&dst_path);
+
+            let Some(existing_file_info) = instance_files.get(&dst_path) else {
+                instance_files.insert(dst_path.clone(), target_file_info.clone());
+                return;
+            };
+
+            let Some(existing_file_priority) = load_order.get(&existing_file_info.parent_name) else {
+                tracing::warn!("Could not find file priority for {}, skipping", dst_path.display());
+                return;
+            };
+
+            let Some(target_file_priority) = load_order.get(&target_file_info.parent_name) else {
+                tracing::warn!("Could not find file priority for {}, skipping", dst_path.display());
+                return;
+            };
+
+            let conflict_list = instance_conflicts.entries.entry(dst_path.clone()).or_default();
+            match existing_file_priority.cmp(target_file_priority) {
+                std::cmp::Ordering::Greater => {
+                    // Existing file has higher priority - add target to conflicts but don't replace
+                    conflict_list.insert(*target_file_priority, target_file_info);
+                    // Also ensure existing file is tracked in conflicts
+                    if !conflict_list.contains_key(existing_file_priority) {
+                        conflict_list.insert(*existing_file_priority, existing_file_info.clone());
+                    }
+                }
+                std::cmp::Ordering::Less => {
+                    // Target file has higher priority - replace existing and add both to conflicts
+                    tracing::warn!("{} already exists, overwriting", dst_path.display());
+                    conflict_list.insert(*existing_file_priority, existing_file_info.clone());
+                    conflict_list.insert(*target_file_priority, target_file_info.clone());
+                    instance_files.insert(dst_path.clone(), target_file_info.clone());
+                }
+                std::cmp::Ordering::Equal => {
+                    // Same priority - this shouldn't happen if load_order is properly managed
+                    tracing::warn!(
+                        "Mods {} and {} have same priority for {}, keeping existing",
+                        existing_file_info.parent_name,
+                        target_file_info.parent_name,
+                        dst_path.display()
+                    );
+                }
+            }
+        });
+    }
+
+    fn get_mod_info(mod_path: &Path, mod_name: &str) -> Result<core::profile::ModInfo, ErrorContext> {
         let get_file_info = |path: &path::Path| {
             core::profile::FileMetadata::default()
                 .with_enabled(true)
                 .with_source_path(path)
-                .with_parent_name(mod_name.to_string())
+                .with_parent_name(mod_name)
         };
 
         let mod_files = ignore::WalkBuilder::new(mod_path)

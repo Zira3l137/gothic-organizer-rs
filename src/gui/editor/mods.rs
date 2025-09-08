@@ -69,15 +69,13 @@ pub fn mods_menu<'a>(
         disabled_background = palette_ext.secondary.weak.color
     )
     .on_press_maybe(match app.session.mod_selected {
-        Some(mod_index) => {
-            instance_selected.and_then(|i| i.mods.as_ref()).and_then(|m| m.get(mod_index)).map(|m| {
-                message::SystemMessage::ExecuteCommand(
-                    OPEN_PATH_COMMAND.to_owned(),
-                    vec![m.path.to_string_lossy().into_owned()],
-                )
-                .into()
-            })
-        }
+        Some(mod_index) => instance_selected.map(|i| &i.mods).and_then(|m| m.get(mod_index)).map(|m| {
+            message::SystemMessage::ExecuteCommand(
+                OPEN_PATH_COMMAND.to_owned(),
+                vec![m.path.to_string_lossy().into_owned()],
+            )
+            .into()
+        }),
         None => None,
     })
     .into();
@@ -123,10 +121,10 @@ pub fn mods_view<'a>(
     current_instance: Option<&'a crate::core::profile::Instance>,
     palette_ext: &palette::Extended,
 ) -> iced::Element<'a, message::Message> {
-    if let Some(instance) = current_instance
-        && let Some(mods) = &instance.mods
-    {
-        mods.iter()
+    if let Some(instance) = current_instance {
+        instance
+            .mods
+            .iter()
             .enumerate()
             .fold(widget::Column::new(), |column, (mod_index, mod_info)| {
                 let toggle: iced::Element<'a, message::Message> = styled_button!(

@@ -98,7 +98,7 @@ pub fn file_view<'a>(
         .iter()
         .fold(widget::Column::new(), |column, (path, info)| {
             let file_name = path.file_name().unwrap().to_string_lossy().to_string();
-            let parent_name = info.parent_name.clone().unwrap_or(String::from("Default"));
+            let parent_name = info.parent_name.clone();
             let tooltip_text = widget::text(format!("Supplied by: {parent_name}"));
             let is_dir = path.is_dir();
             let icon_path = match &is_dir {

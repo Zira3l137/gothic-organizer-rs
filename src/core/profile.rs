@@ -59,14 +59,21 @@ impl Profile {
 #[derive(Debug, Default, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Instance {
     pub name: String,
-    pub files: Option<Lookup<PathBuf, FileMetadata>>,
-    pub conflicts: Option<Conflicts>,
-    pub mods: Option<Vec<ModInfo>>,
+    pub files: Lookup<PathBuf, FileMetadata>,
+    pub conflicts: Conflicts,
+    pub mods: Vec<ModInfo>,
+    pub load_order: Lookup<String, usize>,
 }
 
 impl Instance {
-    pub fn new(name: &str, files: Option<Lookup<PathBuf, FileMetadata>>, mods: Option<Vec<ModInfo>>) -> Self {
-        Self { name: name.to_owned(), files, conflicts: None, mods }
+    pub fn new(name: &str, files: Lookup<PathBuf, FileMetadata>, mods: Vec<ModInfo>) -> Self {
+        Self {
+            name: name.to_owned(),
+            files,
+            conflicts: Conflicts::default(),
+            mods,
+            load_order: Lookup::default(),
+        }
     }
 
     pub fn with_name(mut self, name: &str) -> Self {
@@ -74,40 +81,45 @@ impl Instance {
         self
     }
 
-    pub fn with_files(mut self, files: Option<Lookup<PathBuf, FileMetadata>>) -> Self {
+    pub fn with_files(mut self, files: Lookup<PathBuf, FileMetadata>) -> Self {
         self.files = files;
         self
     }
 
-    pub fn with_mods(mut self, mods: Option<Vec<ModInfo>>) -> Self {
+    pub fn with_mods(mut self, mods: Vec<ModInfo>) -> Self {
         self.mods = mods;
         self
     }
 
-    pub fn with_conflicts_files(mut self, conflicts_files: Option<Conflicts>) -> Self {
-        self.conflicts = conflicts_files;
+    pub fn with_conflicts(mut self, conflicts: Conflicts) -> Self {
+        self.conflicts = conflicts;
+        self
+    }
+
+    pub fn with_load_order(mut self, load_order: Lookup<String, usize>) -> Self {
+        self.load_order = load_order;
         self
     }
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Conflicts {
-    pub entries: Lookup<PathBuf, Vec<FileMetadata>>,
+    pub entries: Lookup<PathBuf, Lookup<usize, FileMetadata>>,
 }
 
 impl Conflicts {
     pub fn new<T>(entries: T) -> Self
     where
-        T: Into<Lookup<PathBuf, Vec<FileMetadata>>>,
+        T: Into<Lookup<PathBuf, Lookup<usize, FileMetadata>>>,
     {
         Self { entries: entries.into() }
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&PathBuf, &Vec<FileMetadata>)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&PathBuf, &Lookup<usize, FileMetadata>)> {
         self.entries.iter()
     }
 
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = (&PathBuf, &mut Vec<FileMetadata>)> {
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = (&PathBuf, &mut Lookup<usize, FileMetadata>)> {
         self.entries.iter_mut()
     }
 
@@ -155,16 +167,16 @@ pub struct FileMetadata {
     pub enabled: bool,
     pub source_path: PathBuf,
     pub target_path: PathBuf,
-    pub parent_name: Option<String>,
+    pub parent_name: String,
 }
 
 impl FileMetadata {
-    pub fn new(enabled: bool, source_path: &Path, target_path: &Path, parent_name: Option<String>) -> Self {
+    pub fn new(enabled: bool, source_path: &Path, target_path: &Path, parent_name: &str) -> Self {
         Self {
             enabled,
             source_path: source_path.to_owned(),
             target_path: target_path.to_owned(),
-            parent_name,
+            parent_name: parent_name.to_owned(),
         }
     }
 
@@ -183,8 +195,8 @@ impl FileMetadata {
         self
     }
 
-    pub fn with_parent_name(mut self, parent_name: String) -> Self {
-        self.parent_name = Some(parent_name);
+    pub fn with_parent_name(mut self, parent_name: &str) -> Self {
+        self.parent_name = parent_name.to_owned();
         self
     }
 }
