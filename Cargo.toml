@@ -5,7 +5,7 @@ edition = "2024"
 authors = ["Zira3l137"]
 repository = "https://github.com/Zira3l137/gothic-organizer-rs"
 
-[build-dependencies]
+[target.'cfg(windows)'.build-dependencies]
 winres = "0.1.12"
 
 [dependencies]
@@ -18,7 +18,7 @@ hashbrown = { version = "0.16.0", features = ["serde"] }
 ahash = { version = "0.8.12", features = ["serde"] }
 ignore = "0.4.23"
 clap = { version = "4.5.40", features = ['derive'] }
-zip = "4.2.0"
+zip = "5.0.0"
 chrono = { version = "0.4.41", features = ['serde'] }
 tracing = "0.1.41"
 uuid = { version = "1.18.1", features = ["serde", "v4"] }
