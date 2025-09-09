@@ -1,3 +1,4 @@
+#[cfg(windows)]
 fn main() {
     let mut res = winres::WindowsResource::new();
     res.set_icon("resources/icon.ico");
@@ -5,3 +6,6 @@ fn main() {
         println!("cargo:warning=Failed to compile resource file: {e}");
     };
 }
+
+#[cfg(not(windows))]
+fn main() {}
