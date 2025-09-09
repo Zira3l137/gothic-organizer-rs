@@ -49,8 +49,11 @@ pub fn handle_mod_message(
 ) -> iced::Task<message::Message> {
     match message {
         message::ModMessage::Add(path) => {
-            let mut service = services::mods::ModService::new(session, state);
-            service.add_mod(path).map(message::Message::from)
+            let mut profile_service = services::profile::ProfileService::new(session, state);
+            let commit_changes = profile_service.commit_session_files();
+            let mut mod_service = services::mods::ModService::new(session, state);
+            let add_mod = mod_service.add_mod(path).map(message::Message::from);
+            commit_changes.chain(add_mod)
         }
 
         message::ModMessage::Toggle(index, new_state) => {

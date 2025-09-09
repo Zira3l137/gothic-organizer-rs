@@ -75,7 +75,6 @@ impl<'a> ModService<'a> {
         let active_profile_name = self.session.active_profile.clone().unwrap();
         let active_instance_name = self.session.active_instance.clone().unwrap();
         let active_profile = self.state.profile.profiles.get_mut(&active_profile_name).unwrap();
-        let active_profile_path = active_profile.path.clone();
         let active_instance =
             active_profile.instances.as_mut().unwrap().get_mut(&active_instance_name).unwrap();
 
@@ -86,18 +85,17 @@ impl<'a> ModService<'a> {
 
         Self::install_mod(mod_path, &mod_dst_path)?;
         let mod_info = Self::get_mod_info(&mod_dst_path, &mod_name)?;
-        Self::apply_mod_files(
-            &mut active_instance.files,
-            &mut active_instance.conflicts,
-            &mut active_instance.load_order,
-            &active_profile_path,
-            &mod_info,
-        );
-
         active_instance.mods.push(mod_info.clone());
         active_instance
             .load_order
             .insert(mod_info.name.clone(), active_instance.mods.len().saturating_sub(1));
+        Self::apply_mod_files(
+            &mut active_instance.files,
+            &mut active_instance.conflicts,
+            &mut active_instance.load_order,
+            &active_profile.path,
+            &mod_info,
+        );
 
         Ok(())
     }
@@ -252,7 +250,6 @@ impl<'a> ModService<'a> {
             };
 
             let existing_file_parent_active = {
-                tracing::debug!("{instance_mods:?}");
                 let existing_file_parent_mod = instance_mods.get(*existing_file_priority).unwrap();
                 existing_file_parent_mod.enabled
             };

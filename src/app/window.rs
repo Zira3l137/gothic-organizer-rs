@@ -16,10 +16,13 @@ pub enum ApplicationWindow {
     #[default]
     #[display("editor")]
     Editor,
+
     #[display("options")]
     Options,
+
     #[display("conflicts")]
     Conflicts,
+
     #[display("logs")]
     Logs,
 }
@@ -69,8 +72,7 @@ impl ApplicationWindow {
         match self {
             ApplicationWindow::Editor => crate::gui::editor::editor_view(app),
             ApplicationWindow::Options => crate::gui::options::options_view(app),
-            // TODO: conflicts window
-            ApplicationWindow::Conflicts => crate::gui::editor::editor_view(app),
+            ApplicationWindow::Conflicts => crate::gui::conflicts::conflicts_view(app),
             ApplicationWindow::Logs => crate::gui::logs::logs_view(app),
         }
     }

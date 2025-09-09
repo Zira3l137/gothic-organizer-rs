@@ -1,3 +1,4 @@
+pub mod conflicts;
 pub mod custom_widgets;
 pub mod editor;
 pub mod helpers;

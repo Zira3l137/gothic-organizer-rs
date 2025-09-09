@@ -112,7 +112,8 @@ impl<'a> ProfileService<'a> {
             return Ok(());
         }
 
-        let new_instance = Self::create_new_instance(instance_name, &profile_path);
+        let mut new_instance = Self::create_new_instance(instance_name, &profile_path);
+        new_instance.load_order.insert(instance_name.to_owned(), 0);
         tracing::info!("Adding instance: {instance_name}");
         active_profile_instances.insert(instance_name.to_owned(), new_instance);
         let instance_names = active_profile_instances.keys().cloned().collect();
@@ -261,6 +262,7 @@ impl<'a> ProfileService<'a> {
                     profile::FileMetadata::default()
                         .with_source_path(e.path())
                         .with_target_path(e.path())
+                        .with_parent_name(name)
                         .with_enabled(true),
                 )),
                 _ => None,

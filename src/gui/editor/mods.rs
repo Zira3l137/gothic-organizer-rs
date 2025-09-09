@@ -3,6 +3,7 @@ use iced::theme::palette;
 use iced::widget;
 
 use crate::app::message;
+use crate::app::window::ApplicationWindow;
 use crate::core::constants::OPEN_PATH_COMMAND;
 use crate::core::profile;
 use crate::styled_button;
@@ -93,7 +94,9 @@ pub fn mods_menu<'a>(
         pressed_background = palette_ext.secondary.base.color,
         disabled_background = palette_ext.secondary.weak.color
     )
-    .on_press_maybe(app.session.mod_selected.map(|_| message::SystemMessage::Idle.into())) // TODO: Implement conflicts window
+    .on_press_maybe(
+        app.session.mod_selected.map(|_| message::WindowMessage::Open(ApplicationWindow::Conflicts).into()),
+    )
     .into();
 
     let group_mod_controls = styled_container!(
